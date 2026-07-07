@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>경부선 기상 취약구간 · API / Mock 콘솔</title>
+<style>
+  :root{
+    --paper:#f4f2ec; --ink:#14181f; --rail:#2b3440; --line-on:#d9d4c7;
+    --muted:#8a9099; --hair:#dcd7cb;
+    --lamp-ref:#3fa66a;   /* 참조·목록 (정적) */
+    --lamp-agg:#e0a43b;   /* 취약도 집계 */
+    --lamp-live:#d1495b;  /* 실시간 특보 */
+    --chip:#eae5d9;
+    --mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;
+    --disp:"Helvetica Neue",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--paper); color:var(--ink);
+    font-family:var(--disp);
+    -webkit-font-smoothing:antialiased;
+    line-height:1.5;
+  }
+  .wrap{max-width:900px;margin:0 auto;padding:40px 24px 80px}
+
+  /* header */
+  header{border-bottom:2px solid var(--ink);padding-bottom:20px;margin-bottom:8px}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+  h1{font-size:clamp(26px,4.5vw,40px);line-height:1.08;margin:0;font-weight:800;letter-spacing:-.01em}
+  h1 small{display:block;font-size:.42em;font-weight:600;color:var(--rail);letter-spacing:0;margin-top:8px}
+  .range{display:inline-flex;align-items:center;gap:8px;margin-top:16px;font-family:var(--mono);font-size:12.5px;color:var(--rail);background:var(--chip);border:1px solid var(--hair);padding:5px 10px;border-radius:2px}
+  .range b{color:var(--ink)}
+
+  /* rail strip */
+  .rail{margin:26px 0 34px;overflow-x:auto;padding-bottom:6px}
+  .rail-inner{display:flex;align-items:flex-start;min-width:max-content;position:relative}
+  .stop{display:flex;flex-direction:column;align-items:center;width:96px;position:relative}
+  .stop::before{content:"";position:absolute;top:7px;left:50%;right:-50%;height:2px;background:var(--rail)}
+  .stop:last-child::before{display:none}
+  .dot{width:16px;height:16px;border-radius:50%;background:var(--paper);border:2px solid var(--rail);z-index:1}
+  .stop.key .dot{background:var(--rail)}
+  .stop span{font-family:var(--mono);font-size:12px;margin-top:9px;white-space:nowrap;color:var(--rail)}
+  .stop.key span{color:var(--ink);font-weight:700}
+
+  /* legend */
+  .legend{display:flex;flex-wrap:wrap;gap:16px 22px;margin:0 0 14px;font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .legend b{color:var(--ink);font-weight:600}
+  .lamp{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  .l-ref{background:var(--lamp-ref)} .l-agg{background:var(--lamp-agg)} .l-live{background:var(--lamp-live)}
+
+  /* board */
+  .board{border:1px solid var(--rail);border-radius:4px;overflow:hidden;background:#fff}
+  .row{display:grid;grid-template-columns:14px 62px 1fr auto;gap:14px;align-items:center;
+       padding:15px 18px;border-bottom:1px solid var(--hair);cursor:default}
+  .row:last-of-type{border-bottom:none}
+  .row .lamp{margin:0}
+  .method{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.05em;color:var(--muted)}
+  .path{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--ink);word-break:break-all}
+  .path .q{color:var(--muted);font-weight:400}
+  .desc{grid-column:3;font-size:13px;color:var(--rail);margin-top:3px}
+  .actions{display:flex;gap:8px;grid-column:4;grid-row:1}
+  .btn{font-family:var(--mono);font-size:12px;border:1px solid var(--rail);background:var(--paper);
+       color:var(--ink);padding:6px 11px;border-radius:3px;cursor:pointer;text-decoration:none;white-space:nowrap;transition:background .12s,color .12s}
+  .btn:hover{background:var(--rail);color:var(--paper)}
+  .btn[disabled]{opacity:.4;cursor:not-allowed;border-style:dashed}
+  .btn[disabled]:hover{background:var(--paper);color:var(--ink)}
+  pre{grid-column:1/-1;margin:12px 0 0;padding:14px 16px;background:var(--ink);color:#e8eef4;
+      font-family:var(--mono);font-size:12.5px;line-height:1.55;border-radius:4px;overflow-x:auto;max-height:340px}
+
+  footer{margin-top:34px;padding-top:20px;border-top:1px solid var(--hair);font-size:12.5px;color:var(--muted);font-family:var(--mono);line-height:1.7}
+  footer code{background:var(--chip);padding:1px 6px;border-radius:2px;color:var(--rail)}
+  a.inline{color:var(--rail)}
+
+  @media (max-width:640px){
+    .row{grid-template-columns:14px 1fr;row-gap:8px}
+    .method{grid-column:2;grid-row:1}
+    .path{grid-column:1/-1;grid-row:2}
+    .desc{grid-column:1/-1;grid-row:3}
+    .actions{grid-column:1/-1;grid-row:4;justify-content:flex-start}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">CONTRACT_V5 · source of truth</p>
+    <h1>경부선 기상 취약구간
+      <small>사전 점검 대시보드 — API / Mock 콘솔</small>
+    </h1>
+    <div class="range">데이터 기준 · <b>철도 실적 최근 3개월</b> · 실적은 1일 지연(실시간 아님)</div>
+  </header>
+
+  <!-- 경부선 정차역 (subject) -->
+  <nav class="rail" aria-label="경부선 정차역 순서">
+    <div class="rail-inner">
+      <div class="stop key"><span class="dot"></span><span>서울</span></div>
+      <div class="stop"><span class="dot"></span><span>영등포</span></div>
+      <div class="stop"><span class="dot"></span><span>수원</span></div>
+      <div class="stop"><span class="dot"></span><span>천안</span></div>
+      <div class="stop key"><span class="dot"></span><span>대전</span></div>
+      <div class="stop"><span class="dot"></span><span>김천(구미)</span></div>
+      <div class="stop key"><span class="dot"></span><span>동대구</span></div>
+      <div class="stop"><span class="dot"></span><span>밀양</span></div>
+      <div class="stop key"><span class="dot"></span><span>부산</span></div>
+    </div>
+  </nav>
+
+  <div class="legend">
+    <span><span class="lamp l-ref"></span><b>참조·목록</b> 정적 기준</span>
+    <span><span class="lamp l-agg"></span><b>취약도 집계</b> 3개월 산출</span>
+    <span><span class="lamp l-live"></span><b>실시간 특보</b> 현재 발효</span>
+  </div>
+
+  <div class="board" id="board"></div>
+
+  <footer>
+    이 페이지의 응답은 <b>CONTRACT_V5 §5</b> 모양 그대로의 <b>mock</b>입니다.
+    C는 이 URL로 화면을 만들고, 백엔드 완성 후 <code>base</code>만 실제 엔드포인트로 교체하면 됩니다.<br>
+    현재 base = <code id="base"></code><br>
+    <a class="inline" href="./CONTRACT.md">CONTRACT.md</a> · mock 파일: <code>/mock/*.json</code>
+  </footer>
+</div>
+
+<script>
+  const base = new URL('.', location.href).href;
+  document.getElementById('base').textContent = base;
+
+  // 램프 종류(kind)는 실제 성격을 인코딩: 참조 / 집계 / 실시간
+  const endpoints = [
+    { kind:'ref',  path:'/lines', mock:'lines.json',
+      desc:'노선·정차역 목록. 필터 선택지의 기준.' },
+    { kind:'agg',  path:'/vulnerability/segments', q:'?line=경부선&alert_type=호우&alert_level=경보&train_type=all', mock:'vulnerability_segments.json',
+      desc:'역간 구간 취약도(신규 지연). avg_delay_incr 내림차순 정렬.' },
+    { kind:'agg',  path:'/vulnerability/stations', q:'?line=경부선&alert_type=폭염&alert_level=경보', mock:'vulnerability_stations.json',
+      desc:'역 단위 취약도. baseline 대비 delta_delay 포함.' },
+    { kind:'agg',  path:'/heatmap', q:'?line=경부선&alert_type=호우', mock:'heatmap.json',
+      desc:'지도용 노드/엣지 vuln(0~1).' },
+    { kind:'agg',  path:'/checklist', q:'?line=경부선', mock:'checklist.json',
+      desc:'우선 점검 Top-N. 현재 발효 특보 반영.' },
+    { kind:'live', path:'/alerts/active', q:'?line=경부선', mock:'alerts_active.json',
+      desc:'현재 발효 특보 + 영향 구간. 상단 배너 실시간 소스.' },
+    { kind:'agg',  path:'/station/{code}', mock:null,
+      desc:'역 상세(특보별 요약 + 최근 사례). 경로 파라미터 — 백엔드 전용.' },
+    { kind:'agg',  path:'/segment/{from}/{to}', mock:null,
+      desc:'구간 상세. 경로 파라미터 — 백엔드 전용.' },
+  ];
+
+  const board = document.getElementById('board');
+  const lampClass = { ref:'l-ref', agg:'l-agg', live:'l-live' };
+
+  endpoints.forEach((e,i)=>{
+    const row = document.createElement('div');
+    row.className = 'row';
+    const q = e.q ? `<span class="q">${e.q}</span>` : '';
+    const open = e.mock
+      ? `<a class="btn" href="./mock/${e.mock}" target="_blank" rel="noopener">열기</a>`
+      : `<button class="btn" disabled title="정적 mock 없음(경로 파라미터)">열기</button>`;
+    const preview = e.mock
+      ? `<button class="btn" data-i="${i}">미리보기</button>`
+      : '';
+    row.innerHTML = `
+      <span class="lamp ${lampClass[e.kind]}"></span>
+      <span class="method">GET</span>
+      <span class="path">${e.path}${q}</span>
+      <div class="actions">${open}${preview}</div>
+      <div class="desc">${e.desc}</div>`;
+    board.appendChild(row);
+  });
+
+  board.addEventListener('click', async (ev)=>{
+    const btn = ev.target.closest('button[data-i]');
+    if(!btn) return;
+    const e = endpoints[btn.dataset.i];
+    const row = btn.closest('.row');
+    let pre = row.querySelector('pre');
+    if(pre){ pre.remove(); btn.textContent='미리보기'; return; }
+    btn.textContent='로딩…';
+    try{
+      const res = await fetch(`./mock/${e.mock}`);
+      const json = await res.json();
+      pre = document.createElement('pre');
+      pre.textContent = JSON.stringify(json, null, 2);
+      row.appendChild(pre);
+      btn.textContent='닫기';
+    }catch(err){
+      pre = document.createElement('pre');
+      pre.textContent = '불러오기 실패: ' + err.message + '\n로컬에서 file:// 로 열면 fetch가 막힙니다. Pages 배포 후 확인하세요.';
+      row.appendChild(pre);
+      btn.textContent='닫기';
+    }
+  });
+</script>
+</body>
+</html>
