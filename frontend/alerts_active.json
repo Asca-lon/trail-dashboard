@@ -1,0 +1,25 @@
+{
+  "line": "경부선",
+  "updated_at": "2026-07-07T14:30:00+09:00",
+  "active": [
+    {
+      "region_name": "대전",
+      "alert_type": "호우",
+      "alert_level": "경보",
+      "since": "2026-07-07T13:10:00+09:00",
+      "affected": [
+        { "type": "segment", "from": "대전", "to": "김천(구미)", "vuln_rank": 1, "note": "호우 경보 시 평균 +14.6분" },
+        { "type": "station", "station": "대전", "vuln_rank": 1, "note": "호우 경보 시 지연율 44%" }
+      ]
+    },
+    {
+      "region_name": "동대구",
+      "alert_type": "폭염",
+      "alert_level": "주의보",
+      "since": "2026-07-07T11:00:00+09:00",
+      "affected": [
+        { "type": "station", "station": "동대구", "vuln_rank": 2, "note": "폭염 경보 시 평균 +10.2분" }
+      ]
+    }
+  ]
+}

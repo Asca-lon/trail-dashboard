@@ -1,0 +1,9 @@
+{
+  "line": "경부선",
+  "items": [
+    { "rank": 1, "target": "대전→김천(구미) 구간", "reason": "호우 경보 시 평균 +14.6분", "avg_delay_incr": 14.6, "sample_n": 37 },
+    { "rank": 2, "target": "천안→대전 구간",       "reason": "호우 경보 시 평균 +11.3분", "avg_delay_incr": 11.3, "sample_n": 42 },
+    { "rank": 3, "target": "대전역",              "reason": "폭염 경보 시 지연율 44%",   "avg_delay_incr": 8.9,  "sample_n": 61 },
+    { "rank": 4, "target": "영등포→수원 구간",     "reason": "호우 경보 시 평균 +9.2분",  "avg_delay_incr": 9.2,  "sample_n": 51 }
+  ]
+}
