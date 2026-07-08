@@ -28,3 +28,6 @@ results/
 .DS_Store
 .idea/
 .vscode/
+
+# ── 로컬 데이터베이스 ──
+*.db

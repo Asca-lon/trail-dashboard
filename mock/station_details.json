@@ -1,0 +1,15 @@
+{
+  "station": "대전",
+  "by_alert": [
+    { "alert_type": "호우", "alert_level": "경보",   "avg_delay": 15.2, "sample_n": 34 },
+    { "alert_type": "폭염", "alert_level": "경보",   "avg_delay": 12.7, "sample_n": 61 },
+    { "alert_type": "호우", "alert_level": "주의보", "avg_delay": 8.4,  "sample_n": 52 },
+    { "alert_type": "폭염", "alert_level": "주의보", "avg_delay": 6.1,  "sample_n": 70 }
+  ],
+  "cases": [
+    { "date": "2026-06-28", "alert_type": "호우", "delay_min": 22 },
+    { "date": "2026-06-22", "alert_type": "폭염", "delay_min": 15 },
+    { "date": "2026-06-15", "alert_type": "호우", "delay_min": 11 },
+    { "date": "2026-06-09", "alert_type": null,   "delay_min": 7 }
+  ]
+}

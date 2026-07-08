@@ -21,6 +21,9 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
 from models import (
     LinesResponse, SegmentsResponse, StationsResponse, HeatmapResponse,
     StationDetail, SegmentDetail, ChecklistResponse, AlertsActiveResponse,
@@ -183,8 +186,9 @@ def get_heatmap(line: str = "경부선", alert_type: str = "호우"):
 @app.get("/station/{code}", response_model=StationDetail)
 def get_station_detail(code: str):
     if USE_MOCK:
-        # 정적 mock 없음: 스켈레톤에선 빈 상세를 계약 모양으로 반환.
-        return {"station": code, "by_alert": [], "cases": []}
+        d = _mock("station_detail.json")
+        d["station"] = code   # 어떤 역을 조회하든 상세 모양을 보여준다(값은 mock)
+        return d
     from db import fetch_all
     by_alert = fetch_all(
         "SELECT alert_type, alert_level, avg_delay, sample_n "
@@ -205,7 +209,9 @@ def get_station_detail(code: str):
 @app.get("/segment/{frm}/{to}", response_model=SegmentDetail)
 def get_segment_detail(frm: str, to: str):
     if USE_MOCK:
-        return {"from": frm, "to": to, "by_alert": [], "cases": []}
+        d = _mock("segment_detail.json")
+        d["from"], d["to"] = frm, to
+        return d
     from db import fetch_all
     by_alert = fetch_all(
         "SELECT alert_type, alert_level, avg_delay_incr AS avg_delay, sample_n "
