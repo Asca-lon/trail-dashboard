@@ -5,6 +5,35 @@
 
 > **단일 진실 원천은 [`CONTRACT.md`](./CONTRACT.md).** 다른 문서와 어긋나면 CONTRACT 가 우선한다.
 
+## 저장소 구조
+```
+trail-dashboard/
+├─ README.md
+├─ CONTRACT.md            # 이 문서 = 진실의 원천
+├─ docker-compose.yml     # TimescaleDB (+ adminer)
+├─ .env.example
+├─ db/                    # A
+│  ├─ schema.sql          # 아래 4장
+│  └─ seed_stations.sql   # 경부선 역·특보구역 매핑
+├─ collector/             # A
+│  ├─ rail_collector.py     # 운행계획+운행정보 → DB (백필/일배치)
+│  ├─ weather_collector.py  # 특보 이력+현재 현황 → DB
+│  └─ config.py
+├─ processor/             # A (분석)
+│  ├─ delay.py            # 계획×실제 조인 → delay_min·status
+│  └─ vulnerability.py    # 역/구간 취약도 집계
+├─ backend/               # B (읽기 전용 API)
+│  ├─ api.py              # FastAPI 엔드포인트
+│  ├─ models.py           # pydantic 응답 모델 = 계약을 코드로
+│  └─ db.py               # 조회 전용
+├─ frontend/              # C
+│  └─ (React 또는 HTML/JS: 순위표·지도·상세)
+└─ mock/                  # 공유: 병렬 작업의 핵심
+   ├─ vulnerability_segments.json
+   ├─ vulnerability_stations.json
+   ├─ heatmap.json
+   └─ alerts_active.json    # 현재 발효 특보(실시간 배너용)
+```
 
 ## 폴더
 
