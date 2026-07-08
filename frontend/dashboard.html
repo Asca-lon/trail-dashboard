@@ -25,20 +25,20 @@
 
       <div class="page-title__updated" aria-label="최근 업데이트 정보">
         <span class="page-title__updated-label">최근 업데이트</span>
-        <time class="page-title__updated-time" datetime="2026-07-08T14:30:00+09:00">2026.07.08. 14 : 30</time>
+        <time class="page-title__updated-time" datetime="2026-07-08T14:30:00+09:00" data-dashboard-updated-time>2026.07.08. 14 : 30</time>
       </div>
     </section>
 
-    <section class="alert-banner" aria-labelledby="active-alert-title">
+    <section class="alert-banner" aria-labelledby="active-alert-title" data-dashboard-alert-banner>
       <div class="alert-banner__icon" aria-hidden="true"><img class="alert-banner__icon-image" src="./assets/icons/triangle-alert.svg" alt=""></div>
 
       <div class="alert-banner__content">
         <h2 class="alert-banner__title" id="active-alert-title">현재 발효 중인 기상특보</h2>
-        <span class="alert-banner__badge">호우 경보</span>
-        <p class="alert-banner__text">
+        <span class="alert-banner__badge" data-dashboard-alert-badge>호우 경보</span>
+        <p class="alert-banner__text" data-dashboard-alert-text>
           대전광역시 외 3개 지역
-          <span class="alert-banner__muted">14:00 기준 영향 가능 철도 구간</span>
-          <strong class="alert-banner__count">7개</strong>
+          <span class="alert-banner__muted" data-dashboard-alert-standard-time>14:00 기준 영향 가능 철도 구간</span>
+          <strong class="alert-banner__count" data-dashboard-alert-count>7개</strong>
         </p>
       </div>
     </section>
@@ -50,7 +50,7 @@
         <div class="filter-form__fields">
           <div class="filter-group">
             <label class="filter-group__label" for="line-select">노선</label>
-            <select class="filter-group__select" id="line-select" name="line">
+            <select class="filter-group__select" id="line-select" name="line" data-dashboard-line-select>
               <option value="경부선" selected>경부선</option>
             </select>
           </div>
@@ -93,39 +93,39 @@
     <section class="summary-cards" aria-labelledby="summary-cards-title">
       <h2 class="sr-only" id="summary-cards-title">주요 위험 요약</h2>
 
-      <article class="summary-card" aria-label="영향 가능 구간 7개, 전일 대비 2개 증가">
+      <article class="summary-card" aria-label="영향 가능 구간 7개, 전일 대비 2개 증가" data-dashboard-summary-card="affected-segments">
         <div class="summary-card__icon summary-card__icon--segment" aria-hidden="true"><img class="summary-card__icon-image" src="./assets/icons/triangle-alert.svg" alt=""></div>
         <div class="summary-card__content">
           <h3 class="summary-card__title">영향 가능 구간</h3>
-          <p class="summary-card__value"><strong>7</strong><span>개</span></p>
-          <p class="summary-card__comparison">전일 대비 <strong>+2 ↑</strong></p>
+          <p class="summary-card__value"><strong data-dashboard-summary-value>7</strong><span data-dashboard-summary-unit>개</span></p>
+          <p class="summary-card__comparison" data-dashboard-summary-comparison>전일 대비 <strong>+2 ↑</strong></p>
         </div>
       </article>
 
-      <article class="summary-card" aria-label="운행 지연 예상 열차 23편, 전일 대비 6편 증가">
+      <article class="summary-card" aria-label="운행 지연 예상 열차 23편, 전일 대비 6편 증가" data-dashboard-summary-card="delayed-trains">
         <div class="summary-card__icon summary-card__icon--train" aria-hidden="true"><img class="summary-card__icon-image" src="./assets/icons/train-front.svg" alt=""></div>
         <div class="summary-card__content">
           <h3 class="summary-card__title">운행 지연 예상 열차</h3>
-          <p class="summary-card__value"><strong>23</strong><span>편</span></p>
-          <p class="summary-card__comparison">전일 대비 <strong>+6 ↑</strong></p>
+          <p class="summary-card__value"><strong data-dashboard-summary-value>23</strong><span data-dashboard-summary-unit>편</span></p>
+          <p class="summary-card__comparison" data-dashboard-summary-comparison>전일 대비 <strong>+6 ↑</strong></p>
         </div>
       </article>
 
-      <article class="summary-card" aria-label="평균 지연 시간 예상 18.4분, 전일 대비 7.2분 증가">
+      <article class="summary-card" aria-label="평균 지연 시간 예상 18.4분, 전일 대비 7.2분 증가" data-dashboard-summary-card="average-delay">
         <div class="summary-card__icon summary-card__icon--delay" aria-hidden="true"><img class="summary-card__icon-image" src="./assets/icons/clock-4.svg" alt=""></div>
         <div class="summary-card__content">
           <h3 class="summary-card__title">평균 지연 시간(예상)</h3>
-          <p class="summary-card__value"><strong>18.4</strong><span>분</span></p>
-          <p class="summary-card__comparison">전일 대비 <strong>+7.2분 ↑</strong></p>
+          <p class="summary-card__value"><strong data-dashboard-summary-value>18.4</strong><span data-dashboard-summary-unit>분</span></p>
+          <p class="summary-card__comparison" data-dashboard-summary-comparison>전일 대비 <strong>+7.2분 ↑</strong></p>
         </div>
       </article>
 
-      <article class="summary-card" aria-label="취약도 높음 구간 5개, 전일 대비 1개 증가">
+      <article class="summary-card" aria-label="취약도 높음 구간 5개, 전일 대비 1개 증가" data-dashboard-summary-card="high-risk-segments">
         <div class="summary-card__icon summary-card__icon--risk" aria-hidden="true"><img class="summary-card__icon-image" src="./assets/icons/chart-no-axes-combined.svg" alt=""></div>
         <div class="summary-card__content">
           <h3 class="summary-card__title">취약도 높음 구간</h3>
-          <p class="summary-card__value"><strong>5</strong><span>개</span></p>
-          <p class="summary-card__comparison">전일 대비 <strong>+1 ↑</strong></p>
+          <p class="summary-card__value"><strong data-dashboard-summary-value>5</strong><span data-dashboard-summary-unit>개</span></p>
+          <p class="summary-card__comparison" data-dashboard-summary-comparison>전일 대비 <strong>+1 ↑</strong></p>
         </div>
       </article>
     </section>
@@ -137,7 +137,7 @@
       <article class="map-card" aria-labelledby="map-card-title">
         <header class="map-card__header">
           <div class="map-card__title-group">
-            <h3 class="map-card__title" id="map-card-title">경부선 기상 취약도 현황</h3>
+            <h3 class="map-card__title" id="map-card-title" data-dashboard-heatmap-title>경부선 기상 취약도 현황</h3>
             <span class="map-card__info" aria-label="취약도 지도 안내">i</span>
           </div>
           <button class="map-card__view-button" type="button">
@@ -157,8 +157,8 @@
             </ul>
           </aside>
 
-          <div class="route-map" aria-label="경부선 역별 취약도">
-            <ol class="route-map__list">
+          <div class="route-map" aria-label="경부선 역별 취약도" data-dashboard-route-map>
+            <ol class="route-map__list" data-dashboard-route-list>
               <li class="route-map__item route-map__item--interest"><span class="route-map__station">서울</span><span class="route-map__marker"></span><span class="route-map__dash"></span><span class="route-map__status">관심</span><span class="route-map__chevron">›</span></li>
               <li class="route-map__item route-map__item--interest"><span class="route-map__station">광명</span><span class="route-map__marker"></span><span class="route-map__dash"></span><span class="route-map__status">관심</span><span class="route-map__chevron">›</span></li>
               <li class="route-map__item route-map__item--warning"><span class="route-map__station">천안아산</span><span class="route-map__marker"></span><span class="route-map__dash"></span><span class="route-map__status">주의</span><span class="route-map__chevron">›</span></li>
@@ -175,17 +175,17 @@
           <aside class="map-summary" aria-label="구간 요약 정보">
             <h4 class="map-summary__title">구간 요약 정보</h4>
             <ul class="map-summary__list">
-              <li class="map-summary__item map-summary__item--high"><img class="map-summary__icon" src="./assets/icons/circle-alert.svg" alt="" aria-hidden="true"><span>높음 구간 <strong>2개</strong></span></li>
-              <li class="map-summary__item map-summary__item--warning"><img class="map-summary__icon" src="./assets/icons/triangle-alert.svg" alt="" aria-hidden="true"><span>주의 구간 <strong>4개</strong></span></li>
-              <li class="map-summary__item map-summary__item--interest"><img class="map-summary__icon" src="./assets/icons/circle.svg" alt="" aria-hidden="true"><span>관심 구간 <strong>4개</strong></span></li>
-              <li class="map-summary__item map-summary__item--none"><img class="map-summary__icon" src="./assets/icons/circle-minus.svg" alt="" aria-hidden="true"><span>데이터 없음 구간 <strong>0개</strong></span></li>
+              <li class="map-summary__item map-summary__item--high"><img class="map-summary__icon" src="./assets/icons/circle-alert.svg" alt="" aria-hidden="true"><span>높음 구간 <strong data-dashboard-heatmap-summary="high">2개</strong></span></li>
+              <li class="map-summary__item map-summary__item--warning"><img class="map-summary__icon" src="./assets/icons/triangle-alert.svg" alt="" aria-hidden="true"><span>주의 구간 <strong data-dashboard-heatmap-summary="warning">4개</strong></span></li>
+              <li class="map-summary__item map-summary__item--interest"><img class="map-summary__icon" src="./assets/icons/circle.svg" alt="" aria-hidden="true"><span>관심 구간 <strong data-dashboard-heatmap-summary="interest">4개</strong></span></li>
+              <li class="map-summary__item map-summary__item--none"><img class="map-summary__icon" src="./assets/icons/circle-minus.svg" alt="" aria-hidden="true"><span>데이터 없음 구간 <strong data-dashboard-heatmap-summary="none">0개</strong></span></li>
             </ul>
           </aside>
         </div>
 
         <footer class="map-card__footer">
-          <span>기준 시간 : 2026.07.07 14:30</span>
-          <span>데이터 업데이트 : 5분 전</span>
+          <span data-dashboard-heatmap-reference-time>기준 시간 : 2026.07.07 14:30</span>
+          <span data-dashboard-heatmap-source>데이터 업데이트 : 5분 전</span>
         </footer>
       </article>
       <div class="ranking-area">
@@ -207,7 +207,7 @@
                   <th scope="col">예상 지연(분)</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody data-dashboard-segment-ranking-body>
                 <tr>
                   <td>1</td>
                   <td class="ranking-table__target">대전-김천(구미)</td>
@@ -266,7 +266,7 @@
                   <th scope="col">지연 건수</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody data-dashboard-station-ranking-body>
                 <tr>
                   <td>1</td>
                   <td class="ranking-table__target">대전</td>
@@ -327,7 +327,7 @@
               <th scope="col">상세</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody data-dashboard-inspection-body>
             <tr>
               <td><span class="risk-badge risk-badge--interest">관심</span></td>
               <td class="inspection-table__target">대전→김천(구미)</td>
@@ -373,6 +373,7 @@
       </div>
     </section>
   </main>
+  <script src="./dashboard.js" defer></script>
 </body>
 </html>
 
