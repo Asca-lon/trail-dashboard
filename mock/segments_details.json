@@ -1,0 +1,14 @@
+{
+  "from": "대전",
+  "to": "김천(구미)",
+  "by_alert": [
+    { "alert_type": "호우", "alert_level": "경보",   "avg_delay": 14.6, "sample_n": 37 },
+    { "alert_type": "호우", "alert_level": "주의보", "avg_delay": 9.1,  "sample_n": 44 },
+    { "alert_type": "폭염", "alert_level": "경보",   "avg_delay": 7.2,  "sample_n": 25 }
+  ],
+  "cases": [
+    { "date": "2026-06-28", "alert_type": "호우", "delay_min": 19 },
+    { "date": "2026-06-14", "alert_type": "호우", "delay_min": 12 },
+    { "date": "2026-06-03", "alert_type": null,   "delay_min": 6 }
+  ]
+}
