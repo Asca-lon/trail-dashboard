@@ -186,7 +186,7 @@ def get_heatmap(line: str = "경부선", alert_type: str = "호우"):
 @app.get("/station/{code}", response_model=StationDetail)
 def get_station_detail(code: str):
     if USE_MOCK:
-        d = _mock("station_detail.json")
+        d = _mock("station_details.json")
         d["station"] = code   # 어떤 역을 조회하든 상세 모양을 보여준다(값은 mock)
         return d
     from db import fetch_all
@@ -209,7 +209,7 @@ def get_station_detail(code: str):
 @app.get("/segment/{frm}/{to}", response_model=SegmentDetail)
 def get_segment_detail(frm: str, to: str):
     if USE_MOCK:
-        d = _mock("segment_detail.json")
+        d = _mock("segments_details.json")
         d["from"], d["to"] = frm, to
         return d
     from db import fetch_all

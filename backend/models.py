@@ -90,7 +90,7 @@ class ByAlert(BaseModel):
 
 class Case(BaseModel):
     date: str
-    alert_type: str
+    alert_type: Optional[str] = None
     delay_min: Optional[int] = None
 
 class StationDetail(BaseModel):
