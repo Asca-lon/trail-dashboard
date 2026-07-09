@@ -1322,6 +1322,447 @@ rg -n "station-global-header__right|station-global-header__timestamp|station-glo
 
 ---
 
+# Segment ID Mock 구조화 작업 요약
+
+# 개요
+
+`mock/vulnerability_segments.json`의 각 구간에 `segment_id`를 추가했습니다.
+
+또한 대시보드의 취약 구간 랭킹 row와 우선 점검 대상 row에 id를 DOM dataset으로 남겨, 이후 구간 상세 화면 연결에 사용할 수 있도록 준비했습니다.
+
+# 구현 목적
+
+구간 상세 화면을 만들려면 `대전→김천(구미) 구간` 같은 표시 문자열보다 안정적인 구간 식별자가 필요합니다.
+
+이번 단계에서는 구간 상세 페이지를 바로 만들지 않고, 먼저 mock 데이터와 DOM 렌더링 흐름이 같은 `segment_id`를 공유하도록 정리했습니다.
+
+# 구현 내용
+
+- `mock/vulnerability_segments.json`
+  - 각 구간에 `segment_id` 추가
+  - 예: `daejeon-gimcheon_gumi`, `cheonan-daejeon`, `yeongdeungpo-suwon`
+
+- `frontend/dashboard.js`
+  - 취약 구간 랭킹 row에 `data-segment-id` 추가
+  - 우선 점검 대상 row에 `data-target-type` 추가
+  - 우선 점검 대상 row에 `data-target-id` 추가
+
+# 코드 설명
+
+## 왜 필요한가
+
+구간명은 화면 표시용 문구입니다.
+
+구간 상세 이동, API 조회, 데이터 join에는 `segment_id`처럼 변하지 않는 식별자가 필요합니다.
+
+## 어떤 원리인가
+
+1. `vulnerability_segments.segments[]`에 `segment_id`를 추가합니다.
+2. `checklist.items[]`의 `segment_id`와 같은 값을 사용합니다.
+3. 대시보드 취약 구간 랭킹을 렌더링할 때 row에 `data-segment-id`를 저장합니다.
+4. 우선 점검 대상 row에는 `target_type`과 `target_id`를 dataset으로 저장합니다.
+5. 이후 구간 상세 화면을 만들면 이 id를 query string 또는 route parameter로 전달할 수 있습니다.
+
+## 장점
+
+- checklist와 vulnerability segment mock이 같은 id 체계를 공유합니다.
+- 구간 상세 화면을 만들 준비가 됩니다.
+- 표시 문자열 파싱 없이 구간을 식별할 수 있습니다.
+- DOM에도 id가 남아 있어 클릭 이벤트 확장이 쉬워집니다.
+
+## 단점
+
+- 아직 구간 상세 화면은 없습니다.
+- 현재는 dataset으로 준비만 했기 때문에 사용자가 체감하는 화면 변화는 거의 없습니다.
+- `segment_id` 네이밍 규칙을 프로젝트 전반에서 계속 지켜야 합니다.
+
+## 다른 구현 방법
+
+- 구간 상세 페이지를 먼저 만들고 동시에 링크 연결
+- `segments.json` 메타데이터 파일을 별도로 생성
+- API에서 구간별 `detail_url`을 직접 내려주는 방식
+- route path를 `/segments/{segment_id}` 형태로 설계
+
+# API
+
+API 변경 사항은 없습니다.
+
+변경된 mock 예시:
+
+```json
+{
+  "segment_id": "daejeon-gimcheon_gumi",
+  "from": "대전",
+  "to": "김천(구미)"
+}
+```
+
+# Database
+
+DB 변경 사항은 없습니다.
+
+실제 DB에서는 `segments` 테이블의 primary key 또는 unique key로 `segment_id`를 두고, checklist가 이를 참조하는 구조가 적합합니다.
+
+# 테스트 방법
+
+1. JavaScript 문법 검사
+
+```bash
+node --check frontend/dashboard.js
+```
+
+예상 결과:
+
+- 오류 없이 종료됩니다.
+
+2. segment id 참조 무결성 검사
+
+```bash
+node -e "const fs=require('fs'); const segments=JSON.parse(fs.readFileSync('mock/vulnerability_segments.json','utf8')).segments; const checklist=JSON.parse(fs.readFileSync('mock/checklist.json','utf8')).items; const segmentIds=new Set(segments.map((segment)=>segment.segment_id)); const missing=checklist.filter((item)=>item.target_type==='segment'&&!segmentIds.has(item.segment_id)); console.log('missing checklist segment refs:', missing.length); if (missing.length) process.exit(1);"
+```
+
+예상 결과:
+
+```text
+missing checklist segment refs: 0
+```
+
+3. mock JSON 파싱 검사
+
+```bash
+node -e "const fs=require('fs'); JSON.parse(fs.readFileSync('mock/vulnerability_segments.json','utf8')); JSON.parse(fs.readFileSync('mock/checklist.json','utf8')); console.log('segment mock json OK');"
+```
+
+예상 결과:
+
+```text
+segment mock json OK
+```
+
+4. 브라우저 확인
+
+```text
+http://127.0.0.1:8765/frontend/dashboard.html
+```
+
+검증 기준:
+
+- 대시보드가 정상 로드됩니다.
+- `mock/vulnerability_segments.json`이 HTTP 200으로 로드됩니다.
+- 취약 구간 랭킹은 기존과 동일하게 표시됩니다.
+- 우선 점검 대상 상세 패널도 기존과 동일하게 동작합니다.
+
+# 주의사항
+
+이번 작업은 구간 상세 연결을 위한 데이터 준비 단계입니다.
+
+구간 상세 화면이 아직 없기 때문에 취약 구간 랭킹이나 구간 점검 대상은 링크로 만들지 않았습니다.
+
+# 변경 이력
+
+2026-07-09
+
+- `vulnerability_segments.json`에 `segment_id` 추가
+- 취약 구간 랭킹 row에 `data-segment-id` 추가
+- 우선 점검 대상 row에 `data-target-type`, `data-target-id` 추가
+
+# 다음 작업
+
+- 구간 상세 화면 설계
+- 구간 상세 mock 데이터 구조 설계
+- 취약 구간 랭킹에서 구간 상세 화면으로 이동 연결
+
+# 작업 요약
+
+## 완료한 내용
+
+- 구간 mock id 구조화
+- checklist segment reference와 무결성 검증
+- 대시보드 DOM dataset 준비
+- 테스트 및 문서화
+
+## 수정한 파일
+
+- `mock/vulnerability_segments.json`
+- `frontend/dashboard.js`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+구간 상세 화면을 안정적으로 연결하려면 표시명 대신 `segment_id`가 필요합니다.
+
+이번 작업으로 구간 데이터도 역 데이터처럼 id 기반 확장이 가능해졌습니다.
+
+## 변경 사항
+
+- `segment_id` 필드 추가
+- `data-segment-id` 추가
+- `data-target-type` 추가
+- `data-target-id` 추가
+
+## 새롭게 배운 개념
+
+- Segment ID
+- Reference Integrity
+- Dataset-based UI Extension
+
+## 실무에서는
+
+실무에서는 구간, 역, 노선처럼 여러 데이터가 서로 참조하는 대상에 반드시 안정적인 id를 둡니다.
+
+그리고 mock 단계에서도 id 참조가 맞는지 간단한 검증 스크립트를 두면 API 전환 때 버그를 크게 줄일 수 있습니다.
+
+## 개선 가능한 부분
+
+- 구간 상세 전용 mock 추가
+- `segment_id` 네이밍 규칙 문서화
+- 구간 상세 화면 생성
+- checklist와 vulnerability segment join 로직 추가
+
+## 다음 작업
+
+- 구간 상세 화면의 기본 HTML 구조 설계
+
+## 복습 문제
+
+1. 구간명보다 `segment_id`를 사용하는 것이 안전한 이유는 무엇인가요?
+2. checklist의 `segment_id`가 vulnerability segment mock에 존재하는지 검증해야 하는 이유는 무엇인가요?
+3. DOM dataset은 어떤 상황에서 유용하게 사용할 수 있나요?
+
+## 오늘 배운 내용
+
+- Segment ID
+- Reference Integrity
+- DOM Dataset
+- Mock Data Contract
+
+## Change Log
+
+2026-07-09
+
+- segment id mock 구조화
+- dashboard row dataset 추가
+- 문서 업데이트
+
+## Timestamp
+
+2026-07-09 14:33:10 (KST)
+
+---
+
+# Station Lookup Mock 기반 통일 작업 요약
+
+# 개요
+
+`frontend/dashboard.js`에 남아 있던 `STATION_NAME_BY_ID` 하드코딩 상수를 제거하고, `mock/vulnerability_stations.json`의 `station_id`와 `station` 값을 기준으로 lookup하도록 정리했습니다.
+
+# 구현 목적
+
+역 id와 역명 매핑을 코드에 중복으로 관리하면 mock 데이터가 바뀔 때 JS 상수도 함께 수정해야 합니다.
+
+이번 작업은 역 메타데이터의 기준을 `vulnerability_stations.json`으로 통일해 유지보수성을 높이기 위한 정리입니다.
+
+# 구현 내용
+
+- `frontend/dashboard.js`
+  - `STATION_NAME_BY_ID` 제거
+  - `getStationsFromData()` 추가
+  - `getStationByName()` 추가
+  - `getStationById()` 추가
+  - 우선 점검 대상 역 링크 생성 시 mock stations 배열을 기준으로 station id와 역명 조회
+  - 기존 문자열 fallback은 유지
+
+# 코드 설명
+
+## 왜 필요한가
+
+`STATION_NAME_BY_ID`처럼 JS 안에 역 목록을 다시 적으면 `vulnerability_stations.json`과 데이터가 중복됩니다.
+
+중복 데이터는 한쪽만 수정되는 순간 화면 링크가 깨질 수 있으므로, 한 곳의 mock 데이터를 기준으로 lookup하는 편이 안전합니다.
+
+## 어떤 원리인가
+
+1. `vulnerabilityStationsData.stations[]`를 가져옵니다.
+2. `station_id`가 필요한 경우 `getStationById()`로 찾습니다.
+3. 역명으로 id를 찾아야 하는 경우 `getStationByName()`을 사용합니다.
+4. 우선 점검 대상의 `station_id`와 stations mock을 비교해 실제 역명을 찾습니다.
+5. 찾은 역명의 `station_id`로 역 상세 URL을 생성합니다.
+
+## 장점
+
+- 역 id/역명 매핑을 한 곳에서 관리합니다.
+- 새 역을 추가할 때 JS 상수를 수정하지 않아도 됩니다.
+- mock 데이터가 실제 API 메타데이터 역할을 하게 됩니다.
+- 이후 station id 기반 API 전환이 쉬워집니다.
+
+## 단점
+
+- 링크 생성 함수에 stations mock 데이터가 필요합니다.
+- mock 데이터에 `station_id`가 빠지면 fallback으로 역명 query를 사용합니다.
+
+## 다른 구현 방법
+
+- 별도 `stations.json` 메타데이터 파일 생성
+- API에서 station id와 label을 공통 코드 테이블로 제공
+- 빌드 시 mock schema 검증 추가
+- station id만 URL에 사용하고 역명 fallback 제거
+
+# API
+
+API 변경 사항은 없습니다.
+
+사용한 mock 데이터:
+
+- `GET ../mock/vulnerability_stations.json`
+- `GET ../mock/checklist.json`
+
+# Database
+
+DB 변경 사항은 없습니다.
+
+실제 서비스에서는 `stations` 테이블을 기준 테이블로 두고 다른 데이터가 `station_id`를 참조하는 구조가 적합합니다.
+
+# 테스트 방법
+
+1. JavaScript 문법 검사
+
+```bash
+node --check frontend/dashboard.js
+```
+
+예상 결과:
+
+- 오류 없이 종료됩니다.
+
+2. mock JSON 파싱 검사
+
+```bash
+node -e "const fs=require('fs'); JSON.parse(fs.readFileSync('mock/vulnerability_stations.json','utf8')); JSON.parse(fs.readFileSync('mock/checklist.json','utf8')); console.log('mock json OK');"
+```
+
+예상 결과:
+
+```text
+mock json OK
+```
+
+3. station id 기반 링크 확인
+
+```bash
+node -e "const fs=require('fs'); const stations=JSON.parse(fs.readFileSync('mock/vulnerability_stations.json','utf8')).stations; const checklist=JSON.parse(fs.readFileSync('mock/checklist.json','utf8')).items; const stationItem=checklist.find((item)=>item.target_type==='station'); const station=stations.find((item)=>item.station_id===stationItem.station_id); console.log([stationItem.target, station.station_id, station.station, './station-detail.html?'+new URLSearchParams({station_id:station.station_id}).toString()].join(' | '));"
+```
+
+예상 결과:
+
+```text
+대전역 | daejeon | 대전 | ./station-detail.html?station_id=daejeon
+```
+
+4. 브라우저 확인
+
+```text
+http://127.0.0.1:8765/frontend/dashboard.html
+```
+
+검증 기준:
+
+- 대시보드가 정상 로드됩니다.
+- 우선 점검 대상의 `대전역` 링크가 `station_id=daejeon`으로 이동합니다.
+- 역 상세 화면도 정상 로드됩니다.
+
+# 주의사항
+
+현재 `station_id`는 `vulnerability_stations.json`에만 있습니다.
+
+향후 다른 mock 파일에서도 역을 참조한다면 같은 id 체계를 사용해야 합니다.
+
+# 변경 이력
+
+2026-07-09
+
+- `STATION_NAME_BY_ID` 제거
+- stations mock 기반 lookup 함수 추가
+- 우선 점검 대상 역 링크 lookup 통일
+
+# 다음 작업
+
+- `vulnerability_segments.json`에 `segment_id` 추가
+- 구간 상세 화면 설계
+- segment id 기반 구간 상세 링크 준비
+
+# 작업 요약
+
+## 완료한 내용
+
+- 하드코딩 역명 매핑 제거
+- stations mock 기반 id/name lookup 통일
+- 대시보드 링크 동작 검증
+- 문서화
+
+## 수정한 파일
+
+- `frontend/dashboard.js`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+데이터 매핑 기준을 코드 상수가 아니라 mock 데이터로 통일하면 확장과 유지보수가 쉬워집니다.
+
+## 변경 사항
+
+- `getStationsFromData()` 추가
+- `getStationByName()` 추가
+- `getStationById()` 추가
+- 우선 점검 대상 역 링크가 stations mock을 기준으로 생성되도록 변경
+
+## 새롭게 배운 개념
+
+- Single Source of Truth
+- Metadata Lookup
+- Mock-driven Mapping
+
+## 실무에서는
+
+실무에서는 station 목록을 공통 메타데이터 API로 제공하고, 여러 화면이 같은 `station_id`를 기준으로 데이터를 join합니다.
+
+프론트엔드는 화면 표시명보다 id를 신뢰하고, label은 표시용으로만 사용합니다.
+
+## 개선 가능한 부분
+
+- 모든 station 참조 mock에 `station_id` 적용
+- segment도 id 기반으로 구조화
+- mock schema 검증 스크립트 추가
+
+## 다음 작업
+
+- `vulnerability_segments.json`에 `segment_id`를 추가하고 구간 상세 연결을 준비
+
+## 복습 문제
+
+1. Single Source of Truth가 유지보수에 도움이 되는 이유는 무엇인가요?
+2. 역명 대신 station id를 기준으로 lookup하면 어떤 문제가 줄어드나요?
+3. mock schema 검증이 필요한 이유는 무엇인가요?
+
+## 오늘 배운 내용
+
+- Single Source of Truth
+- Metadata Lookup
+- Mock-driven Mapping
+
+## Change Log
+
+2026-07-09
+
+- dashboard station lookup을 mock 기반으로 통일
+- 하드코딩 station map 제거
+- 문서 업데이트
+
+## Timestamp
+
+2026-07-09 14:29:40 (KST)
+
+---
+
 # 역 상세 Station ID 전환 작업 요약
 
 # 개요

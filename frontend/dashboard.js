@@ -20,14 +20,6 @@ const STATION_DETAIL_URL = "./station-detail.html";
 const STATION_QUERY_PARAM = "station";
 const STATION_ID_QUERY_PARAM = "station_id";
 
-const STATION_NAME_BY_ID = {
-  daejeon: "대전",
-  dongdaegu: "동대구",
-  gimcheon_gumi: "김천(구미)",
-  suwon: "수원",
-  miryang: "밀양",
-};
-
 const alertElements = {
   updatedTime: document.querySelector("[data-dashboard-updated-time]"),
   banner: document.querySelector("[data-dashboard-alert-banner]"),
@@ -569,11 +561,21 @@ function createRankingCell(text, className = "") {
   return cell;
 }
 
-function getStationIdByName(stationName) {
-  return Object.entries(STATION_NAME_BY_ID).find(([, name]) => name === stationName)?.[0] || null;
+function getStationsFromData(vulnerabilityStationsData) {
+  return Array.isArray(vulnerabilityStationsData.stations)
+    ? vulnerabilityStationsData.stations
+    : [];
 }
 
-function createStationDetailUrl(stationName, stationId = getStationIdByName(stationName)) {
+function getStationByName(stationName, stations) {
+  return stations.find((station) => station.station === stationName) || null;
+}
+
+function getStationById(stationId, stations) {
+  return stations.find((station) => station.station_id === stationId) || null;
+}
+
+function createStationDetailUrl(stationName, stationId) {
   const params = new URLSearchParams({
     [stationId ? STATION_ID_QUERY_PARAM : STATION_QUERY_PARAM]: stationId || stationName,
   });
@@ -595,33 +597,27 @@ function createStationLinkCell(stationName, stationId) {
   return cell;
 }
 
-function getStationNamesFromData(vulnerabilityStationsData) {
-  return Array.isArray(vulnerabilityStationsData.stations)
-    ? vulnerabilityStationsData.stations.map((station) => station.station)
-    : [];
-}
-
-function getStationNameFromInspectionTarget(target, stationNames) {
+function getStationNameFromInspectionTarget(target, stations) {
   if (!target || !target.endsWith("역")) {
     return null;
   }
 
   const stationName = target.slice(0, -1);
 
-  return stationNames.includes(stationName) ? stationName : null;
+  return getStationByName(stationName, stations)?.station || null;
 }
 
-function getStationNameFromInspectionItem(item, stationNames) {
+function getStationNameFromInspectionItem(item, stations) {
   if (item.target_type === "station" && item.station_id) {
-    const stationName = STATION_NAME_BY_ID[item.station_id];
+    const station = getStationById(item.station_id, stations);
 
-    return stationNames.includes(stationName) ? stationName : null;
+    return station?.station || null;
   }
 
-  return getStationNameFromInspectionTarget(item.target, stationNames);
+  return getStationNameFromInspectionTarget(item.target, stations);
 }
 
-function createStationDetailLink(stationName, label, stationId = getStationIdByName(stationName)) {
+function createStationDetailLink(stationName, label, stationId) {
   const link = document.createElement("a");
 
   link.className = "inspection-link";
@@ -670,6 +666,10 @@ function createSegmentRankingRow(segment, index, lineName) {
   const row = document.createElement("tr");
   const riskLevel = getRiskLevelByDelayIncrease(segment.avg_delay_incr);
   const riskCell = document.createElement("td");
+
+  if (segment.segment_id) {
+    row.dataset.segmentId = segment.segment_id;
+  }
 
   riskCell.append(createRiskBadge(riskLevel));
   row.append(
@@ -755,13 +755,14 @@ function getInspectionRecommendation(riskLevel) {
   return "상황 모니터링";
 }
 
-function renderInspectionDetail(item, stationNames = []) {
+function renderInspectionDetail(item, stations = []) {
   if (!inspectionElements.detail) {
     return;
   }
 
   const riskLevel = getRiskLevelByDelayIncrease(item.avg_delay_incr);
-  const stationName = getStationNameFromInspectionItem(item, stationNames);
+  const stationName = getStationNameFromInspectionItem(item, stations);
+  const stationId = getStationByName(stationName, stations)?.station_id;
   const title = document.createElement("h3");
   const list = document.createElement("dl");
   const fields = [
@@ -785,7 +786,7 @@ function renderInspectionDetail(item, stationNames = []) {
     term.textContent = label;
 
     if (label === "대상" && stationName) {
-      description.append(createStationDetailLink(stationName, value));
+      description.append(createStationDetailLink(stationName, value, stationId));
     } else {
       description.textContent = value;
     }
@@ -809,14 +810,15 @@ function setSelectedInspectionRow(selectedRow) {
   });
 }
 
-function createInspectionTargetCell(item, stationNames) {
+function createInspectionTargetCell(item, stations) {
   const cell = document.createElement("td");
-  const stationName = getStationNameFromInspectionItem(item, stationNames);
+  const stationName = getStationNameFromInspectionItem(item, stations);
+  const stationId = getStationByName(stationName, stations)?.station_id;
 
   cell.className = "inspection-table__target";
 
   if (stationName) {
-    cell.append(createStationDetailLink(stationName, item.target));
+    cell.append(createStationDetailLink(stationName, item.target, stationId));
     return cell;
   }
 
@@ -825,12 +827,21 @@ function createInspectionTargetCell(item, stationNames) {
   return cell;
 }
 
-function createInspectionRow(item, stationNames) {
+function createInspectionRow(item, stations) {
   const row = document.createElement("tr");
   const riskLevel = getRiskLevelByDelayIncrease(item.avg_delay_incr);
   const riskCell = document.createElement("td");
   const detailCell = document.createElement("td");
   const detailButton = document.createElement("button");
+  const targetId = item.station_id || item.segment_id;
+
+  if (item.target_type) {
+    row.dataset.targetType = item.target_type;
+  }
+
+  if (targetId) {
+    row.dataset.targetId = targetId;
+  }
 
   riskCell.append(createRiskBadge(riskLevel));
   detailButton.className = "inspection-table__button";
@@ -838,14 +849,14 @@ function createInspectionRow(item, stationNames) {
   detailButton.textContent = "상세보기";
   detailButton.setAttribute("aria-label", `${item.target} 상세보기`);
   detailButton.addEventListener("click", () => {
-    renderInspectionDetail(item, stationNames);
+    renderInspectionDetail(item, stations);
     setSelectedInspectionRow(row);
   });
   detailCell.append(detailButton);
 
   row.append(
     riskCell,
-    createInspectionTargetCell(item, stationNames),
+    createInspectionTargetCell(item, stations),
     createRankingCell(getAlertLabelFromReason(item.reason)),
     createRankingCell(item.reason || "-"),
     createRankingCell(getInspectionRecommendation(riskLevel)),
@@ -879,18 +890,18 @@ function renderInspectionTable(checklistData, vulnerabilityStationsData) {
     return;
   }
 
-  const stationNames = getStationNamesFromData(vulnerabilityStationsData);
+  const stations = getStationsFromData(vulnerabilityStationsData);
   const items = getChecklistItems(checklistData)
     .slice()
     .sort((a, b) => a.rank - b.rank);
-  const rows = items.map((item) => createInspectionRow(item, stationNames));
+  const rows = items.map((item) => createInspectionRow(item, stations));
 
   inspectionElements.body.replaceChildren(
     ...(rows.length > 0 ? rows : [createTableMessageRow("우선 점검 대상 데이터가 없습니다.", 6)]),
   );
 
   if (items.length > 0) {
-    renderInspectionDetail(items[0], stationNames);
+    renderInspectionDetail(items[0], stations);
     setSelectedInspectionRow(rows[0]);
   }
 }
