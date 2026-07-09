@@ -1,87 +1,162 @@
 import os
+import sys
+import argparse
 import requests
+import traceback
+from pathlib import Path
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
-from db_writer import get_writer_conn
 
-# .env 파일 로드
-load_dotenv()
+BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
 
-# .env에서 공공데이터포털 API 키 및 철도 운행 Base URL 가져오기
-PUBLIC_API_KEY = os.getenv("PUBLIC_DATA_API_KEY", "416ae05cbf69b4c9b3c32cdc101a39a774f304c9c0d0d806362af53cc9ee31b2")
+if str(BASE_DIR) not in sys.path:
+    sys.path.append(str(BASE_DIR))
+
+from collector.db_writer import get_writer_conn
+
+PUBLIC_API_KEY = os.getenv("PUBLIC_DATA_API_KEY")
 KORAIL_RUN_API_URL = os.getenv("KORail_RUN_API_URL", "https://apis.data.go.kr/B551457/run/v2").rstrip('/')
 
-def collect_realtime_rail():
-    print("🚆 [실시간 철도] 최신 여객열차 운행정보 수집 중...")
-    
+def parse_iso_time(ymd, time_str):
+    if not time_str or len(time_str) < 4:
+        return None
+    s = time_str.strip()
+    return f"{ymd[:4]}-{ymd[4:6]}-{ymd[6:8]} {s[:2]}:{s[2:4]}:00+09:00"
+
+def classify_train_type(train_no):
+    if not train_no:
+        return "일반"
+    num_str = "".join(filter(str.isdigit, str(train_no)))
+    if not num_str:
+        return "일반"
+    val = int(num_str)
+    if val < 200:
+        return "KTX"
+    elif val < 1000:
+        return "새마을"
+    else:
+        return "무궁화"
+
+def collect_rail_by_date(target_date=None):
+    if not PUBLIC_API_KEY:
+        print("❌ PUBLIC_DATA_API_KEY가 설정되지 않았습니다.")
+        return
+
+    if not target_date:
+        target_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+
+    run_ymd_param = target_date.replace("-", "")
     url = f"{KORAIL_RUN_API_URL}/travelerTrainRunInfo2"
-    
-    params = {
-        'serviceKey': requests.utils.unquote(PUBLIC_API_KEY),
-        'pageNo': '1',
-        'numOfRows': '100',
-        '_type': 'json'
-    }
+    page_no = 1
+    num_of_rows = 1000
 
-    try:
-        response = requests.get(url, params=params, timeout=10)
-        print(f"  ├ 🌐 API 응답 상태 코드: {response.status_code}")
+    with get_writer_conn() as conn:
+        with conn.cursor() as cur:
+            while True:
+                params = {
+                    'serviceKey': requests.utils.unquote(PUBLIC_API_KEY),
+                    'pageNo': str(page_no),
+                    'numOfRows': str(num_of_rows),
+                    'runYmd': run_ymd_param,
+                    '_type': 'json'
+                }
 
-        if response.status_code == 200:
-            try:
-                data = response.json()
-            except Exception:
-                print(f"  └ 🚨 JSON 파싱 실패 (응답 내용: {response.text[:200]})")
-                return
+                try:
+                    response = requests.get(url, params=params, timeout=15)
+                    if response.status_code != 200:
+                        print(f"❌ API 요청 실패: Status {response.status_code}")
+                        break
 
-            header = data.get('response', {}).get('header', {})
-            result_code = header.get('resultCode')
-            result_msg = header.get('resultMsg')
+                    data = response.json()
+                    header = data.get('response', {}).get('header', {})
+                    if str(header.get('resultCode')) not in ['0', '00']:
+                        print(f"❌ API 응답 에러: {header}")
+                        break
 
-            # '0' 또는 '00' 모두 정상으로 처리
-            if str(result_code) not in ['0', '00']:
-                print(f"  └ 🚨 API 결과 에러: [{result_code}] {result_msg}")
-                return
+                    body = data.get('response', {}).get('body', {})
+                    items = body.get('items', {}).get('item', [])
 
-            items = data.get('response', {}).get('body', {}).get('items', {}).get('item', [])
-            
-            if items:
-                if isinstance(items, dict):
-                    items = [items]
+                    if not items:
+                        print("ℹ️ 더 이상 수집할 데이터가 없습니다.")
+                        break
 
-                inserted_cnt = 0
-                with get_writer_conn() as conn:
-                    with conn.cursor() as cur:
-                        for item in items:
-                            run_ymd = item.get('runYmd') or item.get('run_ymd')
-                            trn_no = item.get('trnNo') or item.get('trn_no')
-                            stn_cd = item.get('stnCd') or item.get('stn_cd')
+                    if isinstance(items, dict):
+                        items = [items]
 
-                            if not run_ymd or not trn_no or not stn_cd:
-                                continue
+                    batch_data = []
+                    stations_to_insert = set()
 
-                            cur.execute("""
-                                INSERT INTO train_stops (
-                                    mrnt_cd, mrnt_nm, run_ymd, stn_cd, stn_nm,
-                                    stop_se_cd, stop_se_nm, trn_arvl_dt, trn_dptre_dt,
-                                    trn_no, trn_run_sn, uppln_dn_se_cd
-                                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                                ON CONFLICT DO NOTHING;
-                            """, (
-                                item.get('mrntCd'), item.get('mrntNm'), run_ymd,
-                                stn_cd, item.get('stnNm'), item.get('stopSeCd'),
-                                item.get('stopSeNm'), item.get('trnArvlDt'), item.get('trnDptreDt'),
-                                trn_no, item.get('trnRunSn'), item.get('upplnDnSeCd')
-                            ))
-                            inserted_cnt += 1
+                    for item in items:
+                        trn_no = item.get('trnNo') or item.get('trn_no')
+                        stn_cd = item.get('stnCd') or item.get('stn_cd')
+                        stn_nm = item.get('stnNm') or item.get('stn_nm') or f"역_{stn_cd}"
 
-                print(f"🎉 [성공] 철도 운행 데이터 {inserted_cnt}건 동기화 완료!")
-            else:
-                print("  └ ℹ️ 현재 수집된 철도 운행 데이터가 없습니다.")
-        else:
-            print(f"  └ 🚨 API 요청 실패 (HTTP {response.status_code})")
+                        if not trn_no or not stn_cd:
+                            continue
 
-    except Exception as e:
-        print(f"💥 수집 예외 발생: {e}")
+                        stn_cd_str = str(stn_cd)
+                        stations_to_insert.add((stn_cd_str, str(stn_nm), "경부선"))
+
+                        seq_val = int(item.get('trnRunSn') or 0)
+                        planned_arr = parse_iso_time(run_ymd_param, item.get('arvlTm') or item.get('plan_arvl_tm'))
+                        actual_arr = parse_iso_time(run_ymd_param, item.get('trnArvlDt') or item.get('actual_arvl_tm'))
+                        planned_dpt = parse_iso_time(run_ymd_param, item.get('dptreTm') or item.get('plan_dpt_tm'))
+                        actual_dpt = parse_iso_time(run_ymd_param, item.get('trnDptreDt') or item.get('actual_dpt_tm'))
+
+                        event_time = planned_arr or actual_arr or planned_dpt or actual_dpt
+                        if not event_time:
+                            event_time = f"{target_date} 00:00:00+09:00"
+
+                        train_type = classify_train_type(trn_no)
+
+                        batch_data.append((
+                            target_date,
+                            str(trn_no).lstrip('0'),
+                            seq_val,
+                            stn_cd_str,
+                            "경부선",
+                            train_type,
+                            planned_arr,
+                            actual_arr,
+                            planned_dpt,
+                            actual_dpt,
+                            event_time
+                        ))
+
+                    if stations_to_insert:
+                        cur.executemany("""
+                            INSERT INTO stations (station_code, station_name, line)
+                            VALUES (%s, %s, %s)
+                            ON CONFLICT (station_code) DO NOTHING;
+                        """, list(stations_to_insert))
+
+                    if batch_data:
+                        cur.executemany("""
+                            INSERT INTO train_stops (
+                                run_date, train_no, seq, station_code, line, train_type,
+                                planned_arrival, actual_arrival, planned_departure, actual_departure, event_time
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            ON CONFLICT (run_date, train_no, station_code, event_time) DO NOTHING;
+                        """, batch_data)
+                        conn.commit()
+                        print(f"✅ Page {page_no}: {len(batch_data)}건 적재 완료")
+
+                    total_count = body.get('totalCount', 0)
+                    if page_no * num_of_rows >= total_count:
+                        break
+
+                    page_no += 1
+
+                except Exception as e:
+                    print("❌ 오류 상세 내역:")
+                    traceback.print_exc()
+                    conn.rollback()
+                    break
 
 if __name__ == "__main__":
-    collect_realtime_rail()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--date", type=str, help="수집할 날짜 (YYYY-MM-DD)")
+    args = parser.parse_args()
+    
+    collect_rail_by_date(args.date)
