@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>구간 상세 | 기상-철도 리스크 의사결정 지원 시스템</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <header class="station-global-header">
+    <div class="station-global-header__inner">
+      <button class="brand station-global-header__menu-button" type="button" aria-label="사이드바 열기" aria-controls="main-sidebar" aria-expanded="false" data-sidebar-toggle>
+        <img class="brand__logo station-global-header__menu-icon" src="./assets/icons/menu.svg" alt="" aria-hidden="true">
+      </button>
+    </div>
+  </header>
+
+  <nav class="sidebar" id="main-sidebar" aria-label="구간 상세 내비게이션" data-sidebar hidden>
+    <div class="sidebar__panel">
+      <a class="sidebar__logo-area" href="./dashboard.html" aria-label="기상-철도 리스크 의사결정 지원 시스템 홈">
+        <span class="sidebar__logo-icon" aria-hidden="true"></span>
+        <span class="sidebar__logo-text">
+          <strong class="sidebar__logo-title">기상-철도 리스크</strong>
+          <span class="sidebar__logo-subtitle">의사결정 지원 시스템</span>
+        </span>
+      </a>
+
+      <ul class="sidebar__navigation-list" aria-label="주요 메뉴">
+        <li class="sidebar__navigation-item">
+          <a class="sidebar__navigation-link" href="./dashboard.html">
+            <span class="sidebar__navigation-icon sidebar__navigation-icon--home" aria-hidden="true"></span>
+            <span>대시보드</span>
+          </a>
+        </li>
+        <li class="sidebar__navigation-item">
+          <a class="sidebar__navigation-link" href="./station-detail.html">
+            <span class="sidebar__navigation-icon sidebar__navigation-icon--station" aria-hidden="true"></span>
+            <span>역 상세</span>
+          </a>
+        </li>
+        <li class="sidebar__navigation-item">
+          <a class="sidebar__navigation-link sidebar__navigation-link--active" href="./route-detail.html" aria-current="page">
+            <span class="sidebar__navigation-icon sidebar__navigation-icon--route" aria-hidden="true"></span>
+            <span>구간 상세</span>
+          </a>
+        </li>
+        <li class="sidebar__navigation-item">
+          <a class="sidebar__navigation-link" href="#">
+            <span class="sidebar__navigation-icon sidebar__navigation-icon--rag" aria-hidden="true"></span>
+            <span>RAG 심층 설명</span>
+          </a>
+        </li>
+        <li class="sidebar__navigation-item">
+          <a class="sidebar__navigation-link" href="#">
+            <span class="sidebar__navigation-icon sidebar__navigation-icon--analytics" aria-hidden="true"></span>
+            <span>데이터 분석·통계</span>
+          </a>
+        </li>
+      </ul>
+
+      <div class="sidebar__bottom">
+        <a class="sidebar__standard-link" href="#">
+          <span class="sidebar__standard-icon" aria-hidden="true"></span>
+          <span>데이터 기준 안내</span>
+        </a>
+        <button class="sidebar__collapse-button" type="button" aria-label="사이드바 닫기" data-sidebar-close>
+          <span class="sidebar__collapse-icon" aria-hidden="true"></span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="route-detail-main">
+    <nav class="route-breadcrumb" aria-label="현재 위치">
+      <a class="route-breadcrumb__link" href="./dashboard.html">대시보드</a>
+      <img class="route-breadcrumb__separator" src="./assets/icons/chevron-right.svg" alt="" aria-hidden="true">
+      <span class="route-breadcrumb__current" aria-current="page">구간 상세</span>
+    </nav>
+
+    <section class="route-page-title" aria-labelledby="route-detail-title">
+      <h1 class="route-page-title__heading" id="route-detail-title">구간 상세</h1>
+      <p class="route-page-title__description">특정 구간의 기상 영향과 철도 운행 현황을 확인할 수 있습니다.</p>
+    </section>
+
+    <section class="route-summary-grid" aria-label="구간 요약 정보">
+      <article class="route-info-card" aria-labelledby="route-name">
+        <div class="route-info-card__visual" aria-hidden="true">
+          <div class="route-info-card__line">
+            <span class="route-info-card__point"></span>
+            <span class="route-info-card__track"></span>
+            <span class="route-info-card__point"></span>
+          </div>
+          <div class="route-info-card__stations">
+            <strong>대전역</strong>
+            <strong>김천(구미)역</strong>
+          </div>
+        </div>
+
+        <div class="route-info-card__meta" aria-label="구간 기본 정보">
+          <div class="route-info-card__meta-item">
+            <span>노선</span>
+            <strong id="route-name">경부선 고속</strong>
+          </div>
+          <div class="route-info-card__divider" aria-hidden="true"></div>
+          <div class="route-info-card__meta-item">
+            <span>구간 거리</span>
+            <strong>114.7 km</strong>
+          </div>
+          <div class="route-info-card__divider" aria-hidden="true"></div>
+          <div class="route-info-card__meta-item">
+            <span>기준 시간</span>
+            <strong>45 분</strong>
+          </div>
+          <div class="route-info-card__divider" aria-hidden="true"></div>
+          <div class="route-info-card__meta-item">
+            <span>데이터 기준 시간</span>
+            <strong>2026.07.07 14:00</strong>
+          </div>
+        </div>
+      </article>
+
+      <aside class="route-risk-card" aria-labelledby="route-risk-title">
+        <img class="route-risk-card__icon" src="./assets/icons/triangle-alert.svg" alt="" aria-hidden="true">
+        <div class="route-risk-card__content">
+          <div class="route-risk-card__title-row">
+            <h2 class="route-risk-card__title" id="route-risk-title">현재 위험도</h2>
+            <span class="route-risk-card__badge">높음</span>
+          </div>
+          <p class="route-risk-card__alert">호우 경보</p>
+          <p class="route-risk-card__time">14:00 기준</p>
+        </div>
+      </aside>
+    </section>
+
+    <section class="route-content-card" aria-labelledby="route-tab-summary">
+      <header class="route-content-card__header">
+        <div class="route-tabs" role="tablist" aria-label="구간 상세 탭">
+          <button class="route-tabs__button route-tabs__button--active" type="button" role="tab" aria-selected="true" aria-controls="route-panel-summary" id="route-tab-summary" data-route-tab="summary">요약</button>
+          <button class="route-tabs__button" type="button" role="tab" aria-selected="false" aria-controls="route-panel-alerts" id="route-tab-alerts" data-route-tab="alerts">특보별 분석</button>
+          <button class="route-tabs__button" type="button" role="tab" aria-selected="false" aria-controls="route-panel-history" id="route-tab-history" data-route-tab="history">과거 사례</button>
+        </div>
+        <a class="route-rag-button" href="#" aria-label="RAG 심층 분석 보기">
+          RAG 심층 분석 보기
+          <img src="./assets/icons/chevron-right.svg" alt="" aria-hidden="true">
+        </a>
+      </header>
+
+      <div class="route-content-grid" id="route-panel-summary" role="tabpanel" aria-labelledby="route-tab-summary" data-route-panel="summary">
+        <div class="route-analysis-area">
+          <section class="route-metric-grid" aria-labelledby="route-metric-title">
+            <h2 class="sr-only" id="route-metric-title">구간 주요 지표</h2>
+
+            <article class="route-metric-card" aria-label="평균 예상 지연 시간 18.4분, 전일 대비 7.2분 증가">
+              <div class="route-metric-card__icon route-metric-card__icon--delay" aria-hidden="true">
+                <img src="./assets/icons/clock-4.svg" alt="">
+              </div>
+              <div class="route-metric-card__content">
+                <h3>평균 예상 지연 시간</h3>
+                <p><strong>18.4</strong><span>분</span></p>
+                <small>전일 대비 <b>+7.2 분 ↑</b></small>
+              </div>
+            </article>
+
+            <article class="route-metric-card" aria-label="지연 증가량 12.6분, 전일 대비 4.3분 증가">
+              <div class="route-metric-card__icon route-metric-card__icon--increase" aria-hidden="true">
+                <img src="./assets/icons/trending-up.svg" alt="">
+              </div>
+              <div class="route-metric-card__content">
+                <h3>지연 증가량</h3>
+                <p><strong>+12.6</strong><span>분</span></p>
+                <small>전일 대비 <b>+4.3 분 ↑</b></small>
+              </div>
+            </article>
+
+            <article class="route-metric-card" aria-label="운행 중단률 8.2퍼센트, 전일 대비 2.1퍼센트 포인트 증가">
+              <div class="route-metric-card__icon route-metric-card__icon--suspend" aria-hidden="true">
+                <img src="./assets/icons/circle-minus.svg" alt="">
+              </div>
+              <div class="route-metric-card__content">
+                <h3>운행 중단률</h3>
+                <p><strong>8.2</strong><span>%</span></p>
+                <small>전일 대비 <b>+2.1 %p ↑</b></small>
+              </div>
+            </article>
+
+            <article class="route-metric-card" aria-label="예상 영향 열차 34편, 전일 대비 9편 증가">
+              <div class="route-metric-card__icon route-metric-card__icon--train" aria-hidden="true">
+                <img src="./assets/icons/train-front.svg" alt="">
+              </div>
+              <div class="route-metric-card__content">
+                <h3>예상 영향 열차</h3>
+                <p><strong>34</strong><span>편</span></p>
+                <small>전일 대비 <b>+9 편 ↑</b></small>
+              </div>
+            </article>
+          </section>
+
+          <section class="route-chart-grid" aria-labelledby="route-chart-title">
+            <h2 class="sr-only" id="route-chart-title">구간 분석 차트</h2>
+
+            <article class="route-chart-card" aria-labelledby="route-hourly-title">
+              <header class="route-chart-card__header">
+                <h3 id="route-hourly-title">시간대별 평균 지연 시간</h3>
+                <span>(단위: 분)</span>
+              </header>
+              <div class="route-line-chart" role="img" aria-label="00시부터 24시까지 실제 지연과 예측 지연을 비교한 선 그래프">
+                <svg viewBox="0 0 452 220" aria-hidden="true">
+                  <g class="route-line-chart__grid">
+                    <line x1="34" y1="24" x2="440" y2="24"></line>
+                    <line x1="34" y1="72" x2="440" y2="72"></line>
+                    <line x1="34" y1="120" x2="440" y2="120"></line>
+                    <line x1="34" y1="168" x2="440" y2="168"></line>
+                  </g>
+                  <g class="route-line-chart__axis">
+                    <text x="4" y="28">40</text>
+                    <text x="4" y="76">30</text>
+                    <text x="4" y="124">20</text>
+                    <text x="10" y="172">10</text>
+                    <text x="14" y="204">0</text>
+                    <text x="32" y="216">00시</text>
+                    <text x="100" y="216">04시</text>
+                    <text x="168" y="216">08시</text>
+                    <text x="236" y="216">12시</text>
+                    <text x="304" y="216">16시</text>
+                    <text x="372" y="216">20시</text>
+                    <text x="414" y="216">24시</text>
+                  </g>
+                  <polyline class="route-line-chart__actual" points="38,154 86,148 134,124 182,92 230,84 278,104 326,86"></polyline>
+                  <polyline class="route-line-chart__forecast" points="326,86 374,114 438,76"></polyline>
+                  <circle class="route-line-chart__point" cx="182" cy="92" r="5"></circle>
+                  <g class="route-line-chart__tooltip">
+                    <rect x="162" y="56" width="44" height="28" rx="6"></rect>
+                    <text x="184" y="75" text-anchor="middle">18.4</text>
+                  </g>
+                </svg>
+                <div class="route-chart-legend">
+                  <span><i class="route-chart-legend__line route-chart-legend__line--actual"></i>실제</span>
+                  <span><i class="route-chart-legend__line route-chart-legend__line--forecast"></i>예측</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="route-chart-card" aria-labelledby="route-increase-title">
+              <header class="route-chart-card__header">
+                <h3 id="route-increase-title">지연 증가량 추이 <small>(최근 7일)</small></h3>
+                <span>(단위: 분)</span>
+              </header>
+              <div class="route-bar-chart" role="img" aria-label="최근 7일 지연 증가량 막대 그래프">
+                <div class="route-bar-chart__plot">
+                  <span class="route-bar-chart__y route-bar-chart__y--20">20</span>
+                  <span class="route-bar-chart__y route-bar-chart__y--15">15</span>
+                  <span class="route-bar-chart__y route-bar-chart__y--10">10</span>
+                  <span class="route-bar-chart__y route-bar-chart__y--5">5</span>
+                  <span class="route-bar-chart__y route-bar-chart__y--0">0</span>
+                  <div class="route-bar-chart__item route-bar-chart__item--d1"><span>3.1</span><strong>07/01</strong></div>
+                  <div class="route-bar-chart__item route-bar-chart__item--d2"><span>5.4</span><strong>07/02</strong></div>
+                  <div class="route-bar-chart__item route-bar-chart__item--d3"><span>7.8</span><strong>07/03</strong></div>
+                  <div class="route-bar-chart__item route-bar-chart__item--d4"><span>6.2</span><strong>07/04</strong></div>
+                  <div class="route-bar-chart__item route-bar-chart__item--d5"><span>4.1</span><strong>07/05</strong></div>
+                  <div class="route-bar-chart__item route-bar-chart__item--d6"><span>8.3</span><strong>07/06</strong></div>
+                  <div class="route-bar-chart__item route-bar-chart__item--today"><span>12.6</span><strong>07/07</strong></div>
+                </div>
+                <div class="route-chart-legend">
+                  <span><i class="route-chart-legend__bar route-chart-legend__bar--previous"></i>이전</span>
+                  <span><i class="route-chart-legend__bar route-chart-legend__bar--today"></i>오늘</span>
+                </div>
+              </div>
+            </article>
+          </section>
+
+          <section class="route-impact-card" aria-labelledby="route-impact-title">
+            <header class="route-impact-card__header">
+              <h2 id="route-impact-title">특보별 영향 요약</h2>
+              <span>(단위: 분, %)</span>
+            </header>
+            <div class="route-impact-table-wrap">
+              <table class="route-impact-table">
+                <caption class="sr-only">특보별 구간 영향 요약</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">특보 종류</th>
+                    <th scope="col">특보 등급</th>
+                    <th scope="col">평균 지연 시간(분)</th>
+                    <th scope="col">지연 증가량(분)</th>
+                    <th scope="col">운행 중단률(%)</th>
+                    <th scope="col">영향 빈도(최근 30일)</th>
+                    <th scope="col"><span class="sr-only">상세</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th scope="row"><img src="./assets/icons/cloud-rain.svg" alt="" aria-hidden="true">호우</th>
+                    <td><span class="route-status-badge route-status-badge--high">경보</span></td>
+                    <td>18.4</td>
+                    <td>+12.6</td>
+                    <td>8.2</td>
+                    <td>14 회</td>
+                    <td><img class="route-impact-table__chevron" src="./assets/icons/chevron-right.svg" alt="" aria-hidden="true"></td>
+                  </tr>
+                  <tr>
+                    <th scope="row"><img src="./assets/icons/cloud-rain.svg" alt="" aria-hidden="true">호우</th>
+                    <td><span class="route-status-badge route-status-badge--warning">주의보</span></td>
+                    <td>8.7</td>
+                    <td>+5.1</td>
+                    <td>3.6</td>
+                    <td>9 회</td>
+                    <td><img class="route-impact-table__chevron" src="./assets/icons/chevron-right.svg" alt="" aria-hidden="true"></td>
+                  </tr>
+                  <tr>
+                    <th scope="row"><img src="./assets/icons/trending-up.svg" alt="" aria-hidden="true">강풍</th>
+                    <td><span class="route-status-badge route-status-badge--warning">주의보</span></td>
+                    <td>6.2</td>
+                    <td>+2.8</td>
+                    <td>2.1</td>
+                    <td>6 회</td>
+                    <td><img class="route-impact-table__chevron" src="./assets/icons/chevron-right.svg" alt="" aria-hidden="true"></td>
+                  </tr>
+                  <tr>
+                    <th scope="row"><img src="./assets/icons/snowflake.svg" alt="" aria-hidden="true">대설</th>
+                    <td><span class="route-status-badge route-status-badge--info">주의보</span></td>
+                    <td>12.1</td>
+                    <td>+6.9</td>
+                    <td>4.3</td>
+                    <td>3 회</td>
+                    <td><img class="route-impact-table__chevron" src="./assets/icons/chevron-right.svg" alt="" aria-hidden="true"></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+
+        <aside class="route-side-area" aria-label="현재 특보와 위험도 기준">
+          <section class="route-alert-card" aria-labelledby="route-alert-title">
+            <h2 id="route-alert-title">현재 발효 특보</h2>
+            <div class="route-alert-card__box">
+              <div class="route-alert-card__headline">
+                <img src="./assets/icons/cloud-rain.svg" alt="" aria-hidden="true">
+                <strong>호우 경보</strong>
+              </div>
+              <dl class="route-alert-card__details">
+                <div>
+                  <dt>발효 지역</dt>
+                  <dd>대전광역시, 충청북도, 경상북도(김천)</dd>
+                </div>
+                <div>
+                  <dt>시작 시간</dt>
+                  <dd>07.07 12:00</dd>
+                </div>
+                <div>
+                  <dt>종료 예상</dt>
+                  <dd>07.07 22:00</dd>
+                </div>
+              </dl>
+            </div>
+          </section>
+
+          <button class="route-risk-criteria" type="button" aria-label="위험도 산정 기준 보기">
+            <span><img src="./assets/icons/circle-info.svg" alt="" aria-hidden="true">위험도 산정 기준 보기</span>
+            <img src="./assets/icons/chevron-down.svg" alt="" aria-hidden="true">
+          </button>
+        </aside>
+      </div>
+
+      <p class="route-metric-description" data-route-panel="summary">
+        <img src="./assets/icons/circle-info.svg" alt="" aria-hidden="true">
+        지표 설명: 평균 지연 증가량은 평상시 평균 지연 시간 대비 특보 발생 시 평균 지연 시간의 증가 수치입니다.
+      </p>
+      <div class="route-content-grid route-content-grid--alert-analysis" id="route-panel-alerts" role="tabpanel" aria-labelledby="route-tab-alerts" data-route-panel="alerts" hidden>
+        <div class="route-analysis-area">
+          <section class="route-alert-analysis-card" aria-labelledby="route-alert-analysis-title">
+            <h2 id="route-alert-analysis-title">특보별 영향 비교</h2>
+            <div class="route-alert-analysis-table-wrap">
+              <table class="route-alert-analysis-table">
+                <caption class="sr-only">특보별 영향 비교 표</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">특보 종류</th>
+                    <th scope="col">특보 등급</th>
+                    <th scope="col">발생 빈도 (최근 30일)</th>
+                    <th scope="col">평균 지연 시간(분)</th>
+                    <th scope="col">지연 증가량(분)</th>
+                    <th scope="col">운행 중단률(%)</th>
+                    <th scope="col">최대 지연 시간(분)</th>
+                    <th scope="col">영향 열차(평균)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th scope="row"><img src="./assets/icons/cloud-rain.svg" alt="" aria-hidden="true">호우</th>
+                    <td><span class="route-status-badge route-status-badge--high">경보</span></td>
+                    <td>14 회</td>
+                    <td>18.4</td>
+                    <td>+12.6</td>
+                    <td>8.2</td>
+                    <td>65.3</td>
+                    <td>34 편</td>
+                  </tr>
+                  <tr>
+                    <th scope="row"><img src="./assets/icons/cloud-rain.svg" alt="" aria-hidden="true">호우</th>
+                    <td><span class="route-status-badge route-status-badge--warning">주의보</span></td>
+                    <td>9 회</td>
+                    <td>8.7</td>
+                    <td>+5.1</td>
+                    <td>3.6</td>
+                    <td>32.8</td>
+                    <td>15 편</td>
+                  </tr>
+                  <tr>
+                    <th scope="row"><img src="./assets/icons/trending-up.svg" alt="" aria-hidden="true">강풍</th>
+                    <td><span class="route-status-badge route-status-badge--warning">주의보</span></td>
+                    <td>6 회</td>
+                    <td>6.2</td>
+                    <td>+2.8</td>
+                    <td>2.1</td>
+                    <td>24.6</td>
+                    <td>11 편</td>
+                  </tr>
+                  <tr>
+                    <th scope="row"><img src="./assets/icons/snowflake.svg" alt="" aria-hidden="true">대설</th>
+                    <td><span class="route-status-badge route-status-badge--info">주의보</span></td>
+                    <td>3 회</td>
+                    <td>12.1</td>
+                    <td>+6.9</td>
+                    <td>4.3</td>
+                    <td>41.2</td>
+                    <td>18 편</td>
+                  </tr>
+                  <tr>
+                    <th scope="row"><img src="./assets/icons/circle.svg" alt="" aria-hidden="true">안개</th>
+                    <td><span class="route-status-badge route-status-badge--neutral">주의보</span></td>
+                    <td>5 회</td>
+                    <td>5.3</td>
+                    <td>+1.9</td>
+                    <td>1.8</td>
+                    <td>18.7</td>
+                    <td>8 편</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="route-alert-chart-grid" aria-labelledby="route-alert-chart-title">
+            <h2 class="sr-only" id="route-alert-chart-title">특보별 분석 차트</h2>
+            <article class="route-alert-horizontal-card" aria-labelledby="route-alert-delay-title">
+              <header class="route-alert-horizontal-card__header">
+                <h3 id="route-alert-delay-title">특보별 평균 지연 시간</h3>
+                <span>(단위: 분)</span>
+              </header>
+              <div class="route-horizontal-chart" role="img" aria-label="특보별 평균 지연 시간을 비교한 가로 막대 차트">
+                <div class="route-horizontal-chart__row route-horizontal-chart__row--rain-warning"><span>호우 (경보)</span><i></i><strong>18.4</strong></div>
+                <div class="route-horizontal-chart__row route-horizontal-chart__row--rain-watch"><span>호우 (주의보)</span><i></i><strong>8.7</strong></div>
+                <div class="route-horizontal-chart__row route-horizontal-chart__row--snow"><span>대설 (주의보)</span><i></i><strong>12.1</strong></div>
+                <div class="route-horizontal-chart__row route-horizontal-chart__row--wind"><span>강풍 (주의보)</span><i></i><strong>6.2</strong></div>
+                <div class="route-horizontal-chart__row route-horizontal-chart__row--fog"><span>안개 (주의보)</span><i></i><strong>5.3</strong></div>
+                <div class="route-horizontal-chart__axis"><span>0</span><span>5</span><span>10</span><span>15</span><span>20</span></div>
+              </div>
+            </article>
+
+            <article class="route-alert-horizontal-card" aria-labelledby="route-alert-stop-title">
+              <header class="route-alert-horizontal-card__header">
+                <h3 id="route-alert-stop-title">특보별 운행 중단률</h3>
+                <span>(단위: %)</span>
+              </header>
+              <div class="route-horizontal-chart route-horizontal-chart--rate" role="img" aria-label="특보별 운행 중단률을 비교한 가로 막대 차트">
+                <div class="route-horizontal-chart__row route-horizontal-chart__row--rain-warning"><span>호우 (경보)</span><i></i><strong>8.2%</strong></div>
+                <div class="route-horizontal-chart__row route-horizontal-chart__row--rain-watch"><span>호우 (주의보)</span><i></i><strong>3.6%</strong></div>
+                <div class="route-horizontal-chart__row route-horizontal-chart__row--snow"><span>대설 (주의보)</span><i></i><strong>4.3%</strong></div>
+                <div class="route-horizontal-chart__row route-horizontal-chart__row--wind"><span>강풍 (주의보)</span><i></i><strong>2.1%</strong></div>
+                <div class="route-horizontal-chart__row route-horizontal-chart__row--fog"><span>안개 (주의보)</span><i></i><strong>1.8%</strong></div>
+                <div class="route-horizontal-chart__axis"><span>0</span><span>2</span><span>4</span><span>6</span><span>8</span><span>10</span></div>
+              </div>
+            </article>
+          </section>
+
+          <p class="route-analysis-footnote">
+            <img src="./assets/icons/circle-info.svg" alt="" aria-hidden="true">
+            분석 기간: 최근 30일 (2026.06.08 ~ 2026.07.07)
+            <span>특보 기준: 기상청 발표 기준</span>
+          </p>
+        </div>
+
+        <aside class="route-side-area" aria-label="특보 분석 보조 정보">
+          <section class="route-alert-card" aria-labelledby="route-alert-analysis-current-title">
+            <h2 id="route-alert-analysis-current-title">현재 발효 특보</h2>
+            <div class="route-alert-card__box">
+              <div class="route-alert-card__headline">
+                <img src="./assets/icons/cloud-rain.svg" alt="" aria-hidden="true">
+                <strong>호우 경보</strong>
+              </div>
+              <dl class="route-alert-card__details">
+                <div>
+                  <dt>발효 지역</dt>
+                  <dd>대전광역시, 충청북도, 경상북도(김천)</dd>
+                </div>
+                <div>
+                  <dt>시작 시간</dt>
+                  <dd>07.07 12:00</dd>
+                </div>
+                <div>
+                  <dt>종료 예상</dt>
+                  <dd>07.07 22:00</dd>
+                </div>
+              </dl>
+            </div>
+          </section>
+
+          <button class="route-risk-criteria" type="button" aria-label="위험도 산정 기준 보기">
+            <span><img src="./assets/icons/circle-info.svg" alt="" aria-hidden="true">위험도 산정 기준 보기</span>
+            <img src="./assets/icons/chevron-down.svg" alt="" aria-hidden="true">
+          </button>
+
+          <section class="route-grade-card" aria-labelledby="route-grade-title">
+            <h2 id="route-grade-title">특보 등급 기준</h2>
+            <ul class="route-grade-card__list">
+              <li><i class="route-grade-card__dot route-grade-card__dot--high"></i><strong>경보</strong><span>피해 발생이 예상되어 대응이 필요한 수준</span></li>
+              <li><i class="route-grade-card__dot route-grade-card__dot--warning"></i><strong>주의보</strong><span>피해 발생이 우려되어 주의가 필요한 수준</span></li>
+              <li><i class="route-grade-card__dot route-grade-card__dot--safe"></i><strong>관심</strong><span>주의가 필요한 기상 상황</span></li>
+              <li><i class="route-grade-card__dot route-grade-card__dot--info"></i><strong>정보</strong><span>참고가 필요한 기상 상황</span></li>
+            </ul>
+          </section>
+        </aside>
+      </div>
+
+      <p class="route-metric-description" data-route-panel="alerts" hidden>
+        <img src="./assets/icons/circle-info.svg" alt="" aria-hidden="true">
+        특보별 분석은 최근 30일 동안의 특보 발생 빈도와 운행 영향 지표를 비교합니다.
+      </p>
+
+      <div class="route-content-grid route-content-grid--history" id="route-panel-history" role="tabpanel" aria-labelledby="route-tab-history" data-route-panel="history" hidden>
+        <div class="route-analysis-area">
+          <form class="route-history-filter" action="#" method="get" aria-label="과거 사례 필터">
+            <div class="route-history-filter__group">
+              <label for="history-alert-type">특보 종류</label>
+              <select id="history-alert-type" name="alertType">
+                <option value="rain" selected>호우</option>
+                <option value="snow">대설</option>
+                <option value="wind">강풍</option>
+              </select>
+            </div>
+            <div class="route-history-filter__group">
+              <label for="history-alert-level">특보 등급</label>
+              <select id="history-alert-level" name="alertLevel">
+                <option value="all" selected>전체</option>
+                <option value="warning">주의보</option>
+                <option value="high">경보</option>
+              </select>
+            </div>
+            <div class="route-history-filter__group">
+              <label for="history-period">기간</label>
+              <select id="history-period" name="period">
+                <option value="1y" selected>최근 1년</option>
+                <option value="6m">최근 6개월</option>
+                <option value="3m">최근 3개월</option>
+              </select>
+            </div>
+            <button class="route-history-filter__button" type="submit">조회 <span aria-hidden="true">↻</span></button>
+          </form>
+
+          <section class="route-history-list-card" aria-labelledby="route-history-list-title">
+            <header class="route-history-list-card__header">
+              <h2 id="route-history-list-title">유사 사례 목록</h2>
+              <span aria-label="유사도 산정 안내">i</span>
+            </header>
+            <div class="route-history-table-wrap">
+              <table class="route-history-table">
+                <caption class="sr-only">구간 과거 유사 사례 목록</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">발생 일시</th>
+                    <th scope="col">특보 종류 / 등급</th>
+                    <th scope="col">누적 강수량 (mm)</th>
+                    <th scope="col">평균 지연 시간 (분)</th>
+                    <th scope="col">지연 증가량 (분)</th>
+                    <th scope="col">운행 중단률 (%)</th>
+                    <th scope="col">영향 열차 (편)</th>
+                    <th scope="col">유사도</th>
+                    <th scope="col">상세</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>2025.07.02 10:00</td>
+                    <td><span class="route-history-alert"><img src="./assets/icons/cloud-rain.svg" alt="" aria-hidden="true"><b class="route-status-badge route-status-badge--high">호우 경보</b></span></td>
+                    <td>162.3</td>
+                    <td>19.6</td>
+                    <td class="route-history-table__increase">+13.4</td>
+                    <td>8.9</td>
+                    <td>36</td>
+                    <td><span class="route-history-stars" aria-label="유사도 별 5개 만점">★★★★★</span></td>
+                    <td><img class="route-history-table__chevron" src="./assets/icons/chevron-right.svg" alt="" aria-hidden="true"></td>
+                  </tr>
+                  <tr>
+                    <td>2024.09.21 09:00</td>
+                    <td><span class="route-history-alert"><img src="./assets/icons/cloud-rain.svg" alt="" aria-hidden="true"><b class="route-status-badge route-status-badge--warning">호우 주의보</b></span></td>
+                    <td>112.7</td>
+                    <td>12.1</td>
+                    <td class="route-history-table__increase">+6.5</td>
+                    <td>4.3</td>
+                    <td>18</td>
+                    <td><span class="route-history-stars" aria-label="유사도 별 4개">★★★★☆</span></td>
+                    <td><img class="route-history-table__chevron" src="./assets/icons/chevron-right.svg" alt="" aria-hidden="true"></td>
+                  </tr>
+                  <tr>
+                    <td>2025.06.17 14:00</td>
+                    <td><span class="route-history-alert"><img src="./assets/icons/cloud-rain.svg" alt="" aria-hidden="true"><b class="route-status-badge route-status-badge--high">호우 경보</b></span></td>
+                    <td>158.9</td>
+                    <td>17.2</td>
+                    <td class="route-history-table__increase">+10.8</td>
+                    <td>7.1</td>
+                    <td>30</td>
+                    <td><span class="route-history-stars" aria-label="유사도 별 4개">★★★★☆</span></td>
+                    <td><img class="route-history-table__chevron" src="./assets/icons/chevron-right.svg" alt="" aria-hidden="true"></td>
+                  </tr>
+                  <tr>
+                    <td>2025.08.15 08:00</td>
+                    <td><span class="route-history-alert"><img src="./assets/icons/cloud-rain.svg" alt="" aria-hidden="true"><b class="route-status-badge route-status-badge--warning">호우 주의보</b></span></td>
+                    <td>98.4</td>
+                    <td>9.3</td>
+                    <td class="route-history-table__increase">+4.2</td>
+                    <td>2.6</td>
+                    <td>12</td>
+                    <td><span class="route-history-stars" aria-label="유사도 별 3개">★★★☆☆</span></td>
+                    <td><img class="route-history-table__chevron" src="./assets/icons/chevron-right.svg" alt="" aria-hidden="true"></td>
+                  </tr>
+                  <tr>
+                    <td>2024.07.11 11:00</td>
+                    <td><span class="route-history-alert"><img src="./assets/icons/cloud-rain.svg" alt="" aria-hidden="true"><b class="route-status-badge route-status-badge--safe">호우 관심</b></span></td>
+                    <td>72.1</td>
+                    <td>6.1</td>
+                    <td class="route-history-table__increase">+2.3</td>
+                    <td>1.2</td>
+                    <td>6</td>
+                    <td><span class="route-history-stars" aria-label="유사도 별 3개">★★★☆☆</span></td>
+                    <td><img class="route-history-table__chevron" src="./assets/icons/chevron-right.svg" alt="" aria-hidden="true"></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <nav class="route-history-pagination" aria-label="과거 사례 페이지">
+              <button type="button" aria-label="이전 페이지" disabled>‹</button>
+              <button class="route-history-pagination__current" type="button" aria-current="page">1</button>
+              <button type="button">2</button>
+              <button type="button" aria-label="다음 페이지">›</button>
+            </nav>
+          </section>
+
+          <section class="route-history-comparison" aria-labelledby="route-history-comparison-title">
+            <h2 id="route-history-comparison-title">과거 사례 비교 <span>(상위 3건)</span></h2>
+            <div class="route-history-comparison__grid">
+              <article class="route-history-mini-chart" aria-labelledby="history-delay-compare-title">
+                <header><h3 id="history-delay-compare-title">평균 지연 시간 비교</h3><span>(단위: 분)</span></header>
+                <div class="route-mini-bar-chart route-mini-bar-chart--delay" role="img" aria-label="평균 지연 시간 비교 막대 차트">
+                  <i class="route-mini-bar-chart__bar route-mini-bar-chart__bar--case1"><b>19.6</b><span>2025.07.02<br>(경보)</span></i>
+                  <i class="route-mini-bar-chart__bar route-mini-bar-chart__bar--case2"><b>17.2</b><span>2025.06.17<br>(경보)</span></i>
+                  <i class="route-mini-bar-chart__bar route-mini-bar-chart__bar--case3"><b>12.1</b><span>2024.09.21<br>(주의보)</span></i>
+                  <i class="route-mini-bar-chart__bar route-mini-bar-chart__bar--forecast"><b>18.4</b><span>현재 예측</span></i>
+                </div>
+              </article>
+              <article class="route-history-mini-chart" aria-labelledby="history-increase-compare-title">
+                <header><h3 id="history-increase-compare-title">지연 증가량 비교</h3><span>(단위: 분)</span></header>
+                <div class="route-mini-bar-chart route-mini-bar-chart--increase" role="img" aria-label="지연 증가량 비교 막대 차트">
+                  <i class="route-mini-bar-chart__bar route-mini-bar-chart__bar--case1"><b>+13.4</b><span>2025.07.02</span></i>
+                  <i class="route-mini-bar-chart__bar route-mini-bar-chart__bar--case2"><b>+10.8</b><span>2025.06.17</span></i>
+                  <i class="route-mini-bar-chart__bar route-mini-bar-chart__bar--case3"><b>+6.5</b><span>2024.09.21</span></i>
+                  <i class="route-mini-bar-chart__bar route-mini-bar-chart__bar--forecast"><b>+12.6</b><span>현재 예측</span></i>
+                </div>
+              </article>
+              <article class="route-history-mini-chart" aria-labelledby="history-stop-compare-title">
+                <header><h3 id="history-stop-compare-title">운행 중단률 비교</h3><span>(단위: %)</span></header>
+                <div class="route-mini-bar-chart route-mini-bar-chart--stop" role="img" aria-label="운행 중단률 비교 막대 차트">
+                  <i class="route-mini-bar-chart__bar route-mini-bar-chart__bar--case1"><b>8.9</b><span>2025.07.02</span></i>
+                  <i class="route-mini-bar-chart__bar route-mini-bar-chart__bar--case2"><b>7.1</b><span>2025.06.17</span></i>
+                  <i class="route-mini-bar-chart__bar route-mini-bar-chart__bar--case3"><b>4.3</b><span>2024.09.21</span></i>
+                  <i class="route-mini-bar-chart__bar route-mini-bar-chart__bar--forecast"><b>8.2</b><span>현재 예측</span></i>
+                </div>
+              </article>
+              <article class="route-history-mini-chart" aria-labelledby="history-rain-compare-title">
+                <header><h3 id="history-rain-compare-title">누적 강수량 비교</h3><span>(단위: mm)</span></header>
+                <div class="route-mini-bar-chart route-mini-bar-chart--rain" role="img" aria-label="누적 강수량 비교 막대 차트">
+                  <i class="route-mini-bar-chart__bar route-mini-bar-chart__bar--case1"><b>162.3</b><span>2025.07.02</span></i>
+                  <i class="route-mini-bar-chart__bar route-mini-bar-chart__bar--case2"><b>158.9</b><span>2025.06.17</span></i>
+                  <i class="route-mini-bar-chart__bar route-mini-bar-chart__bar--case3"><b>112.7</b><span>2024.09.21</span></i>
+                  <i class="route-mini-bar-chart__bar route-mini-bar-chart__bar--forecast"><b>126.4</b><span>현재 관측</span></i>
+                </div>
+              </article>
+            </div>
+          </section>
+        </div>
+
+        <aside class="route-side-area" aria-label="과거 사례 보조 정보">
+          <section class="route-alert-card" aria-labelledby="route-history-current-alert-title">
+            <h2 id="route-history-current-alert-title">현재 발효 특보</h2>
+            <div class="route-alert-card__box">
+              <div class="route-alert-card__headline">
+                <img src="./assets/icons/cloud-rain.svg" alt="" aria-hidden="true">
+                <strong>호우 경보</strong>
+              </div>
+              <dl class="route-alert-card__details">
+                <div>
+                  <dt>발효 지역</dt>
+                  <dd>대전광역시, 충청북도, 경상북도(김천)</dd>
+                </div>
+                <div>
+                  <dt>시작 시간</dt>
+                  <dd>07.07 12:00</dd>
+                </div>
+                <div>
+                  <dt>종료 예상</dt>
+                  <dd>07.07 22:00</dd>
+                </div>
+              </dl>
+            </div>
+          </section>
+
+          <button class="route-risk-criteria" type="button" aria-label="위험도 산정 기준 보기">
+            <span><img src="./assets/icons/circle-info.svg" alt="" aria-hidden="true">위험도 산정 기준 보기</span>
+            <img src="./assets/icons/chevron-down.svg" alt="" aria-hidden="true">
+          </button>
+
+          <section class="route-similar-card" aria-labelledby="route-similar-title">
+            <h2 id="route-similar-title">현재 사례와 유사한 과거 사례</h2>
+            <article class="route-similar-card__case">
+              <strong>1순위 사례</strong>
+              <p>2025.07.02 10:00 (유사도 98%)</p>
+              <div class="route-similar-card__metrics">
+                <span>평균 지연 시간 <b>19.6분</b></span>
+                <span>지연 증가량 <b>+13.4분</b></span>
+                <span>운행 중단률 <b>8.9%</b></span>
+                <span>영향 열차 <b>36편</b></span>
+              </div>
+              <a class="route-similar-card__button" href="#">상세 비교 보기 <img src="./assets/icons/chevron-right.svg" alt="" aria-hidden="true"></a>
+            </article>
+          </section>
+        </aside>
+      </div>
+
+      <p class="route-metric-description" data-route-panel="history" hidden>
+        <img src="./assets/icons/circle-info.svg" alt="" aria-hidden="true">
+        분석 기간: 최근 1년 (2025.07.07 ~ 2026.07.07) <span>특보 기준: 기상청 발표 기준</span> <span>유사도 기준: 누적 강수량, 지연 시간, 운행 중단률 가중 평균</span>
+      </p>    </section>
+  </main>
+
+  <script src="./sidebar.js" defer></script>
+  <script src="./route-detail.js" defer></script>
+</body>
+</html>
