@@ -74,12 +74,12 @@
     <nav class="route-breadcrumb" aria-label="현재 위치">
       <a class="route-breadcrumb__link" href="./dashboard.html">대시보드</a>
       <img class="route-breadcrumb__separator" src="./assets/icons/chevron-right.svg" alt="" aria-hidden="true">
-      <span class="route-breadcrumb__current" aria-current="page">구간 상세</span>
+      <span class="route-breadcrumb__current" aria-current="page" data-route-detail-breadcrumb>구간 상세</span>
     </nav>
 
     <section class="route-page-title" aria-labelledby="route-detail-title">
-      <h1 class="route-page-title__heading" id="route-detail-title">구간 상세</h1>
-      <p class="route-page-title__description">특정 구간의 기상 영향과 철도 운행 현황을 확인할 수 있습니다.</p>
+      <h1 class="route-page-title__heading" id="route-detail-title" data-route-detail-title>구간 상세</h1>
+      <p class="route-page-title__description" data-route-detail-description>특정 구간의 기상 영향과 철도 운행 현황을 확인할 수 있습니다.</p>
     </section>
 
     <section class="route-summary-grid" aria-label="구간 요약 정보">
@@ -91,15 +91,15 @@
             <span class="route-info-card__point"></span>
           </div>
           <div class="route-info-card__stations">
-            <strong>대전역</strong>
-            <strong>김천(구미)역</strong>
+            <strong data-route-detail-from-station>대전역</strong>
+            <strong data-route-detail-to-station>김천(구미)역</strong>
           </div>
         </div>
 
         <div class="route-info-card__meta" aria-label="구간 기본 정보">
           <div class="route-info-card__meta-item">
             <span>노선</span>
-            <strong id="route-name">경부선 고속</strong>
+            <strong id="route-name" data-route-detail-line>경부선 고속</strong>
           </div>
           <div class="route-info-card__divider" aria-hidden="true"></div>
           <div class="route-info-card__meta-item">
@@ -114,20 +114,20 @@
           <div class="route-info-card__divider" aria-hidden="true"></div>
           <div class="route-info-card__meta-item">
             <span>데이터 기준 시간</span>
-            <strong>2026.07.07 14:00</strong>
+            <strong data-route-detail-reference-time>2026.07.07 14:00</strong>
           </div>
         </div>
       </article>
 
-      <aside class="route-risk-card" aria-labelledby="route-risk-title">
+      <aside class="route-risk-card" aria-labelledby="route-risk-title" data-route-detail-risk-card>
         <img class="route-risk-card__icon" src="./assets/icons/triangle-alert.svg" alt="" aria-hidden="true">
         <div class="route-risk-card__content">
           <div class="route-risk-card__title-row">
             <h2 class="route-risk-card__title" id="route-risk-title">현재 위험도</h2>
-            <span class="route-risk-card__badge">높음</span>
+            <span class="route-risk-card__badge" data-route-detail-risk-badge>높음</span>
           </div>
-          <p class="route-risk-card__alert">호우 경보</p>
-          <p class="route-risk-card__time">14:00 기준</p>
+          <p class="route-risk-card__alert" data-route-detail-alert>호우 경보</p>
+          <p class="route-risk-card__time" data-route-detail-risk-time>14:00 기준</p>
         </div>
       </aside>
     </section>
@@ -150,47 +150,47 @@
           <section class="route-metric-grid" aria-labelledby="route-metric-title">
             <h2 class="sr-only" id="route-metric-title">구간 주요 지표</h2>
 
-            <article class="route-metric-card" aria-label="평균 예상 지연 시간 18.4분, 전일 대비 7.2분 증가">
+            <article class="route-metric-card" aria-label="평균 예상 지연 시간 18.4분, 전일 대비 7.2분 증가" data-route-detail-metric="avg-delay">
               <div class="route-metric-card__icon route-metric-card__icon--delay" aria-hidden="true">
                 <img src="./assets/icons/clock-4.svg" alt="">
               </div>
               <div class="route-metric-card__content">
                 <h3>평균 예상 지연 시간</h3>
-                <p><strong>18.4</strong><span>분</span></p>
-                <small>전일 대비 <b>+7.2 분 ↑</b></small>
+                <p><strong data-route-detail-metric-value>18.4</strong><span data-route-detail-metric-unit>분</span></p>
+                <small data-route-detail-metric-comparison>전일 대비 <b>+7.2 분 ↑</b></small>
               </div>
             </article>
 
-            <article class="route-metric-card" aria-label="지연 증가량 12.6분, 전일 대비 4.3분 증가">
+            <article class="route-metric-card" aria-label="지연 증가량 12.6분, 전일 대비 4.3분 증가" data-route-detail-metric="delay-increase">
               <div class="route-metric-card__icon route-metric-card__icon--increase" aria-hidden="true">
                 <img src="./assets/icons/trending-up.svg" alt="">
               </div>
               <div class="route-metric-card__content">
                 <h3>지연 증가량</h3>
-                <p><strong>+12.6</strong><span>분</span></p>
-                <small>전일 대비 <b>+4.3 분 ↑</b></small>
+                <p><strong data-route-detail-metric-value>+12.6</strong><span data-route-detail-metric-unit>분</span></p>
+                <small data-route-detail-metric-comparison>전일 대비 <b>+4.3 분 ↑</b></small>
               </div>
             </article>
 
-            <article class="route-metric-card" aria-label="운행 중단률 8.2퍼센트, 전일 대비 2.1퍼센트 포인트 증가">
+            <article class="route-metric-card" aria-label="운행 중단률 8.2퍼센트, 전일 대비 2.1퍼센트 포인트 증가" data-route-detail-metric="stop-rate">
               <div class="route-metric-card__icon route-metric-card__icon--suspend" aria-hidden="true">
                 <img src="./assets/icons/circle-minus.svg" alt="">
               </div>
               <div class="route-metric-card__content">
                 <h3>운행 중단률</h3>
-                <p><strong>8.2</strong><span>%</span></p>
-                <small>전일 대비 <b>+2.1 %p ↑</b></small>
+                <p><strong data-route-detail-metric-value>8.2</strong><span data-route-detail-metric-unit>%</span></p>
+                <small data-route-detail-metric-comparison>전일 대비 <b>+2.1 %p ↑</b></small>
               </div>
             </article>
 
-            <article class="route-metric-card" aria-label="예상 영향 열차 34편, 전일 대비 9편 증가">
+            <article class="route-metric-card" aria-label="예상 영향 열차 34편, 전일 대비 9편 증가" data-route-detail-metric="sample-count">
               <div class="route-metric-card__icon route-metric-card__icon--train" aria-hidden="true">
                 <img src="./assets/icons/train-front.svg" alt="">
               </div>
               <div class="route-metric-card__content">
-                <h3>예상 영향 열차</h3>
-                <p><strong>34</strong><span>편</span></p>
-                <small>전일 대비 <b>+9 편 ↑</b></small>
+                <h3>분석 표본 수</h3>
+                <p><strong data-route-detail-metric-value>34</strong><span data-route-detail-metric-unit>건</span></p>
+                <small data-route-detail-metric-comparison>mock 기준 <b>표본 수</b></small>
               </div>
             </article>
           </section>
@@ -203,7 +203,7 @@
                 <h3 id="route-hourly-title">시간대별 평균 지연 시간</h3>
                 <span>(단위: 분)</span>
               </header>
-              <div class="route-line-chart" role="img" aria-label="00시부터 24시까지 실제 지연과 예측 지연을 비교한 선 그래프">
+              <div class="route-line-chart" role="img" aria-label="00시부터 24시까지 실제 지연과 예측 지연을 비교한 선 그래프" data-route-detail-line-chart>
                 <svg viewBox="0 0 452 220" aria-hidden="true">
                   <g class="route-line-chart__grid">
                     <line x1="34" y1="24" x2="440" y2="24"></line>
@@ -225,12 +225,12 @@
                     <text x="372" y="216">20시</text>
                     <text x="414" y="216">24시</text>
                   </g>
-                  <polyline class="route-line-chart__actual" points="38,154 86,148 134,124 182,92 230,84 278,104 326,86"></polyline>
-                  <polyline class="route-line-chart__forecast" points="326,86 374,114 438,76"></polyline>
-                  <circle class="route-line-chart__point" cx="182" cy="92" r="5"></circle>
+                  <polyline class="route-line-chart__actual" points="38,154 86,148 134,124 182,92 230,84 278,104 326,86" data-route-detail-line-actual></polyline>
+                  <polyline class="route-line-chart__forecast" points="326,86 374,114 438,76" data-route-detail-line-forecast></polyline>
+                  <circle class="route-line-chart__point" cx="182" cy="92" r="5" data-route-detail-line-point></circle>
                   <g class="route-line-chart__tooltip">
-                    <rect x="162" y="56" width="44" height="28" rx="6"></rect>
-                    <text x="184" y="75" text-anchor="middle">18.4</text>
+                    <rect x="162" y="56" width="44" height="28" rx="6" data-route-detail-line-tooltip-box></rect>
+                    <text x="184" y="75" text-anchor="middle" data-route-detail-line-tooltip>18.4</text>
                   </g>
                 </svg>
                 <div class="route-chart-legend">
@@ -246,7 +246,7 @@
                 <span>(단위: 분)</span>
               </header>
               <div class="route-bar-chart" role="img" aria-label="최근 7일 지연 증가량 막대 그래프">
-                <div class="route-bar-chart__plot">
+                <div class="route-bar-chart__plot" data-route-detail-bar-chart>
                   <span class="route-bar-chart__y route-bar-chart__y--20">20</span>
                   <span class="route-bar-chart__y route-bar-chart__y--15">15</span>
                   <span class="route-bar-chart__y route-bar-chart__y--10">10</span>
@@ -287,7 +287,7 @@
                     <th scope="col"><span class="sr-only">상세</span></th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody data-route-detail-impact-summary-body>
                   <tr>
                     <th scope="row"><img src="./assets/icons/cloud-rain.svg" alt="" aria-hidden="true">호우</th>
                     <td><span class="route-status-badge route-status-badge--high">경보</span></td>
@@ -385,7 +385,7 @@
                     <th scope="col">영향 열차(평균)</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody data-route-detail-alert-analysis-body>
                   <tr>
                     <th scope="row"><img src="./assets/icons/cloud-rain.svg" alt="" aria-hidden="true">호우</th>
                     <td><span class="route-status-badge route-status-badge--high">경보</span></td>
@@ -579,7 +579,7 @@
                     <th scope="col">상세</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody data-route-detail-history-body>
                   <tr>
                     <td>2025.07.02 10:00</td>
                     <td><span class="route-history-alert"><img src="./assets/icons/cloud-rain.svg" alt="" aria-hidden="true"><b class="route-status-badge route-status-badge--high">호우 경보</b></span></td>

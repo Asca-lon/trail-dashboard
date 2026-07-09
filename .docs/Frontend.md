@@ -1322,6 +1322,1978 @@ rg -n "station-global-header__right|station-global-header__timestamp|station-glo
 
 ---
 
+# 구간 상세 전체 Mock 연결 검수 작업 요약
+
+# 개요
+
+구간 상세 화면의 전체 mock 연결 상태를 검수했습니다.
+
+검수 범위는 구간 제목, breadcrumb, 상단 요약, 주요 지표 카드, 특보별 분석 테이블, 과거 사례 테이블, 대시보드에서 구간 상세로 이동하는 흐름입니다.
+
+# 구현 목적
+
+여러 단계로 나누어 연결한 구간 상세 mock 데이터가 같은 `segment_id` 기준으로 일관되게 표시되는지 확인하기 위함입니다.
+
+# 구현 내용
+
+이번 단계에서는 기능 코드를 새로 추가하지 않고 검수와 문서화를 진행했습니다.
+
+검수한 파일:
+
+- `frontend/route-detail.js`
+- `frontend/dashboard.js`
+- `mock/segments_details.json`
+- `mock/vulnerability_segments.json`
+
+# 코드 설명
+
+## 왜 필요한가
+
+구간 상세 화면은 여러 mock 파일을 함께 사용합니다.
+
+`vulnerability_segments.json`은 요약 지표를 담당하고, `segments_details.json`은 특보별 통계와 과거 사례를 담당합니다.
+
+두 mock의 `segment_id`가 맞지 않으면 화면 일부는 표시되고 일부는 다른 구간 데이터를 보여주는 문제가 생길 수 있습니다.
+
+## 어떤 원리인가
+
+1. JavaScript 문법 오류가 없는지 확인합니다.
+2. `vulnerability_segments.json`의 모든 `segment_id`가 `segments_details.json`에도 존재하는지 확인합니다.
+3. 대표 구간 3개의 화면 표시 기대값을 확인합니다.
+4. 로컬 HTTP 서버에서 route detail 페이지와 mock 파일이 200으로 응답하는지 확인합니다.
+5. 모든 상세 mock에 `by_alert[]`, `cases[]`가 존재하는지 확인합니다.
+
+# API
+
+API 변경 사항은 없습니다.
+
+검수한 mock 데이터:
+
+- `GET ../mock/vulnerability_segments.json`
+- `GET ../mock/segments_details.json`
+
+# Database
+
+DB 변경 사항은 없습니다.
+
+# 테스트 방법
+
+1. JavaScript 문법 검사
+
+```bash
+node --check frontend/route-detail.js
+node --check frontend/dashboard.js
+```
+
+예상 결과:
+
+- 오류 없이 종료됩니다.
+
+2. segment id 참조 무결성 검사
+
+```bash
+node -e "const fs=require('fs'); const details=JSON.parse(fs.readFileSync('mock/segments_details.json','utf8')); const vuln=JSON.parse(fs.readFileSync('mock/vulnerability_segments.json','utf8')); const detailIds=new Set(details.segments.map((item)=>item.segment_id)); const vulnIds=new Set(vuln.segments.map((item)=>item.segment_id)); const missingDetails=vuln.segments.filter((item)=>!detailIds.has(item.segment_id)); const missingSummary=details.segments.filter((item)=>!vulnIds.has(item.segment_id)); console.log('vulnerability segments:', vuln.segments.length); console.log('detail segments:', details.segments.length); console.log('missing details:', missingDetails.length); console.log('missing summaries:', missingSummary.length); if (missingDetails.length||missingSummary.length) process.exit(1);"
+```
+
+예상 결과:
+
+```text
+vulnerability segments: 6
+detail segments: 6
+missing details: 0
+missing summaries: 0
+```
+
+3. 대표 구간 기대값 확인
+
+```text
+daejeon-gimcheon_gumi | 대전→김천(구미) 구간 | 높음 | 14.6분 | 8.0% | 37건 | 3 alerts | 3 cases
+cheonan-daejeon | 천안→대전 구간 | 주의 | 11.3분 | 5.0% | 42건 | 3 alerts | 3 cases
+miryang-busan | 밀양→부산 구간 | 관심 | 5.4분 | 0.0% | 7건 | 3 alerts | 3 cases
+```
+
+4. HTTP 경로 검사
+
+```text
+http://127.0.0.1:8765/frontend/route-detail.html?segment_id=daejeon-gimcheon_gumi
+http://127.0.0.1:8765/frontend/route-detail.html?segment_id=cheonan-daejeon
+http://127.0.0.1:8765/frontend/route-detail.html?segment_id=miryang-busan
+```
+
+검증 결과:
+
+```text
+route-detail.html?segment_id=daejeon-gimcheon_gumi = 200
+route-detail.html?segment_id=cheonan-daejeon = 200
+route-detail.html?segment_id=miryang-busan = 200
+route-detail.js = 200
+segments_details.json = 200
+vulnerability_segments.json = 200
+```
+
+5. 상세 테이블 데이터 존재 검사
+
+```bash
+node -e "const fs=require('fs'); const details=JSON.parse(fs.readFileSync('mock/segments_details.json','utf8')); const bad=details.segments.filter((segment)=>!Array.isArray(segment.by_alert)||!segment.by_alert.length||!Array.isArray(segment.cases)||!segment.cases.length); console.log('segments with missing table data:', bad.length); if (bad.length) console.log(bad.map((item)=>item.segment_id).join(', ')); if (bad.length) process.exit(1);"
+```
+
+예상 결과:
+
+```text
+segments with missing table data: 0
+```
+
+# 주의사항
+
+현재 차트 영역과 일부 사이드 카드에는 아직 정적 데이터가 남아 있습니다.
+
+이번 검수는 지금까지 연결한 mock 데이터 범위의 일관성 검수입니다.
+
+# 변경 이력
+
+2026-07-09
+
+- 구간 상세 전체 mock 연결 검수
+- segment id 참조 무결성 확인
+- 대표 구간 기대값 문서화
+
+# 다음 작업
+
+- 구간 상세 차트 영역 mock 연결 여부 결정
+- route detail 사이드 카드의 정적 정보 mock 연결 여부 검토
+- 전체 프로젝트 mock 데이터 매핑 체크리스트 작성
+
+# 작업 요약
+
+## 완료한 내용
+
+- 구간 상세 JS 문법 검증
+- segment id 참조 무결성 검증
+- 대표 구간 기대값 확인
+- HTTP 경로 검증
+- 문서화
+
+## 수정한 파일
+
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+여러 mock 파일이 연결된 상세 화면은 참조 무결성 검수가 중요합니다.
+
+이번 검수로 구간 상세 화면의 주요 mock 연결이 같은 `segment_id` 기준으로 동작함을 확인했습니다.
+
+## 변경 사항
+
+- 기능 코드 변경 없음
+- 검수 결과 문서 추가
+
+## 새롭게 배운 개념
+
+- Mock Integrity Check
+- Cross-file Reference Validation
+- Detail Page Regression Check
+
+## 실무에서는
+
+실무에서는 mock 또는 seed 데이터에도 schema 검증과 참조 무결성 검사를 자동화합니다.
+
+프론트엔드에서는 최소한 상세 화면이 받는 id와 mock/API 응답 id가 일치하는지 테스트하는 것이 좋습니다.
+
+## 개선 가능한 부분
+
+- 검증 스크립트를 별도 파일로 분리
+- Playwright 기반 화면 텍스트 검증 추가
+- 차트 영역 mock 연결
+
+## 다음 작업
+
+- 구간 상세 차트 영역 mock 연결 여부 결정
+
+## 복습 문제
+
+1. `segment_id` 참조 무결성 검사가 필요한 이유는 무엇인가요?
+2. 상세 화면에서 여러 mock 파일을 함께 사용할 때 주의할 점은 무엇인가요?
+3. 현재 검수 방식에서 자동화할 수 있는 부분은 무엇인가요?
+
+## 오늘 배운 내용
+
+- Reference Integrity
+- Mock Regression Check
+- Cross-file Validation
+
+## Change Log
+
+2026-07-09
+
+- 구간 상세 전체 mock 연결 검수
+- 문서 업데이트
+
+## Timestamp
+
+2026-07-09 16:16:10 (KST)
+
+---
+
+# 구간 상세 요약 차트 Mock 연결 작업 요약
+
+# 개요
+
+구간 상세 화면의 요약 탭에 있는 차트 2개를 mock 데이터와 연결했습니다.
+
+연결한 차트:
+
+- 시간대별 평균 지연 시간 선 그래프
+- 지연 증가량 추이 막대 그래프
+
+# 구현 목적
+
+기존 차트는 HTML에 고정된 정적 값으로 표시되고 있었습니다.
+
+구간 상세 화면이 `segment_id`에 따라 바뀌도록 개선되었기 때문에, 차트도 선택된 구간의 mock 데이터를 기준으로 함께 변경되어야 합니다.
+
+# 구현 내용
+
+- `mock/segments_details.json`
+  - 각 구간에 `hourly_delay[]` 추가
+  - 각 구간에 `delay_increase_trend[]` 추가
+
+- `frontend/route-detail.html`
+  - 선 그래프 polyline, point, tooltip에 렌더링용 `data-*` 속성 추가
+  - 막대 그래프 plot 영역에 렌더링용 `data-*` 속성 추가
+
+- `frontend/route-detail.js`
+  - 선 그래프 좌표 계산 함수 추가
+  - 실제/예측 polyline 렌더링 추가
+  - 최근 7일 지연 증가량 막대 생성 함수 추가
+  - 상세 데이터 없음 상태에서 차트 fallback 처리 추가
+
+# 코드 설명
+
+## 왜 필요한가
+
+상단 요약 카드와 테이블은 이미 mock 데이터와 연결되어 있었지만, 차트는 아직 고정된 숫자를 표시하고 있었습니다.
+
+이 상태에서는 `route-detail.html?segment_id=miryang-busan`처럼 다른 구간으로 이동해도 차트가 같은 값으로 남는 문제가 생깁니다.
+
+## 어떤 원리인가
+
+1. URL의 `segment_id`로 선택 구간을 찾습니다.
+2. 선택 구간의 `segments_details.json` 상세 데이터를 가져옵니다.
+3. `hourly_delay[]`를 SVG 좌표로 변환합니다.
+4. `actual` 데이터는 실선 polyline으로 표시합니다.
+5. `forecast` 데이터는 실제 마지막 지점부터 이어지는 점선 polyline으로 표시합니다.
+6. `delay_increase_trend[]`는 최근 7일 막대 그래프로 다시 생성합니다.
+
+# API
+
+API 변경 사항은 없습니다.
+
+사용한 mock 데이터:
+
+- `GET ../mock/segments_details.json`
+
+추가된 mock 필드:
+
+```json
+{
+  "hourly_delay": [
+    { "time": "00:00", "delay_min": 6.4, "type": "actual" }
+  ],
+  "delay_increase_trend": [
+    { "date": "2026-07-01", "delay_increase": 5.2 }
+  ]
+}
+```
+
+# Database
+
+DB 변경 사항은 없습니다.
+
+# 테스트 방법
+
+1. JavaScript 문법 검사
+
+```bash
+node --check frontend/route-detail.js
+```
+
+예상 결과:
+
+- 오류 없이 종료됩니다.
+
+2. 모든 구간의 차트 mock 데이터 존재 검사
+
+```bash
+node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('mock/segments_details.json','utf8')); const bad=data.segments.filter((s)=>!Array.isArray(s.hourly_delay)||s.hourly_delay.length!==7||!Array.isArray(s.delay_increase_trend)||s.delay_increase_trend.length!==7); console.log('segments:', data.segments.length); console.log('bad chart data:', bad.length); if (bad.length) process.exit(1);"
+```
+
+검증 결과:
+
+```text
+segments: 6
+bad chart data: 0
+```
+
+3. 대표 구간 차트 포인트 검사
+
+```text
+actual points: 4
+forecast points: 3
+trend bars: 7
+```
+
+4. HTTP 경로 검사
+
+```text
+/frontend/route-detail.html?segment_id=daejeon-gimcheon_gumi=200
+/frontend/route-detail.js=200
+/mock/segments_details.json=200
+```
+
+# 주의사항
+
+이번 작업은 요약 탭의 차트 2개만 연결했습니다.
+
+특보별 분석 탭의 가로 막대 차트와 과거 사례 비교 차트는 아직 정적 데이터가 남아 있습니다.
+
+# 변경 이력
+
+2026-07-09
+
+- 구간 상세 요약 차트 mock 연결
+- 구간별 시간대별 지연 데이터 추가
+- 구간별 최근 7일 지연 증가량 데이터 추가
+
+# 작업 요약
+
+## 완료한 내용
+
+- 요약 선 그래프 mock 데이터 연결
+- 요약 막대 그래프 mock 데이터 연결
+- 구간별 차트 데이터 구조 확장
+- 문법 및 mock 구조 검증
+- HTTP 경로 검증
+
+## 수정한 파일
+
+- `frontend/route-detail.html`
+- `frontend/route-detail.js`
+- `mock/segments_details.json`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+구간 상세 화면은 선택된 `segment_id`에 따라 전체 내용이 바뀌어야 합니다.
+
+차트까지 mock 데이터와 연결하면 화면의 데이터 일관성이 높아집니다.
+
+## 변경 사항
+
+- 정적 SVG/polyline 값을 JS 렌더링 대상으로 변경
+- 최근 7일 막대 그래프를 mock 배열 기반으로 재생성
+- 예측선이 실제선의 마지막 지점에서 이어지도록 처리
+
+## 새롭게 배운 개념
+
+- SVG polyline 동적 렌더링
+- Mock 기반 시계열 데이터 매핑
+- Chart Fallback 처리
+
+## 실무에서는
+
+실무에서는 차트 라이브러리를 사용하는 경우가 많지만, 단순한 대시보드 차트는 SVG와 DOM만으로도 충분히 구현할 수 있습니다.
+
+중요한 점은 화면 구조보다 데이터 구조를 먼저 안정적으로 잡는 것입니다.
+
+## 개선 가능한 부분
+
+- 특보별 분석 가로 막대 차트 mock 연결
+- 과거 사례 비교 미니 차트 mock 연결
+- 차트 검증 스크립트 분리
+
+## 다음 작업
+
+- 특보별 분석 탭의 가로 막대 차트 mock 연결
+
+## 복습 문제
+
+1. SVG `polyline`의 `points` 값은 어떤 형식으로 만들어야 하나요?
+2. 실제 데이터와 예측 데이터를 같은 선 그래프에 표시할 때 구분 기준은 무엇인가요?
+3. 차트 데이터가 없을 때 fallback 처리가 필요한 이유는 무엇인가요?
+
+## 오늘 배운 내용
+
+- SVG Polyline
+- Time Series Mock Data
+- DOM-based Chart Rendering
+
+## Change Log
+
+2026-07-09
+
+- 구간 상세 요약 차트 mock 연결
+- 문서 업데이트
+
+## Timestamp
+
+2026-07-09 16:22:57 (KST)
+
+---
+
+# 구간 상세 제목 및 Breadcrumb Mock 연결 작업 요약
+
+# 개요
+
+구간 상세 화면의 breadcrumb, page title, 설명 문구, 브라우저 문서 제목에 현재 선택된 구간명을 반영하도록 개선했습니다.
+
+예를 들어 `route-detail.html?segment_id=miryang-busan`으로 접속하면 `밀양→부산 구간`이 화면 제목에 표시됩니다.
+
+# 구현 목적
+
+구간 상세 화면은 여러 `segment_id`를 지원하게 되었기 때문에, 사용자가 현재 어떤 구간을 보고 있는지 제목 영역에서도 명확히 확인할 수 있어야 합니다.
+
+# 구현 내용
+
+- `frontend/route-detail.html`
+  - breadcrumb current text에 `data-route-detail-breadcrumb` 추가
+  - page title에 `data-route-detail-title` 추가
+  - description에 `data-route-detail-description` 추가
+
+- `frontend/route-detail.js`
+  - `formatSegmentLabel()` 추가
+  - `renderRoutePageMeta()` 추가
+  - 선택된 segment의 `from`, `to` 기준으로 구간명 생성
+  - breadcrumb, h1, 설명 문구, `document.title` 갱신
+  - 데이터 없음 상태의 기본 제목 fallback 처리
+
+# 코드 설명
+
+## 왜 필요한가
+
+상단 카드에는 출발역/도착역이 표시되지만, page title이 계속 `구간 상세`로만 남아 있으면 사용자가 여러 구간 링크를 오갈 때 맥락을 놓치기 쉽습니다.
+
+선택 구간명을 제목에 반영하면 화면의 의미가 더 분명해집니다.
+
+## 어떤 원리인가
+
+1. URL의 `segment_id`로 선택 구간을 찾습니다.
+2. 선택 구간의 `from`, `to` 값을 읽습니다.
+3. `from→to 구간` 형태의 label을 만듭니다.
+4. breadcrumb, h1, description, document title에 같은 label을 반영합니다.
+
+## 장점
+
+- 현재 보고 있는 구간이 명확해집니다.
+- 브라우저 탭 제목도 선택 구간과 일치합니다.
+- 여러 구간 상세 링크를 열었을 때 구분하기 쉽습니다.
+
+## 단점
+
+- 현재 title은 단순 label 중심입니다.
+- 노선명까지 포함한 긴 제목은 아직 사용하지 않았습니다.
+
+## 다른 구현 방법
+
+- `경부선 / 밀양→부산 구간`처럼 노선명을 포함
+- breadcrumb을 `대시보드 > 구간 상세 > 밀양→부산` 3단계로 확장
+- document title에 시스템명까지 포함
+
+# API
+
+API 변경 사항은 없습니다.
+
+사용한 mock 데이터:
+
+- `GET ../mock/segments_details.json`
+- `GET ../mock/vulnerability_segments.json`
+
+# Database
+
+DB 변경 사항은 없습니다.
+
+# 테스트 방법
+
+1. JavaScript 문법 검사
+
+```bash
+node --check frontend/route-detail.js
+```
+
+예상 결과:
+
+- 오류 없이 종료됩니다.
+
+2. 선택 구간 제목 기대값 확인
+
+```bash
+node -e "const fs=require('fs'); const details=JSON.parse(fs.readFileSync('mock/segments_details.json','utf8')); const item=details.segments.find((segment)=>segment.segment_id==='miryang-busan'); console.log(item.from+'→'+item.to+' 구간');"
+```
+
+예상 결과:
+
+```text
+밀양→부산 구간
+```
+
+3. 브라우저 확인
+
+```text
+http://127.0.0.1:8765/frontend/route-detail.html?segment_id=miryang-busan
+```
+
+검증 기준:
+
+- breadcrumb current text가 `밀양→부산 구간`으로 표시됩니다.
+- h1 제목이 `밀양→부산 구간`으로 표시됩니다.
+- 설명 문구가 선택 구간명을 포함합니다.
+- 브라우저 title이 선택 구간명을 포함합니다.
+
+# 주의사항
+
+현재 breadcrumb은 여전히 2단계 구조입니다.
+
+추후 필요하면 `대시보드 > 구간 상세 > 밀양→부산 구간`처럼 3단계 구조로 확장할 수 있습니다.
+
+# 변경 이력
+
+2026-07-09
+
+- 구간 상세 breadcrumb mock 연결
+- 구간 상세 page title mock 연결
+- document title 선택 구간 반영
+
+# 다음 작업
+
+- 구간 상세 화면 전체 mock 연결 검수
+- route-detail의 다른 정적 영역 중 mock 연결 필요 여부 점검
+
+# 작업 요약
+
+## 완료한 내용
+
+- breadcrumb 구간명 반영
+- page title 구간명 반영
+- 설명 문구 구간명 반영
+- document title 구간명 반영
+- 테스트 및 문서화
+
+## 수정한 파일
+
+- `frontend/route-detail.html`
+- `frontend/route-detail.js`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+구간 상세 화면이 여러 segment id를 지원하므로, 화면 제목도 선택 구간과 일치해야 합니다.
+
+## 변경 사항
+
+- 제목 영역 data 속성 추가
+- `formatSegmentLabel()` 추가
+- `renderRoutePageMeta()` 추가
+
+## 새롭게 배운 개념
+
+- Dynamic Page Meta
+- Breadcrumb Data Binding
+- Document Title Update
+
+## 실무에서는
+
+실무에서는 상세 화면의 title, breadcrumb, meta title을 현재 리소스 이름과 동기화합니다.
+
+특히 여러 상세 페이지를 새 탭으로 열 수 있는 운영 도구에서는 브라우저 탭 제목이 매우 중요합니다.
+
+## 개선 가능한 부분
+
+- breadcrumb 3단계 구조로 확장
+- title에 노선명 포함
+- description에 현재 특보와 위험도 포함
+
+## 다음 작업
+
+- 구간 상세 화면 전체 mock 연결 검수
+
+## 복습 문제
+
+1. 상세 화면 title을 선택 리소스 이름과 동기화해야 하는 이유는 무엇인가요?
+2. `document.title`을 동적으로 바꾸면 어떤 사용자 경험이 좋아지나요?
+3. breadcrumb를 3단계로 확장하면 어떤 장점이 있나요?
+
+## 오늘 배운 내용
+
+- Dynamic Title
+- Breadcrumb Binding
+- Page Metadata
+
+## Change Log
+
+2026-07-09
+
+- 구간 상세 제목 및 breadcrumb mock 연결
+- 문서 업데이트
+
+## Timestamp
+
+2026-07-09 16:12:00 (KST)
+
+---
+
+# Segment Detail Mock ID별 구조 확장 작업 요약
+
+# 개요
+
+`mock/segments_details.json`을 단일 구간 객체에서 `segment_id`별 상세 데이터 배열 구조로 확장했습니다.
+
+이제 구간 상세 화면은 URL의 `segment_id`에 맞는 상세 mock을 찾아 특보별 분석 테이블과 과거 사례 목록을 렌더링합니다.
+
+# 구현 목적
+
+기존 `segments_details.json`은 대전-김천(구미) 구간 하나만 표현하는 구조였습니다.
+
+하지만 대시보드와 우선 점검 대상에서 여러 구간이 `route-detail.html?segment_id=...`로 이동하므로, 상세 mock도 여러 구간을 지원해야 합니다.
+
+# 구현 내용
+
+- `mock/segments_details.json`
+  - 단일 객체 구조를 `segments[]` 배열 구조로 변경
+  - 6개 구간의 `segment_id`, `from`, `to`, `by_alert[]`, `cases[]` 추가
+  - `vulnerability_segments.json`의 모든 `segment_id`와 매칭되도록 확장
+
+- `frontend/route-detail.js`
+  - `getSegmentDetails()` 추가
+  - `getSegmentDetailById()` 추가
+  - `getSegmentDetailByEndpoints()` 추가
+  - `getFirstSegmentDetail()` 추가
+  - `getSelectedSegmentDetail()` 추가
+  - 기존 단일 객체 mock도 fallback으로 처리
+  - 선택한 segment id에 맞는 상세 데이터로 테이블/사례 렌더링
+
+# 코드 설명
+
+## 왜 필요한가
+
+대시보드에서 `cheonan-daejeon`, `miryang-busan` 같은 다른 구간으로 이동해도 상세 화면이 항상 대전-김천(구미) 데이터만 보여주면 데이터 신뢰도가 떨어집니다.
+
+따라서 상세 mock도 `segment_id`를 key로 여러 구간을 표현해야 합니다.
+
+## 어떤 원리인가
+
+1. URL에서 `segment_id`를 읽습니다.
+2. `vulnerability_segments.json`에서 선택 구간의 요약 지표를 찾습니다.
+3. `segments_details.json`의 `segments[]`에서 같은 `segment_id`의 상세 데이터를 찾습니다.
+4. 찾은 상세 데이터의 `by_alert[]`와 `cases[]`를 구간 상세 테이블에 렌더링합니다.
+5. id가 없거나 상세 데이터가 없는 경우 endpoint 또는 첫 번째 상세 데이터로 fallback합니다.
+
+## 장점
+
+- 모든 vulnerability segment가 상세 mock과 연결됩니다.
+- 구간 상세 화면이 실제 multi-detail 구조에 가까워졌습니다.
+- 기존 단일 객체 mock 구조도 fallback으로 지원합니다.
+- API 전환 시 `segment_id` 기반 조회 구조로 자연스럽게 이동할 수 있습니다.
+
+## 단점
+
+- mock 파일이 길어졌습니다.
+- 아직 실제 API처럼 pagination이나 case id는 없습니다.
+- 일부 상세 수치는 예시 mock이므로 실제 통계와는 다를 수 있습니다.
+
+## 다른 구현 방법
+
+- `segments_details/{segment_id}.json`처럼 파일을 분리하는 방식
+- 객체 map 구조로 `{ "daejeon-gimcheon_gumi": {...} }` 사용
+- API endpoint `/segments/{segment_id}/details` 형태로 전환
+- 상세 mock을 DB seed 파일로 관리
+
+# API
+
+API 변경 사항은 없습니다.
+
+변경된 mock 구조:
+
+```json
+{
+  "segments": [
+    {
+      "segment_id": "daejeon-gimcheon_gumi",
+      "from": "대전",
+      "to": "김천(구미)",
+      "by_alert": [],
+      "cases": []
+    }
+  ]
+}
+```
+
+# Database
+
+DB 변경 사항은 없습니다.
+
+실제 DB에서는 다음 관계가 적합합니다.
+
+- `segments.segment_id`
+- `segment_alert_stats.segment_id`
+- `segment_cases.segment_id`
+
+# 테스트 방법
+
+1. JavaScript 문법 검사
+
+```bash
+node --check frontend/route-detail.js
+```
+
+예상 결과:
+
+- 오류 없이 종료됩니다.
+
+2. 상세 mock 참조 무결성 검사
+
+```bash
+node -e "const fs=require('fs'); const details=JSON.parse(fs.readFileSync('mock/segments_details.json','utf8')); const vuln=JSON.parse(fs.readFileSync('mock/vulnerability_segments.json','utf8')); const detailIds=new Set(details.segments.map((item)=>item.segment_id)); const missing=vuln.segments.filter((item)=>!detailIds.has(item.segment_id)); console.log('detail count:', details.segments.length); console.log('missing detail refs:', missing.length); if (missing.length) process.exit(1);"
+```
+
+예상 결과:
+
+```text
+detail count: 6
+missing detail refs: 0
+```
+
+3. 상세 mock 목록 확인
+
+```bash
+node -e "const fs=require('fs'); const details=JSON.parse(fs.readFileSync('mock/segments_details.json','utf8')); console.log(details.segments.map((item)=>item.segment_id+':'+item.from+'→'+item.to).join('\n'));"
+```
+
+예상 결과:
+
+```text
+daejeon-gimcheon_gumi:대전→김천(구미)
+cheonan-daejeon:천안→대전
+yeongdeungpo-suwon:영등포→수원
+dongdaegu-miryang:동대구→밀양
+gimcheon_gumi-dongdaegu:김천(구미)→동대구
+miryang-busan:밀양→부산
+```
+
+4. 브라우저 확인
+
+```text
+http://127.0.0.1:8765/frontend/route-detail.html?segment_id=miryang-busan
+```
+
+검증 기준:
+
+- 구간 상세 화면이 정상 로드됩니다.
+- `miryang-busan` segment id가 유효하게 처리됩니다.
+- 특보별 분석과 과거 사례가 해당 구간 상세 mock 기준으로 렌더링됩니다.
+
+# 주의사항
+
+기존 단일 객체 구조도 `route-detail.js`에서 fallback 처리하지만, 앞으로는 `segments[]` 배열 구조를 기준으로 mock을 관리합니다.
+
+# 변경 이력
+
+2026-07-09
+
+- `segments_details.json`을 segment id별 배열 구조로 확장
+- 전체 vulnerability segment와 상세 mock 참조 무결성 확보
+- route detail 선택 상세 lookup 로직 추가
+
+# 다음 작업
+
+- 대시보드 우선 점검 대상이나 취약 구간에서 다른 segment id로 이동했을 때 표시값 최종 검수
+- 구간 상세 breadcrumb에 현재 구간명 반영
+
+# 작업 요약
+
+## 완료한 내용
+
+- segment id별 상세 mock 구조 확장
+- 6개 구간 상세 데이터 추가
+- route-detail lookup 로직 개선
+- 테스트 및 문서화
+
+## 수정한 파일
+
+- `mock/segments_details.json`
+- `frontend/route-detail.js`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+구간 상세 화면이 여러 segment id를 받으려면 상세 mock도 id별 데이터를 가져야 합니다.
+
+이번 변경으로 대시보드의 여러 구간 링크가 각각 다른 상세 데이터를 사용할 수 있게 되었습니다.
+
+## 변경 사항
+
+- `segments[]` 구조 도입
+- `segment_id`별 상세 데이터 추가
+- id 기반 상세 lookup 함수 추가
+- 단일 객체 mock fallback 유지
+
+## 새롭게 배운 개념
+
+- ID-keyed Detail Data
+- Reference Integrity
+- Detail Lookup
+- Backward-compatible Mock Parsing
+
+## 실무에서는
+
+실무에서는 상세 화면이 URL id를 받아 API endpoint에서 해당 id의 상세 데이터를 조회합니다.
+
+프론트엔드는 id를 기준으로 조회하고, 표시명은 응답 데이터의 label/name을 사용합니다.
+
+## 개선 가능한 부분
+
+- `case_id` 추가
+- `by_alert` 상세 필드 확장
+- `segments_details.json` schema 검증 스크립트 추가
+- 구간 상세 breadcrumb 동적 렌더링
+
+## 다음 작업
+
+- 구간 상세 breadcrumb와 page title에 현재 구간명 반영
+
+## 복습 문제
+
+1. 단일 상세 mock 구조가 여러 segment id를 처리하기 어려운 이유는 무엇인가요?
+2. `segment_id` 참조 무결성 검사가 필요한 이유는 무엇인가요?
+3. 기존 단일 객체 mock fallback을 유지하면 어떤 장점이 있나요?
+
+## 오늘 배운 내용
+
+- ID-keyed Detail Mock
+- Reference Integrity
+- Backward Compatibility
+
+## Change Log
+
+2026-07-09
+
+- segment detail mock id별 구조 확장
+- route detail 상세 lookup 로직 개선
+- 문서 업데이트
+
+## Timestamp
+
+2026-07-09 16:09:30 (KST)
+
+---
+
+# 우선 점검 대상 구간 상세 이동 작업 요약
+
+# 개요
+
+대시보드의 `우선 점검 대상` 테이블에서 구간 대상도 구간 상세 화면으로 이동할 수 있게 연결했습니다.
+
+기존에는 역 대상만 역 상세 화면으로 연결되었고, 이번 작업으로 `segment` 타입 대상도 `route-detail.html?segment_id=...` 형식으로 이동합니다.
+
+# 구현 목적
+
+우선 점검 대상에는 역 대상과 구간 대상이 함께 포함됩니다.
+
+역 대상은 역 상세 화면으로, 구간 대상은 구간 상세 화면으로 이동해야 운영자가 대상 유형에 맞는 상세 정보를 확인할 수 있습니다.
+
+# 구현 내용
+
+- `frontend/dashboard.js`
+  - `createRouteDetailLink()` 추가
+  - 우선 점검 대상의 `target_type === "segment"` 항목을 구간 상세 링크로 렌더링
+  - 상세 패널의 `대상` 값도 구간 대상이면 구간 상세 링크로 렌더링
+  - 기존 역 대상 링크 동작 유지
+
+# 코드 설명
+
+## 왜 필요한가
+
+`checklist.json`의 우선 점검 대상은 `target_type`으로 역과 구간을 구분합니다.
+
+이 타입을 기준으로 상세 이동 경로를 나누면 사용자가 올바른 상세 화면으로 이동할 수 있습니다.
+
+## 어떤 원리인가
+
+1. item의 `target_type`을 확인합니다.
+2. `station`이면 `station-detail.html?station_id=...` 링크를 만듭니다.
+3. `segment`이면 `route-detail.html?segment_id=...` 링크를 만듭니다.
+4. 테이블 target 셀과 상세 패널 target 값에 같은 링크 생성 함수를 사용합니다.
+
+## 장점
+
+- 우선 점검 대상의 모든 주요 target type이 상세 화면으로 연결됩니다.
+- 역/구간 링크 로직이 명확히 분리됩니다.
+- 기존 `inspection-link` 스타일을 재사용합니다.
+- 표와 상세 패널의 이동 경로가 일관됩니다.
+
+## 단점
+
+- 구간 상세 mock은 아직 모든 segment id별 상세 데이터를 충분히 갖고 있지 않습니다.
+- `route-detail.html`은 segment id를 받지만, 상세 mock 구조는 아직 단일 구간 중심입니다.
+
+## 다른 구현 방법
+
+- API에서 `detail_url`을 직접 내려주는 방식
+- target type별 route map 객체를 만드는 방식
+- row 전체 클릭으로 이동하게 만드는 방식
+- 상세 패널에 별도 “상세 화면으로 이동” 버튼을 두는 방식
+
+# API
+
+API 변경 사항은 없습니다.
+
+사용한 mock 데이터:
+
+- `GET ../mock/checklist.json`
+
+# Database
+
+DB 변경 사항은 없습니다.
+
+실제 DB에서는 checklist target이 다음 중 하나를 참조하는 구조가 적합합니다.
+
+- `station_id`
+- `segment_id`
+
+# 테스트 방법
+
+1. JavaScript 문법 검사
+
+```bash
+node --check frontend/dashboard.js
+```
+
+예상 결과:
+
+- 오류 없이 종료됩니다.
+
+2. checklist target별 URL 확인
+
+```bash
+node -e "const fs=require('fs'); const checklist=JSON.parse(fs.readFileSync('mock/checklist.json','utf8')).items; console.log(checklist.map((item)=>{ const href=item.target_type==='segment' ? './route-detail.html?'+new URLSearchParams({segment_id:item.segment_id}).toString() : item.target_type==='station' ? './station-detail.html?'+new URLSearchParams({station_id:item.station_id}).toString() : '-'; return item.target+' => '+href; }).join('\n'));"
+```
+
+예상 결과:
+
+```text
+대전→김천(구미) 구간 => ./route-detail.html?segment_id=daejeon-gimcheon_gumi
+천안→대전 구간 => ./route-detail.html?segment_id=cheonan-daejeon
+대전역 => ./station-detail.html?station_id=daejeon
+영등포→수원 구간 => ./route-detail.html?segment_id=yeongdeungpo-suwon
+```
+
+3. 브라우저 확인
+
+```text
+http://127.0.0.1:8765/frontend/dashboard.html
+```
+
+검증 기준:
+
+- 우선 점검 대상의 구간 대상이 링크로 표시됩니다.
+- `대전→김천(구미) 구간`을 클릭하면 구간 상세 화면으로 이동합니다.
+- `대전역`은 기존처럼 역 상세 화면으로 이동합니다.
+- 상세 패널의 `대상` 값도 동일하게 상세 화면 링크로 표시됩니다.
+
+# 주의사항
+
+현재 구간 상세 mock은 모든 구간별 상세 데이터를 완전히 제공하지 않습니다.
+
+따라서 다음 단계에서 `segments_details.json`을 segment id별 구조로 확장하는 것이 좋습니다.
+
+# 변경 이력
+
+2026-07-09
+
+- 우선 점검 대상 구간 target 상세 링크 추가
+- 상세 패널 target 링크 구간 타입 지원
+- 기존 역 target 상세 링크 유지
+
+# 다음 작업
+
+- `segments_details.json`을 segment id별 구조로 확장
+- 구간 상세 화면에서 여러 segment id별 상세 데이터 표시
+
+# 작업 요약
+
+## 완료한 내용
+
+- 우선 점검 대상 구간 링크 연결
+- 표와 상세 패널 target 링크 통일
+- station/segment target type별 라우팅 분기
+- 테스트 및 문서화
+
+## 수정한 파일
+
+- `frontend/dashboard.js`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+우선 점검 대상의 구간 항목도 상세 분석으로 이어져야 실제 운영 흐름이 완성됩니다.
+
+## 변경 사항
+
+- `createRouteDetailLink()` 추가
+- segment target의 링크 렌더링 추가
+- 상세 패널 대상 값 segment 링크 처리
+
+## 새롭게 배운 개념
+
+- Target Type Routing
+- Shared Link Renderer
+- Segment Detail Navigation
+
+## 실무에서는
+
+실무에서는 target type별로 이동 URL을 프론트에서 직접 조립하기보다, route helper 또는 API의 `detail_url` 정책을 만들어 일관되게 관리합니다.
+
+## 개선 가능한 부분
+
+- segment id별 상세 mock 확장
+- route helper 객체화
+- 상세 패널에 명시적인 이동 버튼 추가
+
+## 다음 작업
+
+- `segments_details.json`을 segment id별 구조로 확장
+
+## 복습 문제
+
+1. `target_type`에 따라 상세 화면을 다르게 연결해야 하는 이유는 무엇인가요?
+2. 표와 상세 패널이 같은 링크 생성 함수를 쓰면 어떤 장점이 있나요?
+3. 구간 상세 mock을 segment id별로 확장해야 하는 이유는 무엇인가요?
+
+## 오늘 배운 내용
+
+- Target Type Routing
+- Segment Detail Link
+- Shared Renderer
+
+## Change Log
+
+2026-07-09
+
+- 우선 점검 대상 구간 상세 이동 연결
+- 문서 업데이트
+
+## Timestamp
+
+2026-07-09 16:04:33 (KST)
+
+---
+
+# 대시보드 취약 구간 상세 이동 작업 요약
+
+# 개요
+
+대시보드의 `취약 구간 TOP 5` 랭킹에서 구간명을 클릭하면 구간 상세 화면으로 이동하도록 연결했습니다.
+
+이동 시 `segment_id` query string을 전달합니다.
+
+예시:
+
+```text
+route-detail.html?segment_id=daejeon-gimcheon_gumi
+```
+
+# 구현 목적
+
+대시보드에서 위험도가 높은 구간을 발견한 뒤, 사용자가 바로 해당 구간의 상세 지표와 특보별 분석, 과거 사례를 확인할 수 있게 하기 위함입니다.
+
+# 구현 내용
+
+- `frontend/dashboard.js`
+  - `ROUTE_DETAIL_URL` 추가
+  - `SEGMENT_ID_QUERY_PARAM` 추가
+  - `createSegmentDetailUrl()` 추가
+  - `createSegmentLinkCell()` 추가
+  - 취약 구간 랭킹의 구간명 셀을 링크로 변경
+
+- `frontend/dashboard.html`
+  - 사이드바의 구간 상세 링크를 기본 `segment_id` 포함 URL로 변경
+
+# 코드 설명
+
+## 왜 필요한가
+
+대시보드는 전체 위험 현황을 보여주는 화면이고, 구간 상세는 특정 구간을 깊게 분석하는 화면입니다.
+
+두 화면이 연결되어야 사용자가 대시보드에서 발견한 위험 구간을 바로 분석할 수 있습니다.
+
+## 어떤 원리인가
+
+1. `vulnerability_segments.json`의 `segment_id`를 사용합니다.
+2. 취약 구간 랭킹 row를 만들 때 구간명 셀을 `a` 태그로 생성합니다.
+3. 링크는 `route-detail.html?segment_id=...` 형식으로 생성합니다.
+4. 구간 상세 화면은 `segment_id` query를 읽어 해당 구간 mock 데이터를 렌더링합니다.
+
+## 장점
+
+- 대시보드와 구간 상세 화면의 사용자 흐름이 연결됩니다.
+- 표시 문자열이 아니라 `segment_id`로 이동합니다.
+- 링크이기 때문에 새 탭 열기, 주소 복사, 키보드 접근성이 자연스럽습니다.
+
+## 단점
+
+- 아직 우선 점검 대상의 구간 대상은 링크로 연결하지 않았습니다.
+- 구간 상세 화면은 현재 첫 번째 mock 구간 중심으로 상세 데이터가 구성되어 있습니다.
+
+## 다른 구현 방법
+
+- 랭킹 row 전체를 클릭 가능하게 만들기
+- `segment-detail.html`처럼 별도 파일명을 사용하는 방식
+- 프론트엔드 라우터를 도입해 `/segments/{segment_id}` 형태로 이동
+- API가 상세 URL을 직접 내려주는 방식
+
+# API
+
+API 변경 사항은 없습니다.
+
+사용한 mock 데이터:
+
+- `GET ../mock/vulnerability_segments.json`
+
+# Database
+
+DB 변경 사항은 없습니다.
+
+실제 DB에서는 `segment_id`를 구간 상세 조회 key로 사용하는 것이 적합합니다.
+
+# 테스트 방법
+
+1. JavaScript 문법 검사
+
+```bash
+node --check frontend/dashboard.js
+```
+
+예상 결과:
+
+- 오류 없이 종료됩니다.
+
+2. URL 생성 확인
+
+```bash
+node -e "const params=new URLSearchParams({segment_id:'daejeon-gimcheon_gumi'}); console.log('./route-detail.html?'+params.toString());"
+```
+
+예상 결과:
+
+```text
+./route-detail.html?segment_id=daejeon-gimcheon_gumi
+```
+
+3. 취약 구간 랭킹 링크 기대값 확인
+
+```bash
+node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('mock/vulnerability_segments.json','utf8')); console.log(data.segments.slice().sort((a,b)=>b.avg_delay_incr-a.avg_delay_incr).slice(0,3).map((segment)=>segment.from+'-'+segment.to+' => ./route-detail.html?'+new URLSearchParams({segment_id:segment.segment_id}).toString()).join('\n'));"
+```
+
+예상 결과:
+
+```text
+대전-김천(구미) => ./route-detail.html?segment_id=daejeon-gimcheon_gumi
+천안-대전 => ./route-detail.html?segment_id=cheonan-daejeon
+영등포-수원 => ./route-detail.html?segment_id=yeongdeungpo-suwon
+```
+
+4. 브라우저 확인
+
+```text
+http://127.0.0.1:8765/frontend/dashboard.html
+```
+
+검증 기준:
+
+- 취약 구간 TOP 5의 구간명이 링크처럼 동작합니다.
+- `대전-김천(구미)`를 클릭하면 구간 상세 화면으로 이동합니다.
+- 이동 URL은 `segment_id=daejeon-gimcheon_gumi`를 포함합니다.
+- 구간 상세 화면은 해당 구간 기준으로 렌더링됩니다.
+
+# 주의사항
+
+현재 구간 상세 mock은 `daejeon-gimcheon_gumi` 중심입니다.
+
+다른 구간까지 완전한 상세 데이터를 보여주려면 `segments_details.json`을 segment id별 구조로 확장해야 합니다.
+
+# 변경 이력
+
+2026-07-09
+
+- 취약 구간 랭킹 구간명 링크 추가
+- 구간 상세 URL에 `segment_id` 전달
+- 사이드바 구간 상세 링크 기본 id 포함
+
+# 다음 작업
+
+- 우선 점검 대상의 구간 대상도 구간 상세 화면으로 연결
+- `segments_details.json`을 segment id별 구조로 확장
+
+# 작업 요약
+
+## 완료한 내용
+
+- 취약 구간 TOP 5 상세 이동 구현
+- segment id 기반 URL 생성
+- 사이드바 구간 상세 링크 보강
+- 테스트 및 문서화
+
+## 수정한 파일
+
+- `frontend/dashboard.html`
+- `frontend/dashboard.js`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+대시보드에서 특정 구간의 위험을 확인한 뒤 바로 상세 분석 화면으로 이동할 수 있어야 사용자 흐름이 완성됩니다.
+
+## 변경 사항
+
+- `ROUTE_DETAIL_URL` 추가
+- `SEGMENT_ID_QUERY_PARAM` 추가
+- `createSegmentDetailUrl()` 추가
+- `createSegmentLinkCell()` 추가
+
+## 새롭게 배운 개념
+
+- Segment Detail Navigation
+- Query-based Routing
+- Dashboard to Detail Flow
+
+## 실무에서는
+
+실무에서는 목록 화면의 각 row가 상세 화면으로 이동할 때 내부 id를 사용합니다.
+
+표시명은 바뀔 수 있지만 id는 유지되기 때문에 링크 안정성이 높아집니다.
+
+## 개선 가능한 부분
+
+- 우선 점검 대상 구간 링크 연결
+- 구간 상세 mock을 segment id별로 확장
+- 구간 상세 breadcrumb에 선택 구간 표시
+
+## 다음 작업
+
+- 우선 점검 대상의 구간 대상도 구간 상세 화면으로 연결
+
+## 복습 문제
+
+1. 구간명 대신 `segment_id`로 상세 화면에 이동하는 이유는 무엇인가요?
+2. 링크를 버튼 대신 사용한 이유는 무엇인가요?
+3. 다른 구간 상세를 완전히 지원하려면 mock 구조를 어떻게 바꿔야 할까요?
+
+## 오늘 배운 내용
+
+- Segment Detail Link
+- Query-based Routing
+- Dashboard Flow
+
+## Change Log
+
+2026-07-09
+
+- 대시보드 취약 구간 상세 이동 연결
+- 문서 업데이트
+
+## Timestamp
+
+2026-07-09 16:01:50 (KST)
+
+---
+
+# 구간 상세 과거 사례 Mock 연결 작업 요약
+
+# 개요
+
+구간 상세 화면의 `과거 사례` 탭에 있는 유사 사례 테이블을 `mock/segments_details.json`의 `cases[]` 데이터와 연결했습니다.
+
+# 구현 목적
+
+구간 상세 화면에서 과거 유사 사례는 현재 위험도를 해석하는 근거가 됩니다.
+
+정적 사례 목록을 mock 데이터 기반으로 전환해, 실제 API 전환 전에도 화면 데이터 흐름을 검증할 수 있게 했습니다.
+
+# 구현 내용
+
+- `frontend/route-detail.html`
+  - 과거 사례 테이블 tbody에 `data-route-detail-history-body` 추가
+
+- `frontend/route-detail.js`
+  - `routeTableElements.historyBody` 추가
+  - `formatCaseDate()` 추가
+  - `createHistoryAlertCell()` 추가
+  - `getSimilarityStars()` 추가
+  - `createSimilarityCell()` 추가
+  - `createHistoryRow()` 추가
+  - `renderRouteHistoryTable()` 추가
+  - 빈 상태 fallback 처리 추가
+
+# 코드 설명
+
+## 왜 필요한가
+
+현재 구간의 지연 위험이 과거에도 반복되었는지 확인하려면 유사 사례 목록이 필요합니다.
+
+mock의 `cases[]`를 연결하면 날짜, 특보 종류, 지연 시간을 화면에서 바로 확인할 수 있습니다.
+
+## 어떤 원리인가
+
+1. `segments_details.json`을 fetch합니다.
+2. `segmentDetailData.cases[]`를 읽습니다.
+3. 각 사례의 `date`, `alert_type`, `delay_min`을 테이블 row로 변환합니다.
+4. mock에 없는 강수량, 중단률, 영향 열차는 `-`로 표시합니다.
+5. 지연 시간이 클수록 유사도 별점이 높게 표시되도록 단순 기준을 적용합니다.
+
+## 장점
+
+- 과거 사례 탭이 mock 데이터와 연결됩니다.
+- mock에 없는 값을 임의로 만들지 않습니다.
+- 데이터 없음 상태를 안전하게 처리합니다.
+- 날짜 포맷을 화면 표시용으로 변환합니다.
+
+## 단점
+
+- 현재 mock에는 상세 기상 수치가 없습니다.
+- 유사도는 실제 알고리즘이 아니라 지연 시간 기준 단순 표시입니다.
+- 상세 비교 버튼은 아직 연결하지 않았습니다.
+
+## 다른 구현 방법
+
+- `cases[]`에 강수량, 중단률, 영향 열차, 유사도 필드 추가
+- 사례 상세 modal 추가
+- 과거 사례 필터 select와 실제 필터링 연결
+- 차트 영역까지 cases 기반으로 동적 렌더링
+
+# API
+
+API 변경 사항은 없습니다.
+
+사용한 mock 데이터:
+
+- `GET ../mock/segments_details.json`
+
+# Database
+
+DB 변경 사항은 없습니다.
+
+실제 DB/API에서는 과거 사례에 다음 필드를 포함하는 것이 좋습니다.
+
+- `case_id`
+- `date`
+- `alert_type`
+- `alert_level`
+- `rainfall_mm`
+- `avg_delay`
+- `delay_increase`
+- `stop_rate`
+- `affected_train_count`
+- `similarity_score`
+
+# 테스트 방법
+
+1. JavaScript 문법 검사
+
+```bash
+node --check frontend/route-detail.js
+```
+
+예상 결과:
+
+- 오류 없이 종료됩니다.
+
+2. cases mock 값 확인
+
+```bash
+node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('mock/segments_details.json','utf8')); console.log(data.cases.map((item)=>[item.date,item.alert_type||'평상시',item.delay_min+'분'].join(' | ')).join('\n'));"
+```
+
+예상 결과:
+
+```text
+2026-06-28 | 호우 | 19분
+2026-06-14 | 호우 | 12분
+2026-06-03 | 평상시 | 6분
+```
+
+3. mock JSON 파싱 검사
+
+```bash
+node -e "const fs=require('fs'); JSON.parse(fs.readFileSync('mock/segments_details.json','utf8')); console.log('segments cases json OK');"
+```
+
+예상 결과:
+
+```text
+segments cases json OK
+```
+
+4. 브라우저 확인
+
+```text
+http://127.0.0.1:8765/frontend/route-detail.html?segment_id=daejeon-gimcheon_gumi
+```
+
+검증 기준:
+
+- 과거 사례 탭의 테이블에 사례 3건이 표시됩니다.
+- `2026.06.28 호우 19분` 사례가 표시됩니다.
+- `2026.06.14 호우 12분` 사례가 표시됩니다.
+- `2026.06.03 평상시 6분` 사례가 표시됩니다.
+- mock에 없는 강수량, 중단률, 영향 열차는 `-`로 표시됩니다.
+
+# 주의사항
+
+현재 `cases[]` mock은 매우 간단한 구조입니다.
+
+따라서 실제 유사도 계산이나 상세 비교 기능을 구현하려면 mock 필드를 확장해야 합니다.
+
+# 변경 이력
+
+2026-07-09
+
+- 구간 상세 과거 사례 테이블 mock 연결
+- 날짜 포맷팅 추가
+- 유사도 별점 fallback 표시 추가
+
+# 다음 작업
+
+- 과거 사례 mock 필드 확장
+- 과거 사례 필터 기능 연결
+- 대시보드 취약 구간 랭킹에서 구간 상세 화면으로 이동 연결
+
+# 작업 요약
+
+## 완료한 내용
+
+- 과거 사례 테이블 DOM 연결
+- `cases[]` 기반 row 렌더링
+- mock 미제공 컬럼 fallback 처리
+- 테스트 및 문서화
+
+## 수정한 파일
+
+- `frontend/route-detail.html`
+- `frontend/route-detail.js`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+구간 상세 화면에서 과거 사례는 현재 위험 판단의 근거가 되므로, mock 데이터와 연결해 화면 신뢰도를 높였습니다.
+
+## 변경 사항
+
+- history table body data 속성 추가
+- cases row 생성 함수 추가
+- 날짜/특보/지연 시간 동적 표시
+
+## 새롭게 배운 개념
+
+- Historical Case Rendering
+- Date Formatting
+- Similarity Fallback
+
+## 실무에서는
+
+실무에서는 유사도 점수를 백엔드 또는 분석 모델에서 계산해 내려주고, 프론트엔드는 그 점수를 시각화하는 역할을 맡는 것이 좋습니다.
+
+## 개선 가능한 부분
+
+- case id 추가
+- 유사도 점수 mock 추가
+- 과거 사례 상세보기 연결
+- 필터 form 동작 연결
+
+## 다음 작업
+
+- 대시보드 취약 구간 랭킹에서 구간 상세 화면으로 `segment_id` 전달
+
+## 복습 문제
+
+1. mock에 없는 과거 사례 컬럼을 `-`로 표시한 이유는 무엇인가요?
+2. 날짜 데이터를 화면용 문자열로 변환할 때 주의할 점은 무엇인가요?
+3. 유사도 점수는 프론트엔드에서 계산하는 것보다 백엔드에서 내려주는 것이 좋은 이유는 무엇인가요?
+
+## 오늘 배운 내용
+
+- Historical Case Mapping
+- Date Formatting
+- Fallback UI
+
+## Change Log
+
+2026-07-09
+
+- 구간 상세 과거 사례 mock 연결
+- 문서 업데이트
+
+## Timestamp
+
+2026-07-09 15:58:55 (KST)
+
+---
+
+# 구간 상세 특보별 분석 테이블 Mock 연결 작업 요약
+
+# 개요
+
+구간 상세 화면의 `특보별 영향 요약` 테이블과 `특보별 영향 비교` 테이블을 `mock/segments_details.json`의 `by_alert[]` 데이터와 연결했습니다.
+
+# 구현 목적
+
+구간 상세 화면의 특보별 분석 영역은 어떤 기상특보가 구간 지연에 큰 영향을 주는지 확인하는 핵심 영역입니다.
+
+정적 표를 mock 데이터 기반으로 전환해, 이후 실제 API 응답으로 쉽게 바꿀 수 있도록 렌더링 구조를 만들었습니다.
+
+# 구현 내용
+
+- `frontend/route-detail.html`
+  - 요약 탭의 특보별 영향 요약 tbody에 `data-route-detail-impact-summary-body` 추가
+  - 특보별 분석 탭의 비교 표 tbody에 `data-route-detail-alert-analysis-body` 추가
+
+- `frontend/route-detail.js`
+  - `routeTableElements` 추가
+  - `getAlertIconPath()` 추가
+  - `getStatusBadgeClass()` 추가
+  - `createSummaryAlertRow()` 추가
+  - `createAlertAnalysisRow()` 추가
+  - `renderRouteAlertTables()` 추가
+  - 데이터 없음 fallback row 처리
+
+# 코드 설명
+
+## 왜 필요한가
+
+mock의 `by_alert[]`에는 특보 종류, 특보 등급, 평균 지연 시간, 표본 수가 들어 있습니다.
+
+이 데이터를 테이블에 연결하면 화면에 표시되는 특보별 영향 수치가 mock과 일치하게 됩니다.
+
+## 어떤 원리인가
+
+1. `segments_details.json`을 fetch합니다.
+2. `segmentDetailData.by_alert[]` 배열을 읽습니다.
+3. 요약 탭 테이블에는 특보 종류, 등급, 평균 지연, 표본 수를 렌더링합니다.
+4. 특보별 분석 탭 테이블에도 같은 데이터를 더 넓은 컬럼 구조에 맞춰 렌더링합니다.
+5. mock에 없는 지연 증가량, 운행 중단률, 최대 지연, 영향 열차는 `-`로 표시합니다.
+
+## 장점
+
+- 같은 `by_alert[]` 데이터를 두 테이블에서 재사용합니다.
+- mock에 없는 필드를 임의로 만들지 않습니다.
+- 특보 등급별 badge와 특보 종류별 icon을 동적으로 표시합니다.
+- 데이터 없음 상태를 안전하게 처리합니다.
+
+## 단점
+
+- 현재 mock에는 일부 컬럼 데이터가 없습니다.
+- 차트 영역은 아직 정적 상태입니다.
+- 특보별 분석 탭의 모든 컬럼을 채우려면 mock 확장이 필요합니다.
+
+## 다른 구현 방법
+
+- `by_alert[]` mock에 `delay_increase`, `stop_rate`, `max_delay`, `affected_train_avg` 추가
+- 요약 테이블과 분석 테이블을 하나의 View Model로 변환
+- 특보별 차트까지 같은 데이터로 함께 렌더링
+
+# API
+
+API 변경 사항은 없습니다.
+
+사용한 mock 데이터:
+
+- `GET ../mock/segments_details.json`
+
+# Database
+
+DB 변경 사항은 없습니다.
+
+실제 DB/API에서는 특보별 통계에 다음 필드를 포함하는 것이 좋습니다.
+
+- `alert_type`
+- `alert_level`
+- `sample_n`
+- `avg_delay`
+- `delay_increase`
+- `stop_rate`
+- `max_delay`
+- `affected_train_avg`
+
+# 테스트 방법
+
+1. JavaScript 문법 검사
+
+```bash
+node --check frontend/route-detail.js
+```
+
+예상 결과:
+
+- 오류 없이 종료됩니다.
+
+2. mock JSON 파싱 검사
+
+```bash
+node -e "const fs=require('fs'); JSON.parse(fs.readFileSync('mock/segments_details.json','utf8')); console.log('segments details json OK');"
+```
+
+예상 결과:
+
+```text
+segments details json OK
+```
+
+3. 특보별 테이블 기대값 확인
+
+```bash
+node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('mock/segments_details.json','utf8')); console.log(data.by_alert.map((item)=>[item.alert_type,item.alert_level,item.sample_n+'회',item.avg_delay.toFixed(1)+'분'].join(' | ')).join('\n'));"
+```
+
+예상 결과:
+
+```text
+호우 | 경보 | 37회 | 14.6분
+호우 | 주의보 | 44회 | 9.1분
+폭염 | 경보 | 25회 | 7.2분
+```
+
+4. 브라우저 확인
+
+```text
+http://127.0.0.1:8765/frontend/route-detail.html?segment_id=daejeon-gimcheon_gumi
+```
+
+검증 기준:
+
+- 요약 탭의 특보별 영향 요약 테이블에 mock 데이터 3건이 표시됩니다.
+- 특보별 분석 탭의 특보별 영향 비교 테이블에 mock 데이터 3건이 표시됩니다.
+- `호우 경보`, `호우 주의보`, `폭염 경보`가 표시됩니다.
+- mock에 없는 컬럼은 `-`로 표시됩니다.
+
+# 주의사항
+
+현재 `segments_details.by_alert[]`에는 평균 지연 시간과 표본 수만 있습니다.
+
+따라서 지연 증가량, 운행 중단률, 최대 지연, 영향 열차는 이번 단계에서 계산하지 않고 `-`로 표시했습니다.
+
+# 변경 이력
+
+2026-07-09
+
+- 구간 상세 특보별 영향 요약 테이블 mock 연결
+- 구간 상세 특보별 영향 비교 테이블 mock 연결
+- 특보별 테이블 빈 상태 처리 추가
+
+# 다음 작업
+
+- 구간 상세 과거 사례 목록을 `segments_details.cases[]`와 연결
+- 특보별 차트 mock 연결
+- `by_alert[]` mock 필드 확장
+
+# 작업 요약
+
+## 완료한 내용
+
+- 특보별 분석 테이블 DOM 연결
+- `by_alert[]` 기반 테이블 렌더링
+- mock 미제공 컬럼 fallback 처리
+- 테스트 및 문서화
+
+## 수정한 파일
+
+- `frontend/route-detail.html`
+- `frontend/route-detail.js`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+구간 상세 화면의 특보별 표가 mock 데이터와 일치해야 사용자가 데이터 흐름을 신뢰할 수 있습니다.
+
+## 변경 사항
+
+- table body data 속성 추가
+- 특보별 row 생성 함수 추가
+- 특보별 icon/badge 동적 처리
+
+## 새롭게 배운 개념
+
+- Table Rendering
+- Shared Data Source
+- Missing Field Fallback
+
+## 실무에서는
+
+실무에서는 표 컬럼과 API 필드를 먼저 계약하고, 프론트엔드는 누락 필드에 대한 fallback 정책을 명확히 둡니다.
+
+## 개선 가능한 부분
+
+- `by_alert[]`에 추가 통계 필드 확장
+- 특보별 차트 동적 렌더링
+- 테이블 row 클릭 상세 기능 추가
+
+## 다음 작업
+
+- 구간 상세 과거 사례 목록 mock 연결
+
+## 복습 문제
+
+1. mock에 없는 컬럼을 임의로 계산하지 않고 `-`로 표시한 이유는 무엇인가요?
+2. 같은 `by_alert[]` 데이터를 두 테이블에서 재사용할 때 장점은 무엇인가요?
+3. 특보별 차트까지 동적으로 만들려면 어떤 mock 필드가 추가로 필요할까요?
+
+## 오늘 배운 내용
+
+- Dynamic Table Rendering
+- Missing Data Fallback
+- Alert Statistics Mapping
+
+## Change Log
+
+2026-07-09
+
+- 구간 상세 특보별 분석 테이블 mock 연결
+- 문서 업데이트
+
+## Timestamp
+
+2026-07-09 15:55:45 (KST)
+
+---
+
+# 구간 상세 1차 Mock 매핑 작업 요약
+
+# 개요
+
+`frontend/route-detail.html`의 상단 구간 요약, 현재 위험도, 주요 지표 카드 4개를 mock 데이터와 연결했습니다.
+
+이번 단계는 구간 상세 화면 전체가 아니라, 첫 화면에서 가장 먼저 보이는 핵심 요약 정보만 1차로 매핑했습니다.
+
+# 구현 목적
+
+구간 상세 화면의 정적 데이터를 mock 기반 렌더링 구조로 전환하기 위함입니다.
+
+사용자는 구간 상세 화면에 진입했을 때 선택한 `segment_id` 기준으로 출발역, 도착역, 노선, 위험도, 지연/중단 지표를 확인할 수 있어야 합니다.
+
+# 구현 내용
+
+- `frontend/route-detail.html`
+  - 구간 출발역/도착역에 `data-route-detail-from-station`, `data-route-detail-to-station` 추가
+  - 노선, 기준 시간, 위험도, 특보 문구에 data 속성 추가
+  - 주요 지표 카드 4개에 `data-route-detail-metric` 구조 추가
+
+- `frontend/route-detail.js`
+  - `segments_details.json` fetch 추가
+  - `vulnerability_segments.json` fetch 추가
+  - `segment_id` query 우선 해석
+  - 선택 구간 기준 상단 요약 렌더링
+  - 선택 구간 기준 주요 지표 카드 렌더링
+  - 기존 탭 전환 기능 유지
+  - fetch 실패 또는 데이터 없음 fallback 처리
+
+# 코드 설명
+
+## 왜 필요한가
+
+구간 상세 화면이 정적 값으로 남아 있으면 대시보드의 구간 랭킹, checklist, 상세 화면이 서로 다른 정보를 보여줄 수 있습니다.
+
+mock 데이터 기반으로 매핑하면 이후 API 전환 시 화면 구조를 유지한 채 데이터 출처만 바꾸기 쉬워집니다.
+
+## 어떤 원리인가
+
+1. `route-detail.html?segment_id=daejeon-gimcheon_gumi`에서 `segment_id`를 읽습니다.
+2. `vulnerability_segments.json`에서 같은 `segment_id`의 구간을 찾습니다.
+3. `segments_details.json`에서 기본 구간 상세 데이터를 함께 읽습니다.
+4. 상단 구간명과 노선, 현재 위험도, 특보 문구를 렌더링합니다.
+5. `avg_delay_incr`, `stop_rate`, `sample_n`을 주요 지표 카드에 표시합니다.
+
+## 장점
+
+- 구간 상세 첫 화면이 mock 데이터와 연결됩니다.
+- `segment_id` 기반 진입을 지원합니다.
+- 기존 탭 UI를 유지합니다.
+- 데이터 없음 상태를 안전하게 처리합니다.
+
+## 단점
+
+- 특보별 분석 테이블과 과거 사례는 아직 연결하지 않았습니다.
+- `segments_details.json`은 현재 대전-김천(구미) 구간 중심 데이터만 가지고 있습니다.
+- 기준 시간, 거리, 기준 운행 시간은 아직 mock에 구조화되어 있지 않습니다.
+
+## 다른 구현 방법
+
+- 구간 상세 전용 mock을 segment id별 객체로 확장
+- 대시보드에서 구간 상세로 직접 이동 링크 추가
+- 구간 상세 화면에 select를 추가해 구간 변경 지원
+- 모든 주요 지표를 하나의 View Model로 변환 후 렌더링
+
+# API
+
+API 변경 사항은 없습니다.
+
+사용한 mock 데이터:
+
+- `GET ../mock/segments_details.json`
+- `GET ../mock/vulnerability_segments.json`
+
+# Database
+
+DB 변경 사항은 없습니다.
+
+실제 DB에서는 `segments.segment_id`를 기준으로 구간 상세 지표와 과거 사례를 조회하는 구조가 적합합니다.
+
+# 테스트 방법
+
+1. JavaScript 문법 검사
+
+```bash
+node --check frontend/route-detail.js
+```
+
+예상 결과:
+
+- 오류 없이 종료됩니다.
+
+2. mock JSON 파싱 검사
+
+```bash
+node -e "const fs=require('fs'); JSON.parse(fs.readFileSync('mock/segments_details.json','utf8')); JSON.parse(fs.readFileSync('mock/vulnerability_segments.json','utf8')); console.log('route detail mock json OK');"
+```
+
+예상 결과:
+
+```text
+route detail mock json OK
+```
+
+3. 기대값 확인
+
+```bash
+node -e "const fs=require('fs'); const detail=JSON.parse(fs.readFileSync('mock/segments_details.json','utf8')); const data=JSON.parse(fs.readFileSync('mock/vulnerability_segments.json','utf8')); const seg=data.segments.find((item)=>item.segment_id==='daejeon-gimcheon_gumi'); const risk=seg.avg_delay_incr>=12?'높음':seg.avg_delay_incr>=7?'주의':'관심'; console.log([detail.from+'역→'+detail.to+'역', data.line, data.alert_type+' '+data.alert_level, risk, seg.avg_delay_incr.toFixed(1)+'분', (seg.stop_rate*100).toFixed(1)+'%', seg.sample_n+'건'].join(' | '));"
+```
+
+예상 결과:
+
+```text
+대전역→김천(구미)역 | 경부선 | 호우 경보 | 높음 | 14.6분 | 8.0% | 37건
+```
+
+4. 브라우저 확인
+
+```text
+http://127.0.0.1:8765/frontend/route-detail.html?segment_id=daejeon-gimcheon_gumi
+```
+
+검증 기준:
+
+- 출발역은 `대전역`으로 표시됩니다.
+- 도착역은 `김천(구미)역`으로 표시됩니다.
+- 노선은 `경부선`으로 표시됩니다.
+- 현재 위험도는 `높음`으로 표시됩니다.
+- 특보는 `호우 경보`로 표시됩니다.
+- 평균 예상 지연 시간은 `14.6분`으로 표시됩니다.
+- 운행 중단률은 `8.0%`로 표시됩니다.
+- 분석 표본 수는 `37건`으로 표시됩니다.
+
+# 주의사항
+
+이번 단계는 구간 상세 1차 매핑입니다.
+
+특보별 분석 테이블과 과거 사례 목록은 다음 단계에서 `segments_details.by_alert[]`, `segments_details.cases[]`와 연결하는 것이 좋습니다.
+
+# 변경 이력
+
+2026-07-09
+
+- 구간 상세 상단 요약 mock 연결
+- 구간 상세 위험도 mock 연결
+- 구간 상세 주요 지표 카드 mock 연결
+
+# 다음 작업
+
+- 특보별 분석 테이블을 `segments_details.by_alert[]`와 연결
+- 과거 사례 목록을 `segments_details.cases[]`와 연결
+- 대시보드 취약 구간 랭킹에서 구간 상세 화면으로 `segment_id` 전달
+
+# 작업 요약
+
+## 완료한 내용
+
+- 구간 상세 HTML data 속성 추가
+- route-detail mock fetch 구현
+- segment id 기반 초기 구간 선택
+- 주요 지표 카드 4개 렌더링
+- 테스트 및 문서화
+
+## 수정한 파일
+
+- `frontend/route-detail.html`
+- `frontend/route-detail.js`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+구간 상세 화면도 역 상세 화면처럼 mock 데이터 기반으로 동작해야 전체 프로젝트의 데이터 흐름이 일관됩니다.
+
+## 변경 사항
+
+- `route-detail.js` fetch/render 로직 추가
+- `segment_id` query 해석 추가
+- 상단 구간 정보와 주요 지표 카드 동적 렌더링
+
+## 새롭게 배운 개념
+
+- Segment Detail View
+- Segment ID Query
+- Mock-based Detail Rendering
+
+## 실무에서는
+
+실무에서는 상세 화면에 필요한 요약 데이터, 통계 테이블, 과거 사례를 하나의 endpoint 또는 조합 가능한 endpoint로 제공합니다.
+
+프론트엔드는 API 응답을 바로 DOM에 넣기보다 화면용 View Model로 변환해 렌더링하는 편이 유지보수에 좋습니다.
+
+## 개선 가능한 부분
+
+- 거리/기준 시간 mock 추가
+- 기준 시각 mock 추가
+- 특보별 분석 테이블 연결
+- 과거 사례 연결
+- 구간 변경 UI 추가
+
+## 다음 작업
+
+- 구간 상세 특보별 분석 테이블 mock 연결
+
+## 복습 문제
+
+1. 상세 화면에서 `segment_id` query를 사용하는 이유는 무엇인가요?
+2. `vulnerability_segments.json`과 `segments_details.json`을 함께 읽는 이유는 무엇인가요?
+3. mock에 없는 거리/기준 시간은 어떻게 처리하는 것이 좋을까요?
+
+## 오늘 배운 내용
+
+- Segment Detail Mapping
+- Query-based Detail Rendering
+- Mock View Model
+
+## Change Log
+
+2026-07-09
+
+- 구간 상세 1차 mock 매핑
+- route-detail fetch/render 로직 추가
+- 문서 업데이트
+
+## Timestamp
+
+2026-07-09 15:51:19 (KST)
+
+---
+
 # Segment ID Mock 구조화 작업 요약
 
 # 개요

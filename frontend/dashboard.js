@@ -17,8 +17,10 @@ const RISK_LEVELS = {
 };
 
 const STATION_DETAIL_URL = "./station-detail.html";
+const ROUTE_DETAIL_URL = "./route-detail.html";
 const STATION_QUERY_PARAM = "station";
 const STATION_ID_QUERY_PARAM = "station_id";
+const SEGMENT_ID_QUERY_PARAM = "segment_id";
 
 const alertElements = {
   updatedTime: document.querySelector("[data-dashboard-updated-time]"),
@@ -597,6 +599,35 @@ function createStationLinkCell(stationName, stationId) {
   return cell;
 }
 
+function createSegmentDetailUrl(segmentId) {
+  const params = new URLSearchParams({
+    [SEGMENT_ID_QUERY_PARAM]: segmentId,
+  });
+
+  return `${ROUTE_DETAIL_URL}?${params.toString()}`;
+}
+
+function createSegmentLinkCell(segment) {
+  const cell = document.createElement("td");
+  const link = document.createElement("a");
+  const segmentLabel = `${segment.from}-${segment.to}`;
+
+  cell.className = "ranking-table__target";
+
+  if (!segment.segment_id) {
+    cell.textContent = segmentLabel;
+    return cell;
+  }
+
+  link.className = "ranking-table__link";
+  link.href = createSegmentDetailUrl(segment.segment_id);
+  link.textContent = segmentLabel;
+  link.setAttribute("aria-label", `${segment.from}에서 ${segment.to} 구간 상세 화면으로 이동`);
+  cell.append(link);
+
+  return cell;
+}
+
 function getStationNameFromInspectionTarget(target, stations) {
   if (!target || !target.endsWith("역")) {
     return null;
@@ -624,6 +655,17 @@ function createStationDetailLink(stationName, label, stationId) {
   link.href = createStationDetailUrl(stationName, stationId);
   link.textContent = label;
   link.setAttribute("aria-label", `${label} 상세 화면으로 이동`);
+
+  return link;
+}
+
+function createRouteDetailLink(segmentId, label) {
+  const link = document.createElement("a");
+
+  link.className = "inspection-link";
+  link.href = createSegmentDetailUrl(segmentId);
+  link.textContent = label;
+  link.setAttribute("aria-label", `${label} 구간 상세 화면으로 이동`);
 
   return link;
 }
@@ -674,7 +716,7 @@ function createSegmentRankingRow(segment, index, lineName) {
   riskCell.append(createRiskBadge(riskLevel));
   row.append(
     createRankingCell(String(index + 1)),
-    createRankingCell(`${segment.from}-${segment.to}`, "ranking-table__target"),
+    createSegmentLinkCell(segment),
     createRankingCell(lineName),
     riskCell,
     createRankingCell(segment.avg_delay_incr.toFixed(1), "ranking-table__number"),
@@ -763,6 +805,7 @@ function renderInspectionDetail(item, stations = []) {
   const riskLevel = getRiskLevelByDelayIncrease(item.avg_delay_incr);
   const stationName = getStationNameFromInspectionItem(item, stations);
   const stationId = getStationByName(stationName, stations)?.station_id;
+  const segmentId = item.target_type === "segment" ? item.segment_id : null;
   const title = document.createElement("h3");
   const list = document.createElement("dl");
   const fields = [
@@ -787,6 +830,8 @@ function renderInspectionDetail(item, stations = []) {
 
     if (label === "대상" && stationName) {
       description.append(createStationDetailLink(stationName, value, stationId));
+    } else if (label === "대상" && segmentId) {
+      description.append(createRouteDetailLink(segmentId, value));
     } else {
       description.textContent = value;
     }
@@ -814,11 +859,17 @@ function createInspectionTargetCell(item, stations) {
   const cell = document.createElement("td");
   const stationName = getStationNameFromInspectionItem(item, stations);
   const stationId = getStationByName(stationName, stations)?.station_id;
+  const segmentId = item.target_type === "segment" ? item.segment_id : null;
 
   cell.className = "inspection-table__target";
 
   if (stationName) {
     cell.append(createStationDetailLink(stationName, item.target, stationId));
+    return cell;
+  }
+
+  if (segmentId) {
+    cell.append(createRouteDetailLink(segmentId, item.target));
     return cell;
   }
 
