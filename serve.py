@@ -30,3 +30,5 @@ def dashboard_js():
 @app.get("/style.css", include_in_schema=False)
 def style_css():
     return FileResponse(ROOT / "frontend" / "style.css")
+
+app.mount("/", StaticFiles(directory=ROOT / "frontend"), name="frontend")
