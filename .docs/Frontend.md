@@ -6312,3 +6312,642 @@ http://127.0.0.1:8765/frontend/route-detail.html
 ## Timestamp
 
 2026-07-09 12:40:00 (KST)
+
+---
+
+# 구간 상세 특보별 분석 차트 Mock 연결 작업 요약
+
+# 개요
+
+구간 상세 화면의 `특보별 분석` 탭에 있는 가로 막대 차트 2개를 mock 데이터와 연결했습니다.
+
+연결한 차트:
+
+- 특보별 평균 지연 시간
+- 특보별 운행 중단률
+
+# 구현 목적
+
+특보별 분석 탭의 차트는 기존에 HTML 정적 값으로 표시되고 있었습니다.
+
+구간 상세 화면이 `segment_id`에 따라 다른 구간 데이터를 보여주도록 바뀌었기 때문에, 특보별 차트도 선택된 구간의 `by_alert[]` 데이터를 기준으로 렌더링되어야 합니다.
+
+# 구현 내용
+
+- `frontend/route-detail.html`
+  - 평균 지연 시간 가로 막대 차트에 `data-route-detail-alert-delay-chart` 추가
+  - 운행 중단률 가로 막대 차트에 `data-route-detail-alert-stop-chart` 추가
+
+- `frontend/route-detail.js`
+  - `renderRouteAlertCharts()` 추가
+  - `createHorizontalChartRow()` 추가
+  - `renderHorizontalChart()` 추가
+  - `by_alert[].avg_delay`로 평균 지연 차트 렌더링
+  - `by_alert[].stop_rate`로 운행 중단률 차트 렌더링
+  - 표의 지연 증가량, 운행 중단률 칸도 같은 mock 필드 재사용
+
+- `mock/segments_details.json`
+  - 각 `by_alert` 항목에 `delay_increase` 추가
+  - 각 `by_alert` 항목에 `stop_rate` 추가
+
+# 코드 설명
+
+## 왜 필요한가
+
+특보별 분석 탭은 구간별로 특보가 운행에 미치는 영향을 비교하는 화면입니다.
+
+차트가 정적 값으로 남아 있으면 `천안→대전`, `밀양→부산`처럼 다른 구간을 선택해도 동일한 막대 그래프가 보이게 됩니다.
+
+## 어떤 원리인가
+
+1. URL의 `segment_id`로 현재 구간 상세 데이터를 찾습니다.
+2. 선택 구간의 `by_alert[]` 배열을 읽습니다.
+3. 평균 지연 시간 차트는 `avg_delay`를 기준으로 막대 너비를 계산합니다.
+4. 운행 중단률 차트는 `stop_rate * 100` 값을 기준으로 막대 너비를 계산합니다.
+5. 기존 axis 요소는 유지하고, row만 mock 데이터 기준으로 다시 생성합니다.
+
+# API
+
+API 변경 사항은 없습니다.
+
+사용한 mock 데이터:
+
+- `GET ../mock/segments_details.json`
+
+확장된 mock 필드:
+
+```json
+{
+  "by_alert": [
+    {
+      "alert_type": "호우",
+      "alert_level": "경보",
+      "avg_delay": 14.6,
+      "delay_increase": 9.8,
+      "stop_rate": 0.08,
+      "sample_n": 37
+    }
+  ]
+}
+```
+
+# Database
+
+DB 변경 사항은 없습니다.
+
+# 테스트 방법
+
+1. JavaScript 문법 검사
+
+```bash
+node --check frontend/route-detail.js
+```
+
+예상 결과:
+
+- 오류 없이 종료됩니다.
+
+2. 특보별 차트 mock 데이터 존재 검사
+
+```bash
+node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('mock/segments_details.json','utf8')); const bad=data.segments.filter((s)=>!Array.isArray(s.by_alert)||s.by_alert.some((a)=>!Number.isFinite(a.avg_delay)||!Number.isFinite(a.delay_increase)||!Number.isFinite(a.stop_rate))); console.log('segments:', data.segments.length); console.log('bad alert chart data:', bad.length); if (bad.length) process.exit(1);"
+```
+
+검증 결과:
+
+```text
+segments: 6
+bad alert chart data: 0
+```
+
+3. 대표 구간 값 확인
+
+```text
+daejeon-gimcheon_gumi 호우 경보 14.6 9.8 8.0%
+cheonan-daejeon 호우 경보 11.3 7.1 5.0%
+miryang-busan 호우 경보 5.4 2.9 0.0%
+```
+
+4. HTTP 경로 검사
+
+```text
+/frontend/route-detail.html?segment_id=daejeon-gimcheon_gumi=200
+/frontend/route-detail.js=200
+/mock/segments_details.json=200
+```
+
+# 주의사항
+
+이번 작업은 특보별 분석 탭의 가로 막대 차트만 연결했습니다.
+
+과거 사례 탭의 미니 비교 차트는 아직 정적 데이터가 남아 있습니다.
+
+# 변경 이력
+
+2026-07-09
+
+- 특보별 평균 지연 시간 차트 mock 연결
+- 특보별 운행 중단률 차트 mock 연결
+- `by_alert` mock 필드 확장
+
+# 작업 요약
+
+## 완료한 내용
+
+- 특보별 분석 가로 막대 차트 mock 데이터 연결
+- `by_alert[].delay_increase`, `by_alert[].stop_rate` 추가
+- 특보별 분석 표 일부 칸 mock 데이터 재사용
+- 문법 및 mock 구조 검증
+- HTTP 경로 검증
+
+## 수정한 파일
+
+- `frontend/route-detail.html`
+- `frontend/route-detail.js`
+- `mock/segments_details.json`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+특보별 차트는 구간 상세 화면의 핵심 분석 요소입니다.
+
+구간별 mock 데이터와 연결하면 선택 구간에 따라 차트, 표, 요약 지표가 같은 데이터 기준으로 표시됩니다.
+
+## 변경 사항
+
+- 정적 가로 막대 차트를 DOM 기반 렌더링으로 변경
+- 평균 지연과 운행 중단률을 `by_alert[]`에서 계산
+- 데이터 없음 상태 fallback 메시지 추가
+
+## 새롭게 배운 개념
+
+- Horizontal Bar Chart
+- Data-driven DOM Rendering
+- Shared Mock Field Reuse
+
+## 실무에서는
+
+실무에서는 같은 지표를 표와 차트에서 함께 사용할 때 데이터 소스를 하나로 맞춥니다.
+
+프론트엔드에서 표시 형식만 다르게 만들고, 실제 값은 같은 API 응답 필드를 재사용하는 방식이 유지보수에 유리합니다.
+
+## 개선 가능한 부분
+
+- 차트 axis 값을 데이터 최대값에 따라 동적으로 계산
+- 과거 사례 비교 미니 차트 mock 연결
+- 시각 회귀 테스트 추가
+
+## 다음 작업
+
+- 과거 사례 탭의 미니 비교 차트 mock 연결
+
+## 복습 문제
+
+1. 표와 차트가 같은 mock 필드를 재사용하면 어떤 장점이 있나요?
+2. `stop_rate`를 화면에 표시할 때 왜 `* 100` 변환이 필요한가요?
+3. 가로 막대 차트에서 axis를 유지하고 row만 다시 생성한 이유는 무엇인가요?
+
+## 오늘 배운 내용
+
+- Horizontal Chart Rendering
+- Shared Data Source
+- Rate Formatting
+
+## Change Log
+
+2026-07-09
+
+- 구간 상세 특보별 분석 차트 mock 연결
+- 문서 업데이트
+
+## Timestamp
+
+2026-07-09 17:49:07 (KST)
+
+---
+
+# 구간 상세 과거 사례 미니 비교 차트 Mock 연결 작업 요약
+
+# 개요
+
+구간 상세 화면의 `과거 사례` 탭에 있는 미니 비교 차트 4개를 mock 데이터와 연결했습니다.
+
+연결한 차트:
+
+- 평균 지연 시간 비교
+- 지연 증가량 비교
+- 운행 중단률 비교
+- 누적 강수량 비교
+
+# 구현 목적
+
+과거 사례 탭의 미니 차트는 기존에 HTML 정적 값으로 표시되고 있었습니다.
+
+구간 상세 화면이 `segment_id` 기준으로 여러 구간을 지원하므로, 과거 사례 비교 차트도 선택된 구간의 `cases[]` 데이터를 기준으로 바뀌어야 합니다.
+
+# 구현 내용
+
+- `frontend/route-detail.html`
+  - 미니 비교 차트 4개에 `data-route-detail-history-chart` 속성 추가
+
+- `frontend/route-detail.js`
+  - `renderRouteHistoryCharts()` 추가
+  - `renderMiniChart()` 추가
+  - `createMiniBar()` 추가
+  - 과거 사례 상위 3건과 현재 예측값을 비교하도록 렌더링
+  - 과거 사례 표의 강수량, 지연 증가량, 운행 중단률, 영향 열차 칸을 mock 필드와 연결
+
+- `mock/segments_details.json`
+  - 구간별 `current_rain_mm` 추가
+  - `cases[]` 항목에 `rain_mm`, `delay_increase`, `stop_rate`, `affected_trains` 추가
+
+# 코드 설명
+
+## 왜 필요한가
+
+과거 사례 비교 차트는 현재 상황과 유사한 과거 사례를 빠르게 비교하는 영역입니다.
+
+차트가 정적 값이면 다른 구간 상세로 이동해도 과거 사례 비교가 바뀌지 않아 분석 화면의 신뢰도가 떨어집니다.
+
+## 어떤 원리인가
+
+1. 선택된 구간의 `cases[]`에서 상위 3건을 가져옵니다.
+2. 현재 예측값은 선택 구간의 요약 지표와 `current_rain_mm`을 사용합니다.
+3. 각 차트별 최대값을 기준으로 막대 높이를 계산합니다.
+4. 과거 사례 3개와 현재 예측 1개를 같은 차트에 표시합니다.
+5. 과거 사례 표도 같은 `cases[]` 필드를 사용해 갱신합니다.
+
+# API
+
+API 변경 사항은 없습니다.
+
+사용한 mock 데이터:
+
+- `GET ../mock/segments_details.json`
+- `GET ../mock/vulnerability_segments.json`
+
+확장된 mock 필드:
+
+```json
+{
+  "current_rain_mm": 126.4,
+  "cases": [
+    {
+      "date": "2026-06-28",
+      "alert_type": "호우",
+      "rain_mm": 162.3,
+      "delay_min": 19,
+      "delay_increase": 13.4,
+      "stop_rate": 0.089,
+      "affected_trains": 36
+    }
+  ]
+}
+```
+
+# Database
+
+DB 변경 사항은 없습니다.
+
+# 테스트 방법
+
+1. JavaScript 문법 검사
+
+```bash
+node --check frontend/route-detail.js
+```
+
+예상 결과:
+
+- 오류 없이 종료됩니다.
+
+2. 과거 사례 비교 차트 mock 데이터 존재 검사
+
+```bash
+node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('mock/segments_details.json','utf8')); const bad=data.segments.filter((s)=>!Number.isFinite(s.current_rain_mm)||!Array.isArray(s.cases)||s.cases.some((c)=>!Number.isFinite(c.rain_mm)||!Number.isFinite(c.delay_min)||!Number.isFinite(c.delay_increase)||!Number.isFinite(c.stop_rate)||!Number.isFinite(c.affected_trains))); console.log('segments:', data.segments.length); console.log('bad history chart data:', bad.length); if (bad.length) process.exit(1);"
+```
+
+검증 결과:
+
+```text
+segments: 6
+bad history chart data: 0
+```
+
+3. 대표 구간 값 확인
+
+```text
+daejeon-gimcheon_gumi currentRain 126.4 case 2026-06-28 162.3 19 13.4 8.9% 36
+cheonan-daejeon currentRain 104.8 case 2026-06-26 137.5 15 9.2 6.1% 31
+miryang-busan currentRain 52.7 case 2026-06-16 74.3 7 3.8 0.0% 9
+```
+
+4. HTTP 경로 검사
+
+```text
+/frontend/route-detail.html?segment_id=daejeon-gimcheon_gumi=200
+/frontend/route-detail.js=200
+/mock/segments_details.json=200
+```
+
+# 주의사항
+
+현재 예측의 지연 증가량은 기존 구간 요약 지표인 `avg_delay_incr`를 재사용합니다.
+
+실제 API 설계 단계에서는 평균 지연 시간과 지연 증가량을 별도 필드로 분리하는 것이 더 명확합니다.
+
+# 변경 이력
+
+2026-07-09
+
+- 과거 사례 미니 비교 차트 mock 연결
+- 과거 사례 표 상세 필드 mock 연결
+- 구간별 현재 누적 강수량 mock 추가
+
+# 작업 요약
+
+## 완료한 내용
+
+- 과거 사례 미니 차트 4개 mock 데이터 연결
+- 과거 사례 표의 비어 있던 지표 칸 연결
+- 구간별 `current_rain_mm` 추가
+- `cases[]` 상세 필드 확장
+- 문법 및 mock 구조 검증
+- HTTP 경로 검증
+
+## 수정한 파일
+
+- `frontend/route-detail.html`
+- `frontend/route-detail.js`
+- `mock/segments_details.json`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+과거 사례 탭의 표와 차트가 같은 데이터를 사용해야 상세 화면의 일관성이 높아집니다.
+
+사용자는 현재 예측값과 과거 사례를 같은 기준으로 비교할 수 있습니다.
+
+## 변경 사항
+
+- 정적 미니 막대 차트를 DOM 기반 렌더링으로 변경
+- 과거 사례 상위 3건과 현재 예측값 비교
+- 과거 사례 표에 누적 강수량, 운행 중단률, 영향 열차 수 표시
+
+## 새롭게 배운 개념
+
+- Mini Bar Chart Rendering
+- Historical Case Comparison
+- Current vs Historical Metrics
+
+## 실무에서는
+
+실무에서는 과거 사례 비교용 데이터와 현재 예측 데이터를 API에서 명확히 분리해 내려주는 편이 좋습니다.
+
+프론트엔드는 같은 차트 컴포넌트에 데이터만 바꿔 넣는 구조로 만들면 유지보수가 쉬워집니다.
+
+## 개선 가능한 부분
+
+- 평균 지연 시간과 지연 증가량 필드 분리
+- 유사도 기준 API 설계
+- 과거 사례 상세 비교 페이지 연결
+
+## 다음 작업
+
+- 구간 상세 화면 전체 mock 연결 최종 검수
+
+## 복습 문제
+
+1. 과거 사례 표와 차트가 같은 `cases[]` 데이터를 사용하면 어떤 장점이 있나요?
+2. 현재 예측값과 과거 사례값을 한 차트에서 비교할 때 주의할 점은 무엇인가요?
+3. 실제 API에서는 왜 평균 지연 시간과 지연 증가량을 별도 필드로 분리하는 것이 좋을까요?
+
+## 오늘 배운 내용
+
+- Historical Comparison Chart
+- Shared Case Data
+- Current Forecast Comparison
+
+## Change Log
+
+2026-07-09
+
+- 구간 상세 과거 사례 미니 비교 차트 mock 연결
+- 문서 업데이트
+
+## Timestamp
+
+2026-07-09 17:53:12 (KST)
+
+---
+
+# 구간 상세 화면 전체 Mock 연결 최종 검수 작업 요약
+
+# 개요
+
+구간 상세 화면의 전체 mock 데이터 연결 상태를 최종 검수했습니다.
+
+검수 범위:
+
+- 구간 선택 기준 `segment_id`
+- 상단 제목, breadcrumb, 요약 카드
+- 주요 지표 카드
+- 요약 탭 선 그래프와 막대 그래프
+- 특보별 분석 표와 가로 막대 차트
+- 과거 사례 표와 미니 비교 차트
+- 대시보드에서 구간 상세로 이동하는 HTTP 경로
+
+# 구현 목적
+
+여러 단계로 나누어 연결한 구간 상세 mock 데이터가 화면 전체에서 같은 기준으로 동작하는지 확인하기 위함입니다.
+
+특히 `vulnerability_segments.json`과 `segments_details.json`이 같은 `segment_id`를 공유하므로, 두 mock 파일의 참조 무결성이 중요합니다.
+
+# 구현 내용
+
+이번 단계에서는 기능 코드를 새로 추가하지 않고 검수와 문서화를 진행했습니다.
+
+검수한 파일:
+
+- `frontend/route-detail.html`
+- `frontend/route-detail.js`
+- `frontend/dashboard.js`
+- `mock/segments_details.json`
+- `mock/vulnerability_segments.json`
+
+# 코드 설명
+
+## 왜 필요한가
+
+구간 상세 화면은 여러 종류의 데이터를 함께 표시합니다.
+
+요약 지표는 `vulnerability_segments.json`에서 가져오고, 차트와 상세 표는 `segments_details.json`에서 가져옵니다.
+
+두 데이터의 `segment_id`가 맞지 않거나 특정 필드가 빠지면 화면 일부가 비거나 다른 구간의 데이터를 표시할 수 있습니다.
+
+## 어떤 원리인가
+
+1. JavaScript 문법 오류를 확인합니다.
+2. 두 mock 파일의 `segment_id`가 서로 일치하는지 확인합니다.
+3. 상세 mock에 필요한 차트/표 필드가 모두 존재하는지 확인합니다.
+4. HTML에 렌더링 대상 `data-*` 선택자가 존재하는지 확인합니다.
+5. 대표 구간 3개의 계산값을 확인합니다.
+6. 로컬 HTTP 서버에서 실제 접근 경로가 200으로 응답하는지 확인합니다.
+
+# API
+
+API 변경 사항은 없습니다.
+
+검수한 mock 데이터:
+
+- `GET ../mock/vulnerability_segments.json`
+- `GET ../mock/segments_details.json`
+
+# Database
+
+DB 변경 사항은 없습니다.
+
+# 테스트 방법
+
+1. JavaScript 문법 검사
+
+```bash
+node --check frontend/route-detail.js
+node --check frontend/dashboard.js
+```
+
+예상 결과:
+
+- 오류 없이 종료됩니다.
+
+2. `segment_id` 참조 무결성 및 상세 구조 검사
+
+검증 결과:
+
+```text
+vulnerability segments: 6
+detail segments: 6
+missing details: 0
+missing summaries: 0
+bad detail structures: 0
+```
+
+3. 상세 지표 필드 검사
+
+검증 결과:
+
+```text
+bad metric fields: 0
+```
+
+4. 대표 구간 값 확인
+
+검증 결과:
+
+```text
+daejeon-gimcheon_gumi | 대전→김천(구미) | 14.6분 | 8.0% | 7 hourly | 7 trend | 3 alerts | 3 cases | 126.4mm
+cheonan-daejeon | 천안→대전 | 11.3분 | 5.0% | 7 hourly | 7 trend | 3 alerts | 3 cases | 104.8mm
+miryang-busan | 밀양→부산 | 5.4분 | 0.0% | 7 hourly | 7 trend | 3 alerts | 3 cases | 52.7mm
+```
+
+5. HTTP 경로 검사
+
+검증 결과:
+
+```text
+/frontend/route-detail.html?segment_id=daejeon-gimcheon_gumi=200
+/frontend/route-detail.html?segment_id=cheonan-daejeon=200
+/frontend/route-detail.html?segment_id=miryang-busan=200
+/frontend/route-detail.js=200
+/mock/segments_details.json=200
+/mock/vulnerability_segments.json=200
+```
+
+# 주의사항
+
+이번 검수는 정적 분석과 HTTP 응답 확인 중심입니다.
+
+브라우저에서 실제 렌더링된 텍스트와 차트 픽셀을 확인하는 Playwright 기반 시각 검수는 아직 별도 자동화하지 않았습니다.
+
+# 변경 이력
+
+2026-07-09
+
+- 구간 상세 화면 전체 mock 연결 최종 검수
+- `segment_id` 참조 무결성 확인
+- 차트/테이블 필드 완성도 확인
+- 대표 구간 계산값 문서화
+
+# 작업 요약
+
+## 완료한 내용
+
+- 구간 상세 JS 문법 검증
+- dashboard JS 문법 검증
+- 두 mock 파일 간 `segment_id` 참조 무결성 검증
+- 상세 mock 필드 완성도 검증
+- HTML 렌더링 선택자 존재 확인
+- 대표 구간 3개 계산값 확인
+- HTTP 경로 검증
+- 문서화
+
+## 수정한 파일
+
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+구간 상세 화면의 mock 연결 작업이 여러 단계로 진행되었기 때문에, 최종적으로 전체 데이터 흐름을 한 번에 검증해야 합니다.
+
+이 검수를 통해 현재 구간 상세 화면은 선택된 `segment_id` 기준으로 요약, 차트, 표가 같은 구간 데이터를 표시할 수 있음을 확인했습니다.
+
+## 변경 사항
+
+- 기능 코드 변경 없음
+- 최종 검수 결과 문서 추가
+
+## 새롭게 배운 개념
+
+- End-to-end Mock Validation
+- Cross-file Reference Integrity
+- Static Rendering Selector Check
+
+## 실무에서는
+
+실무에서는 이런 검수를 CI에 포함해 mock 데이터나 API contract가 깨졌을 때 바로 확인할 수 있게 만듭니다.
+
+특히 상세 화면은 URL 파라미터, 목록 화면 링크, 상세 API 응답이 모두 같은 id 체계를 사용해야 안정적으로 동작합니다.
+
+## 개선 가능한 부분
+
+- Playwright로 실제 화면 텍스트 검증 자동화
+- 차트 DOM 렌더링 결과 검증 자동화
+- mock schema 검증 스크립트 분리
+- RAG 심층 분석 화면 mock 연결
+
+## 다음 작업
+
+- 구간 상세 mock 연결 변경사항 커밋 준비
+
+## 복습 문제
+
+1. `segment_id` 참조 무결성 검사가 상세 화면에서 중요한 이유는 무엇인가요?
+2. HTTP 응답 검증과 실제 화면 렌더링 검증은 어떤 차이가 있나요?
+3. mock schema 검증을 CI에 넣으면 어떤 장점이 있나요?
+
+## 오늘 배운 내용
+
+- Mock Validation
+- Reference Integrity
+- HTTP Path Verification
+
+## Change Log
+
+2026-07-09
+
+- 구간 상세 화면 전체 mock 연결 최종 검수
+- 문서 업데이트
+
+## Timestamp
+
+2026-07-09 17:55:23 (KST)

@@ -12,6 +12,10 @@ const LINE_CHART_MAX_Y = 192;
 const BAR_CHART_MAX_VALUE = 20;
 const BAR_CHART_MAX_HEIGHT = 150;
 const BAR_CHART_MIN_HEIGHT = 8;
+const HORIZONTAL_DELAY_MAX_VALUE = 20;
+const HORIZONTAL_STOP_RATE_MAX_VALUE = 10;
+const MINI_CHART_MAX_HEIGHT = 118;
+const MINI_CHART_MIN_HEIGHT = 10;
 
 const RISK_LABELS = {
   high: "높음",
@@ -58,6 +62,14 @@ const routeChartElements = {
   lineTooltipBox: document.querySelector("[data-route-detail-line-tooltip-box]"),
   lineTooltip: document.querySelector("[data-route-detail-line-tooltip]"),
   barChart: document.querySelector("[data-route-detail-bar-chart]"),
+  alertDelayChart: document.querySelector("[data-route-detail-alert-delay-chart]"),
+  alertStopChart: document.querySelector("[data-route-detail-alert-stop-chart]"),
+  historyCharts: {
+    delay: document.querySelector('[data-route-detail-history-chart="delay"]'),
+    increase: document.querySelector('[data-route-detail-history-chart="increase"]'),
+    stop: document.querySelector('[data-route-detail-history-chart="stop"]'),
+    rain: document.querySelector('[data-route-detail-history-chart="rain"]'),
+  },
 };
 
 function setRouteTab(targetTab) {
@@ -97,6 +109,14 @@ function formatPercent(rate) {
   return (rate * 100).toFixed(1);
 }
 
+function formatRatePercent(rate) {
+  if (!Number.isFinite(rate)) {
+    return "-";
+  }
+
+  return `${formatPercent(rate)}%`;
+}
+
 function formatSignedNumber(value) {
   if (!Number.isFinite(value)) {
     return "-";
@@ -123,6 +143,26 @@ function formatCaseDate(dateString) {
 
   if (Number.isNaN(date.getTime())) {
     return "날짜 정보 없음";
+  }
+
+  const formatter = new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts = Object.fromEntries(
+    formatter.formatToParts(date).map((part) => [part.type, part.value]),
+  );
+
+  return `${parts.year}.${parts.month}.${parts.day}`;
+}
+
+function formatCompactCaseDate(dateString) {
+  const date = new Date(dateString);
+
+  if (Number.isNaN(date.getTime())) {
+    return "날짜 없음";
   }
 
   const formatter = new Intl.DateTimeFormat("ko-KR", {
@@ -180,6 +220,30 @@ function getAlertIconPath(alertType) {
   }
 
   return "./assets/icons/cloud-rain.svg";
+}
+
+function getAlertChartColor(alertStat) {
+  if (alertStat.alert_level === "경보") {
+    return "var(--color-danger-red)";
+  }
+
+  if (alertStat.alert_type === "호우") {
+    return "#F59E0B";
+  }
+
+  if (alertStat.alert_type === "대설") {
+    return "#2563EB";
+  }
+
+  if (alertStat.alert_type === "강풍") {
+    return "#22C55E";
+  }
+
+  if (alertStat.alert_type === "폭염") {
+    return "#F97316";
+  }
+
+  return "#94A3B8";
 }
 
 function getSegments(vulnerabilitySegmentsData) {
@@ -340,6 +404,51 @@ function createDelayTrendBar(trendItem, index, itemCount) {
   return bar;
 }
 
+function createHorizontalChartRow(label, valueText, widthPercent, color) {
+  const row = document.createElement("div");
+  const labelElement = document.createElement("span");
+  const bar = document.createElement("i");
+  const value = document.createElement("strong");
+
+  row.className = "route-horizontal-chart__row";
+  labelElement.textContent = label;
+  bar.style.width = `${Math.max(0, Math.min(widthPercent, 100)).toFixed(0)}%`;
+  bar.style.background = color;
+  value.textContent = valueText;
+
+  row.append(labelElement, bar, value);
+
+  return row;
+}
+
+function createHorizontalChartEmptyRow(message) {
+  const row = document.createElement("div");
+
+  row.className = "route-horizontal-chart__row";
+  row.textContent = message;
+
+  return row;
+}
+
+function createMiniBar(value, label, options = {}) {
+  const bar = document.createElement("i");
+  const valueElement = document.createElement("b");
+  const labelElement = document.createElement("span");
+  const maxValue = Number.isFinite(options.maxValue) && options.maxValue > 0 ? options.maxValue : 1;
+  const height = Math.max(
+    MINI_CHART_MIN_HEIGHT,
+    Math.min((value / maxValue) * MINI_CHART_MAX_HEIGHT, MINI_CHART_MAX_HEIGHT),
+  );
+
+  bar.className = `route-mini-bar-chart__bar${options.isCurrent ? " route-mini-bar-chart__bar--forecast" : ""}`;
+  bar.style.height = `${height.toFixed(0)}px`;
+  valueElement.textContent = options.formatValue(value);
+  labelElement.innerHTML = label;
+  bar.append(valueElement, labelElement);
+
+  return bar;
+}
+
 function createMessageRow(message, columnCount) {
   const row = document.createElement("tr");
   const cell = document.createElement("td");
@@ -428,17 +537,17 @@ function createSimilarityCell(delayMinutes) {
 function createHistoryRow(caseItem) {
   const row = document.createElement("tr");
   const delayText = Number.isFinite(caseItem.delay_min) ? caseItem.delay_min.toFixed(1) : "-";
-  const increaseCell = createTableCell(Number.isFinite(caseItem.delay_min) ? `+${caseItem.delay_min.toFixed(1)}` : "-");
+  const increaseCell = createTableCell(Number.isFinite(caseItem.delay_increase) ? formatSignedNumber(caseItem.delay_increase) : "-");
 
   increaseCell.className = "route-history-table__increase";
   row.append(
     createTableCell(formatCaseDate(caseItem.date)),
     createHistoryAlertCell(caseItem),
-    createTableCell("-"),
+    createTableCell(Number.isFinite(caseItem.rain_mm) ? caseItem.rain_mm.toFixed(1) : "-"),
     createTableCell(delayText),
     increaseCell,
-    createTableCell("-"),
-    createTableCell("-"),
+    createTableCell(Number.isFinite(caseItem.stop_rate) ? formatPercent(caseItem.stop_rate) : "-"),
+    createTableCell(Number.isFinite(caseItem.affected_trains) ? String(caseItem.affected_trains) : "-"),
     createSimilarityCell(caseItem.delay_min),
     createTableCell(""),
   );
@@ -449,14 +558,16 @@ function createHistoryRow(caseItem) {
 function createSummaryAlertRow(alertStat) {
   const row = document.createElement("tr");
   const avgDelay = Number.isFinite(alertStat.avg_delay) ? alertStat.avg_delay.toFixed(1) : "-";
+  const delayIncrease = Number.isFinite(alertStat.delay_increase) ? formatSignedNumber(alertStat.delay_increase) : "-";
+  const stopRate = Number.isFinite(alertStat.stop_rate) ? formatPercent(alertStat.stop_rate) : "-";
   const sampleCount = Number.isFinite(alertStat.sample_n) ? `${alertStat.sample_n} 회` : "-";
 
   row.append(
     createAlertHeaderCell(alertStat),
     createAlertLevelCell(alertStat.alert_level),
     createTableCell(avgDelay),
-    createTableCell("-"),
-    createTableCell("-"),
+    createTableCell(delayIncrease),
+    createTableCell(stopRate),
     createTableCell(sampleCount),
     createTableCell(""),
   );
@@ -467,6 +578,8 @@ function createSummaryAlertRow(alertStat) {
 function createAlertAnalysisRow(alertStat) {
   const row = document.createElement("tr");
   const avgDelay = Number.isFinite(alertStat.avg_delay) ? alertStat.avg_delay.toFixed(1) : "-";
+  const delayIncrease = Number.isFinite(alertStat.delay_increase) ? formatSignedNumber(alertStat.delay_increase) : "-";
+  const stopRate = Number.isFinite(alertStat.stop_rate) ? formatPercent(alertStat.stop_rate) : "-";
   const sampleCount = Number.isFinite(alertStat.sample_n) ? `${alertStat.sample_n} 회` : "-";
 
   row.append(
@@ -474,8 +587,8 @@ function createAlertAnalysisRow(alertStat) {
     createAlertLevelCell(alertStat.alert_level),
     createTableCell(sampleCount),
     createTableCell(avgDelay),
-    createTableCell("-"),
-    createTableCell("-"),
+    createTableCell(delayIncrease),
+    createTableCell(stopRate),
     createTableCell("-"),
     createTableCell("-"),
   );
@@ -503,6 +616,46 @@ function renderRouteAlertTables(segmentDetailData) {
   }
 }
 
+function renderHorizontalChart(chartElement, rows, emptyMessage) {
+  if (!chartElement) {
+    return;
+  }
+
+  const axis = chartElement.querySelector(".route-horizontal-chart__axis");
+  const chartRows = rows.length > 0 ? rows : [createHorizontalChartEmptyRow(emptyMessage)];
+
+  chartElement.replaceChildren(...chartRows, ...(axis ? [axis] : []));
+}
+
+function renderRouteAlertCharts(segmentDetailData) {
+  const alertStats = Array.isArray(segmentDetailData.by_alert) ? segmentDetailData.by_alert : [];
+  const delayRows = alertStats.map((alertStat) => {
+    const value = Number.isFinite(alertStat.avg_delay) ? alertStat.avg_delay : 0;
+    const widthPercent = (value / HORIZONTAL_DELAY_MAX_VALUE) * 100;
+
+    return createHorizontalChartRow(
+      `${alertStat.alert_type || "특보"} (${alertStat.alert_level || "-"})`,
+      Number.isFinite(alertStat.avg_delay) ? alertStat.avg_delay.toFixed(1) : "-",
+      widthPercent,
+      getAlertChartColor(alertStat),
+    );
+  });
+  const stopRows = alertStats.map((alertStat) => {
+    const value = Number.isFinite(alertStat.stop_rate) ? Number(formatPercent(alertStat.stop_rate)) : 0;
+    const widthPercent = (value / HORIZONTAL_STOP_RATE_MAX_VALUE) * 100;
+
+    return createHorizontalChartRow(
+      `${alertStat.alert_type || "특보"} (${alertStat.alert_level || "-"})`,
+      formatRatePercent(alertStat.stop_rate),
+      widthPercent,
+      getAlertChartColor(alertStat),
+    );
+  });
+
+  renderHorizontalChart(routeChartElements.alertDelayChart, delayRows, "특보별 평균 지연 데이터가 없습니다.");
+  renderHorizontalChart(routeChartElements.alertStopChart, stopRows, "특보별 운행 중단률 데이터가 없습니다.");
+}
+
 function renderRouteHistoryTable(segmentDetailData) {
   if (!routeTableElements.historyBody) {
     return;
@@ -513,6 +666,89 @@ function renderRouteHistoryTable(segmentDetailData) {
 
   routeTableElements.historyBody.replaceChildren(
     ...(rows.length > 0 ? rows : [createMessageRow("과거 유사 사례 데이터가 없습니다.", 9)]),
+  );
+}
+
+function getTopHistoryCases(segmentDetailData) {
+  const cases = Array.isArray(segmentDetailData.cases) ? segmentDetailData.cases : [];
+
+  return cases.slice(0, 3);
+}
+
+function renderMiniChart(chartElement, items, currentItem, valueKey, valueFormatter, emptyMessage) {
+  if (!chartElement) {
+    return;
+  }
+
+  const values = [
+    ...items.map((item) => item[valueKey]).filter(Number.isFinite),
+    currentItem[valueKey],
+  ].filter(Number.isFinite);
+  const maxValue = Math.max(...values, 1);
+  const bars = items.map((item) => createMiniBar(
+    Number.isFinite(item[valueKey]) ? item[valueKey] : 0,
+    formatCompactCaseDate(item.date),
+    {
+      maxValue,
+      formatValue: valueFormatter,
+    },
+  ));
+  const currentBar = createMiniBar(
+    Number.isFinite(currentItem[valueKey]) ? currentItem[valueKey] : 0,
+    currentItem.label,
+    {
+      maxValue,
+      formatValue: valueFormatter,
+      isCurrent: true,
+    },
+  );
+
+  chartElement.replaceChildren(
+    ...(bars.length > 0 ? [...bars, currentBar] : [createHorizontalChartEmptyRow(emptyMessage)]),
+  );
+}
+
+function renderRouteHistoryCharts(segmentDetailData, selectedSegment) {
+  const topCases = getTopHistoryCases(segmentDetailData);
+  const currentItem = {
+    delay_min: selectedSegment?.avg_delay_incr,
+    delay_increase: selectedSegment?.avg_delay_incr,
+    stop_rate: selectedSegment?.stop_rate,
+    rain_mm: segmentDetailData.current_rain_mm,
+    label: "현재 예측",
+  };
+
+  renderMiniChart(
+    routeChartElements.historyCharts.delay,
+    topCases,
+    currentItem,
+    "delay_min",
+    (value) => Number.isFinite(value) ? value.toFixed(1) : "-",
+    "평균 지연 시간 비교 데이터가 없습니다.",
+  );
+  renderMiniChart(
+    routeChartElements.historyCharts.increase,
+    topCases,
+    currentItem,
+    "delay_increase",
+    (value) => Number.isFinite(value) ? formatSignedNumber(value) : "-",
+    "지연 증가량 비교 데이터가 없습니다.",
+  );
+  renderMiniChart(
+    routeChartElements.historyCharts.stop,
+    topCases,
+    currentItem,
+    "stop_rate",
+    (value) => Number.isFinite(value) ? formatPercent(value) : "-",
+    "운행 중단률 비교 데이터가 없습니다.",
+  );
+  renderMiniChart(
+    routeChartElements.historyCharts.rain,
+    topCases,
+    currentItem,
+    "rain_mm",
+    (value) => Number.isFinite(value) ? value.toFixed(1) : "-",
+    "누적 강수량 비교 데이터가 없습니다.",
   );
 }
 
@@ -584,9 +820,11 @@ function renderRouteDelayTrendChart(segmentDetailData) {
   routeChartElements.barChart.replaceChildren(...axisItems, ...bars);
 }
 
-function renderRouteCharts(segmentDetailData) {
+function renderRouteCharts(segmentDetailData, selectedSegment) {
   renderRouteLineChart(segmentDetailData);
   renderRouteDelayTrendChart(segmentDetailData);
+  renderRouteAlertCharts(segmentDetailData);
+  renderRouteHistoryCharts(segmentDetailData, selectedSegment);
 }
 
 function renderEmptyRouteDetail() {
@@ -630,7 +868,7 @@ function renderEmptyRouteDetail() {
   setMetricCard(routeMetricElements.sampleCount, "-", "건", "mock 데이터", "없음", "분석 표본 수 데이터 없음");
   renderRouteAlertTables({});
   renderRouteHistoryTable({});
-  renderRouteCharts({});
+  renderRouteCharts({}, null);
 }
 
 function renderRoutePageMeta(segmentDetailData, selectedSegment) {
@@ -752,7 +990,7 @@ function renderRouteDetail(segmentDetailsData, vulnerabilitySegmentsData) {
   renderRouteMetrics(selectedSegment);
   renderRouteAlertTables(selectedSegmentDetail);
   renderRouteHistoryTable(selectedSegmentDetail);
-  renderRouteCharts(selectedSegmentDetail);
+  renderRouteCharts(selectedSegmentDetail, selectedSegment);
 }
 
 async function fetchJson(url) {
