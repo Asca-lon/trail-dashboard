@@ -1,4 +1,4 @@
-﻿# 개요
+# 개요
 
 기상-철도 리스크 의사결정 지원 시스템의 메인 대시보드 프론트엔드 구현 기록입니다.
 
@@ -919,3 +919,317 @@ python -m http.server 8765 --bind 127.0.0.1
 
 
 
+
+---
+
+# 역 상세 화면 작업 요약
+
+## 완료한 내용
+
+- `STATION_DETAIL_DESIGN_GUIDE.md` 기준의 역 상세 화면을 추가했습니다.
+- 메인 대시보드와 동일한 오버레이 사이드바 구조를 재사용했습니다.
+- 메뉴 버튼 클릭 시 사이드바가 화면 위에 표시되도록 `sidebar.js`를 연결했습니다.
+- Global Header, Breadcrumb, Page Title, Station Information Header를 구현했습니다.
+- 주요 지표 카드 4개를 구현했습니다.
+- 시간대별 평균 지연 시간 라인 차트와 특보 발생 시/평상시 평균 지연 비교 차트를 구현했습니다.
+- 특보별 영향 통계 테이블과 과거 주요 사례 카드를 구현했습니다.
+- 필요한 Lucide 계열 SVG 아이콘 에셋을 `frontend/assets/icons/`에 추가했습니다.
+- 사이드바 토글 버튼의 깨진 접근성 라벨을 정상 한글 문구로 수정했습니다.
+
+## 수정한 파일
+
+- `frontend/station-detail.html`
+- `frontend/style.css`
+- `frontend/sidebar.js`
+- `frontend/assets/icons/bell.svg`
+- `frontend/assets/icons/chevron-down.svg`
+- `frontend/assets/icons/chevron-right.svg`
+- `frontend/assets/icons/arrow-left.svg`
+- `frontend/assets/icons/trending-up.svg`
+- `frontend/assets/icons/percent.svg`
+- `frontend/assets/icons/cloud-rain.svg`
+- `frontend/assets/icons/wind.svg`
+- `frontend/assets/icons/snowflake.svg`
+- `frontend/assets/icons/sun.svg`
+- `frontend/assets/icons/circle-info.svg`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+역 상세 화면은 메인 대시보드에서 특정 역을 선택한 뒤 기상 영향과 운행 리스크를 더 자세히 확인하는 화면입니다.
+
+메인 대시보드와 같은 디자인 토큰, 카드 스타일, 사이드바 방식을 유지해야 전체 서비스가 하나의 제품처럼 보입니다.
+
+## 변경 사항
+
+- 신규 페이지 `station-detail.html`을 추가했습니다.
+- 사이드바 메뉴에서 `역 상세` 항목을 현재 페이지로 표시했습니다.
+- 고정 사이드바가 아니라 메뉴 버튼을 눌렀을 때 나타나는 오버레이 사이드바를 유지했습니다.
+- 역 정보 카드에 역명, 노선 배지, 주소, 역 변경 버튼, 현재 위험도 박스를 배치했습니다.
+- 주요 지표 카드의 값, 단위, 전일 대비 증감값을 디자인 이미지와 동일한 구조로 배치했습니다.
+- 차트는 별도 라이브러리 없이 HTML/SVG/CSS로 구현했습니다.
+- 반응형에서는 카드와 차트가 한 줄에서 두 줄, 한 줄 세로 배치로 자연스럽게 전환되도록 했습니다.
+
+## 테스트 방법
+
+1. JavaScript 문법 검사
+
+```bash
+node --check frontend/sidebar.js
+```
+
+예상 결과: 오류 메시지가 없어야 합니다.
+
+2. 로컬 서버 실행
+
+```bash
+python -m http.server 8765 --bind 127.0.0.1
+```
+
+브라우저에서 아래 주소로 접속합니다.
+
+```text
+http://127.0.0.1:8765/frontend/station-detail.html
+```
+
+3. 검증 기준
+
+- 상단 메뉴 버튼을 누르면 사이드바가 기존 콘텐츠 위에 표시됩니다.
+- 사이드바에서 `역 상세` 메뉴가 활성화되어 보입니다.
+- 역 정보 카드에 `대전역`, `경부선`, `현재 위험도: 높음`이 표시됩니다.
+- 주요 지표 카드 4개가 데스크톱에서 한 줄로 표시됩니다.
+- 좁은 화면에서는 주요 지표, 차트, 하단 카드가 줄바꿈되어 겹치지 않습니다.
+- `Escape` 키 또는 사이드바 접기 버튼으로 사이드바가 닫힙니다.
+
+## 새롭게 배운 개념
+
+- 상세 화면 레이아웃 분리
+- 오버레이 사이드바 재사용
+- 정적 SVG 차트 구현
+- 반응형 카드 래핑
+- 접근성 라벨 관리
+
+## 실무에서는
+
+실무에서는 역 상세 화면의 지표와 차트 데이터를 정적 HTML에 직접 넣기보다 `/stations/{stationId}/summary`, `/stations/{stationId}/charts`, `/stations/{stationId}/cases` 같은 API로 분리해 가져오는 편이 유지보수에 유리합니다.
+
+차트는 요구사항이 커지면 Chart.js, ECharts, Recharts 같은 검증된 라이브러리를 도입하고, 지금처럼 디자인 검증 단계에서는 정적 구조로 빠르게 화면을 맞춘 뒤 데이터 연결 단계에서 컴포넌트화하는 방식도 많이 사용합니다.
+
+## 개선 가능한 부분
+
+- 역 변경 버튼 동작 설계
+- 실제 역 상세 mock/API 데이터 연결
+- 차트 데이터 동적 렌더링
+- 브라우저 기반 시각 회귀 테스트 추가
+- 사이드바 메뉴 링크 전체 페이지 연결
+
+## 다음 작업
+
+- 역 상세 화면 실제 브라우저 시각 검수
+- 역 상세 mock 데이터 설계
+- 역 변경 플로우 또는 검색 모달 설계
+
+## 복습 문제
+
+1. 오버레이 사이드바를 여러 페이지에서 재사용하려면 HTML과 JS를 어떻게 분리하는 것이 좋을까요?
+2. 정적 SVG 차트와 차트 라이브러리의 장단점은 무엇일까요?
+3. 상세 화면의 지표 데이터를 API로 분리할 때 어떤 단위의 엔드포인트가 적절할까요?
+
+## 오늘 배운 내용
+
+- 상세 페이지 시맨틱 구조
+- Flexbox 기반 반응형 카드 레이아웃
+- SVG 기반 정적 차트
+- 사이드바 접근성 상태 문구
+
+## Change Log
+
+2026-07-09
+
+- 역 상세 화면 `frontend/station-detail.html` 추가
+- 역 상세 전용 CSS 스타일 추가
+- 역 상세 화면용 SVG 아이콘 추가
+- 사이드바 접근성 라벨 한글 깨짐 수정
+
+## Timestamp
+
+2026-07-09 11:11:38 (KST)
+
+---
+
+# 한글 깨짐 수정 작업 요약
+
+## 완료한 내용
+
+- `frontend/station-detail.html`의 깨진 한글 문구를 정상 한글로 복구했습니다.
+- 손상된 HTML 속성 따옴표와 닫는 태그를 정상 구조로 복구했습니다.
+- `frontend/station-detail.html`과 `frontend/sidebar.js`를 BOM 없는 UTF-8로 다시 저장했습니다.
+- 화면 코드 기준 한글 깨짐 패턴 검색을 수행했습니다.
+
+## 수정한 파일
+
+- `frontend/station-detail.html`
+- `frontend/sidebar.js`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+역 상세 화면의 `<title>`, 접근성 라벨, 메뉴 텍스트, 카드 문구가 깨져 브라우저 표시와 HTML 구조 안정성에 문제가 생길 수 있었기 때문입니다.
+
+## 변경 사항
+
+- 문서 제목을 `역 상세 | 기상-철도 리스크 의사결정 지원 시스템`으로 복구했습니다.
+- 메뉴, 내비게이션, 지표, 차트, 테이블, 과거 사례 문구를 정상 한글로 복구했습니다.
+- `aria-label` 문구를 정상 한글로 복구해 접근성을 유지했습니다.
+
+## 테스트 방법
+
+```bash
+rg -n "\?\?\?|湲|泥|由|섏|寃|젙|쒖|곸|꽭" ./frontend -g "*.html" -g "*.js" -g "*.css"
+node --check frontend/sidebar.js
+```
+
+예상 결과:
+
+- 깨짐 패턴 검색 결과가 없어야 합니다.
+- `node --check` 실행 시 오류가 없어야 합니다.
+
+## 새롭게 배운 개념
+
+- UTF-8 인코딩
+- BOM 없는 UTF-8 저장
+- 한글 깨짐 패턴 검색
+
+## 실무에서는
+
+실무에서는 에디터, 터미널, Git 설정의 기본 인코딩을 UTF-8로 통일하고, 저장 후에는 브라우저 표시뿐 아니라 검색 명령으로 깨진 문자열이 남지 않았는지 확인합니다.
+
+## 개선 가능한 부분
+
+- `.editorconfig`로 `charset = utf-8` 명시
+- HTML 정적 검사 도구 도입
+- 저장 전후 인코딩 검증 스크립트 추가
+
+## 다음 작업
+
+- 브라우저에서 `station-detail.html` 실제 표시 확인
+- `.editorconfig` 추가 여부 검토
+
+## 복습 문제
+
+1. UTF-8 BOM이 일부 도구에서 문제를 만들 수 있는 이유는 무엇일까요?
+2. 한글 깨짐을 검색할 때 `???`, `湲`, `泥` 같은 패턴을 찾는 이유는 무엇일까요?
+3. HTML 문구가 깨졌을 때 접근성에도 영향이 생기는 이유는 무엇일까요?
+
+## 오늘 배운 내용
+
+- UTF-8
+- BOM
+- 인코딩 깨짐
+- 접근성 라벨 복구
+
+## Change Log
+
+2026-07-09
+
+- 역 상세 화면 한글 깨짐 복구
+- 수정 파일 BOM 없는 UTF-8 저장 확인
+
+## Timestamp
+
+2026-07-09 11:20:00 (KST)
+---
+
+# 사이드바 역 상세 링크 수정 작업 요약
+
+## 완료한 내용
+
+- 메인 대시보드 사이드바의 `역 상세` 메뉴 링크를 실제 역 상세 페이지로 연결했습니다.
+- `href="#"`로 인해 주소가 `dashboard.html#`에 머무르던 문제를 수정했습니다.
+- `dashboard.html`을 BOM 없는 UTF-8로 저장했습니다.
+
+## 수정한 파일
+
+- `frontend/dashboard.html`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+사이드바의 `역 상세` 메뉴가 임시 링크 `#`를 사용하고 있어 사용자가 클릭해도 페이지 이동이 발생하지 않았습니다.
+
+## 변경 사항
+
+- `frontend/dashboard.html`의 역 상세 링크를 `./station-detail.html`로 변경했습니다.
+
+## 테스트 방법
+
+```bash
+python -m http.server 8765 --bind 127.0.0.1
+```
+
+브라우저에서 아래 주소로 접속합니다.
+
+```text
+http://127.0.0.1:8765/frontend/dashboard.html
+```
+
+검증 기준:
+
+- 메뉴 버튼을 눌러 사이드바를 엽니다.
+- `역 상세` 메뉴를 클릭합니다.
+- 주소가 `http://127.0.0.1:8765/frontend/station-detail.html`로 이동해야 합니다.
+
+## Change Log
+
+2026-07-09
+
+- 메인 대시보드 사이드바의 역 상세 메뉴 링크 수정
+
+## Timestamp
+
+2026-07-09 11:30:00 (KST)
+---
+
+# 역 상세 헤더 오른쪽 영역 제거 작업 요약
+
+## 완료한 내용
+
+- 역 상세 화면의 `station-global-header__right` 영역을 제거했습니다.
+- 데이터 기준, 알림 버튼, 사용자 정보와 관련된 HTML 마크업을 삭제했습니다.
+- 해당 영역에만 사용되던 CSS 클래스들을 삭제했습니다.
+- 모바일 미디어쿼리에 남아 있던 관련 스타일도 제거했습니다.
+
+## 수정한 파일
+
+- `frontend/station-detail.html`
+- `frontend/style.css`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+역 상세 화면 헤더에서는 메뉴 버튼만 유지하고, 오른쪽 사용자/데이터 기준 영역은 표시하지 않도록 하기 위해 제거했습니다.
+
+## 변경 사항
+
+- `station-global-header__right` 마크업 삭제
+- `station-global-header__timestamp` 스타일 삭제
+- `station-global-header__icon-button` 스타일 삭제
+- `station-global-header__user`, `station-global-header__avatar`, `station-global-header__chevron` 스타일 삭제
+
+## 테스트 방법
+
+```bash
+rg -n "station-global-header__right|station-global-header__timestamp|station-global-header__icon-button|station-global-header__user|station-global-header__avatar|station-global-header__chevron" frontend/station-detail.html frontend/style.css
+```
+
+예상 결과: 검색 결과가 없어야 합니다.
+
+## Change Log
+
+2026-07-09
+
+- 역 상세 화면 헤더 오른쪽 영역 제거
+
+## Timestamp
+
+2026-07-09 11:40:00 (KST)

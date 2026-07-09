@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>역 상세 | 기상-철도 리스크 의사결정 지원 시스템</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <header class="station-global-header">
+    <div class="station-global-header__inner">
+      <button class="brand station-global-header__menu-button" type="button" aria-label="사이드바 열기" aria-controls="main-sidebar" aria-expanded="false" data-sidebar-toggle>
+        <img class="brand__logo station-global-header__menu-icon" src="./assets/icons/menu.svg" alt="" aria-hidden="true">
+      </button>
+    </div>
+  </header>
+
+  <nav class="sidebar" id="main-sidebar" aria-label="역 상세 내비게이션" data-sidebar hidden>
+    <div class="sidebar__panel">
+      <a class="sidebar__logo-area" href="./dashboard.html" aria-label="기상-철도 리스크 의사결정 지원 시스템 홈">
+        <span class="sidebar__logo-icon" aria-hidden="true"></span>
+        <span class="sidebar__logo-text">
+          <strong class="sidebar__logo-title">기상-철도 리스크</strong>
+          <span class="sidebar__logo-subtitle">의사결정 지원 시스템</span>
+        </span>
+      </a>
+
+      <ul class="sidebar__navigation-list" aria-label="주요 메뉴">
+        <li class="sidebar__navigation-item">
+          <a class="sidebar__navigation-link" href="./dashboard.html">
+            <span class="sidebar__navigation-icon sidebar__navigation-icon--home" aria-hidden="true"></span>
+            <span>대시보드</span>
+          </a>
+        </li>
+        <li class="sidebar__navigation-item">
+          <a class="sidebar__navigation-link sidebar__navigation-link--active" href="./station-detail.html" aria-current="page">
+            <span class="sidebar__navigation-icon sidebar__navigation-icon--station" aria-hidden="true"></span>
+            <span>역 상세</span>
+          </a>
+        </li>
+        <li class="sidebar__navigation-item">
+          <a class="sidebar__navigation-link" href="#">
+            <span class="sidebar__navigation-icon sidebar__navigation-icon--route" aria-hidden="true"></span>
+            <span>구간 상세</span>
+          </a>
+        </li>
+        <li class="sidebar__navigation-item">
+          <a class="sidebar__navigation-link" href="#">
+            <span class="sidebar__navigation-icon sidebar__navigation-icon--rag" aria-hidden="true"></span>
+            <span>RAG 심층 설명</span>
+          </a>
+        </li>
+        <li class="sidebar__navigation-item">
+          <a class="sidebar__navigation-link" href="#">
+            <span class="sidebar__navigation-icon sidebar__navigation-icon--analytics" aria-hidden="true"></span>
+            <span>데이터 분석·통계</span>
+          </a>
+        </li>
+      </ul>
+
+      <div class="sidebar__bottom">
+        <a class="sidebar__standard-link" href="#">
+          <span class="sidebar__standard-icon" aria-hidden="true"></span>
+          <span>데이터 기준 안내</span>
+        </a>
+        <button class="sidebar__collapse-button" type="button" aria-label="사이드바 닫기" data-sidebar-close>
+          <span class="sidebar__collapse-icon" aria-hidden="true"></span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="station-detail-main">
+    <nav class="station-breadcrumb" aria-label="현재 위치">
+      <a class="station-breadcrumb__link" href="./dashboard.html">대시보드</a>
+      <img class="station-breadcrumb__separator" src="./assets/icons/chevron-right.svg" alt="" aria-hidden="true">
+      <span class="station-breadcrumb__current" aria-current="page">역 상세</span>
+    </nav>
+
+    <section class="station-page-title" aria-labelledby="station-detail-title">
+      <div class="station-page-title__text">
+        <h1 class="station-page-title__heading" id="station-detail-title">역 상세</h1>
+        <p class="station-page-title__description">특정 역의 기상 영향 및 운행 현황을 종합적으로 확인합니다.</p>
+      </div>
+      <a class="station-page-title__back" href="./dashboard.html" aria-label="대시보드 목록으로 돌아가기">
+        <img src="./assets/icons/arrow-left.svg" alt="" aria-hidden="true">
+        목록으로
+      </a>
+    </section>
+
+    <section class="station-info-card" aria-labelledby="station-name">
+      <div class="station-info-card__left">
+        <div class="station-info-card__icon" aria-hidden="true">
+          <img src="./assets/icons/train-front.svg" alt="">
+        </div>
+        <div class="station-info-card__identity">
+          <div class="station-info-card__name-row">
+            <h2 class="station-info-card__name" id="station-name">대전역</h2>
+            <span class="station-line-badge">경부선</span>
+          </div>
+          <p class="station-info-card__address">대전광역시 동구 중앙로 215</p>
+        </div>
+        <button class="station-info-card__change" type="button" aria-label="조회할 역 변경">역 변경</button>
+      </div>
+
+      <aside class="station-risk-status" aria-labelledby="station-risk-title">
+        <img class="station-risk-status__icon" src="./assets/icons/triangle-alert.svg" alt="" aria-hidden="true">
+        <div>
+          <h3 class="station-risk-status__title" id="station-risk-title">현재 위험도: 높음</h3>
+          <p class="station-risk-status__text">호우 경보 · 07.07 14:00 기준</p>
+        </div>
+      </aside>
+    </section>
+
+    <section class="station-metric-grid" aria-labelledby="station-metric-title">
+      <h2 class="sr-only" id="station-metric-title">역 상세 주요 지표</h2>
+
+      <article class="station-metric-card" aria-label="평균 지연 시간 18.4분, 전일 대비 7.2분 증가">
+        <div class="station-metric-card__icon station-metric-card__icon--delay" aria-hidden="true">
+          <img src="./assets/icons/clock-4.svg" alt="">
+        </div>
+        <div class="station-metric-card__body">
+          <h3 class="station-metric-card__title">평균 지연 시간</h3>
+          <p class="station-metric-card__value"><strong>18.4</strong><span>분</span></p>
+          <p class="station-metric-card__comparison">전일 대비 <strong>+7.2 분 ↑</strong></p>
+        </div>
+      </article>
+
+      <article class="station-metric-card" aria-label="평균 지연 증가량 10.2분, 전일 대비 2.8분 증가">
+        <div class="station-metric-card__icon station-metric-card__icon--increase" aria-hidden="true">
+          <img src="./assets/icons/trending-up.svg" alt="">
+        </div>
+        <div class="station-metric-card__body">
+          <h3 class="station-metric-card__title">평균 지연 증가량</h3>
+          <p class="station-metric-card__value"><strong>+10.2</strong><span>분</span></p>
+          <p class="station-metric-card__comparison">전일 대비 <strong>+2.8 분 ↑</strong></p>
+        </div>
+      </article>
+
+      <article class="station-metric-card" aria-label="지연률 12.6퍼센트, 전일 대비 3.1퍼센트 포인트 증가">
+        <div class="station-metric-card__icon station-metric-card__icon--rate" aria-hidden="true">
+          <img src="./assets/icons/percent.svg" alt="">
+        </div>
+        <div class="station-metric-card__body">
+          <h3 class="station-metric-card__title">지연률</h3>
+          <p class="station-metric-card__value"><strong>12.6</strong><span>%</span></p>
+          <p class="station-metric-card__comparison">전일 대비 <strong>+3.1 %p ↑</strong></p>
+        </div>
+      </article>
+
+      <article class="station-metric-card" aria-label="운행 중단률 4.8퍼센트, 전일 대비 1.9퍼센트 포인트 증가">
+        <div class="station-metric-card__icon station-metric-card__icon--suspend" aria-hidden="true">
+          <img src="./assets/icons/circle-minus.svg" alt="">
+        </div>
+        <div class="station-metric-card__body">
+          <h3 class="station-metric-card__title">운행 중단률</h3>
+          <p class="station-metric-card__value"><strong>4.8</strong><span>%</span></p>
+          <p class="station-metric-card__comparison">전일 대비 <strong>+1.9 %p ↑</strong></p>
+        </div>
+      </article>
+    </section>
+
+    <section class="station-chart-grid" aria-labelledby="station-chart-title">
+      <h2 class="sr-only" id="station-chart-title">역 상세 분석 차트</h2>
+
+      <article class="station-chart-card" aria-labelledby="hourly-delay-title">
+        <header class="station-chart-card__header">
+          <h3 class="station-chart-card__title" id="hourly-delay-title">시간대별 평균 지연 시간</h3>
+          <span class="station-chart-card__unit">(단위: 분)</span>
+        </header>
+        <div class="station-line-chart" role="img" aria-label="평일 평균 지연 시간이 14시에 18.4분으로 표시되는 시간대별 평균 지연 시간 차트">
+          <div class="station-line-chart__legend">
+            <span><i class="station-line-chart__legend-line station-line-chart__legend-line--weekday"></i>평일</span>
+            <span><i class="station-line-chart__legend-line station-line-chart__legend-line--holiday"></i>주말/공휴일</span>
+          </div>
+          <svg class="station-line-chart__svg" viewBox="0 0 608 220" aria-hidden="true">
+            <g class="station-line-chart__grid">
+              <line x1="42" y1="24" x2="590" y2="24"></line>
+              <line x1="42" y1="72" x2="590" y2="72"></line>
+              <line x1="42" y1="120" x2="590" y2="120"></line>
+              <line x1="42" y1="168" x2="590" y2="168"></line>
+            </g>
+            <g class="station-line-chart__axis">
+              <text x="8" y="28">40</text>
+              <text x="8" y="76">30</text>
+              <text x="8" y="124">20</text>
+              <text x="8" y="172">10</text>
+              <text x="14" y="204">0</text>
+              <text x="42" y="216">00시</text>
+              <text x="140" y="216">04시</text>
+              <text x="238" y="216">08시</text>
+              <text x="336" y="216">12시</text>
+              <text x="434" y="216">16시</text>
+              <text x="532" y="216">20시</text>
+              <text x="574" y="216">24시</text>
+            </g>
+            <polyline class="station-line-chart__holiday-line" points="42,158 72,150 102,154 132,145 162,142 192,126 222,116 252,136 282,144 312,142 342,118 372,112 402,132 432,146 462,120 492,116 522,124 552,82 590,70"></polyline>
+            <polyline class="station-line-chart__weekday-line" points="42,146 72,136 102,138 132,128 162,112 192,86 222,80 252,104 282,108 312,104 342,86 372,66"></polyline>
+            <circle class="station-line-chart__point" cx="372" cy="66" r="5"></circle>
+            <g class="station-line-chart__tooltip">
+              <rect x="344" y="34" width="58" height="30" rx="6"></rect>
+              <text x="373" y="54" text-anchor="middle">18.4분</text>
+            </g>
+          </svg>
+        </div>
+      </article>
+
+      <article class="station-chart-card" aria-labelledby="alert-comparison-title">
+        <header class="station-chart-card__header">
+          <h3 class="station-chart-card__title" id="alert-comparison-title">특보 발생 시 / 평상시 평균 지연 비교</h3>
+          <span class="station-chart-card__unit">(단위: 분)</span>
+        </header>
+        <div class="station-bar-chart" role="img" aria-label="호우, 대설, 강풍 특보 발생 시 평균 지연이 평상시보다 높은 막대 차트">
+          <div class="station-bar-chart__legend">
+            <span><i class="station-bar-chart__legend-dot station-bar-chart__legend-dot--normal"></i>평상시 평균</span>
+            <span><i class="station-bar-chart__legend-dot station-bar-chart__legend-dot--alert"></i>특보 발생 시 평균</span>
+          </div>
+          <div class="station-bar-chart__plot">
+            <span class="station-bar-chart__y station-bar-chart__y--30">30</span>
+            <span class="station-bar-chart__y station-bar-chart__y--20">20</span>
+            <span class="station-bar-chart__y station-bar-chart__y--10">10</span>
+            <span class="station-bar-chart__y station-bar-chart__y--0">0</span>
+            <div class="station-bar-chart__group">
+              <div class="station-bar-chart__bar station-bar-chart__bar--normal station-bar-chart__bar--normal-rain"><span>8.2</span></div>
+              <div class="station-bar-chart__bar station-bar-chart__bar--alert station-bar-chart__bar--alert-rain"><span>22.7</span></div>
+              <strong>호우</strong>
+            </div>
+            <div class="station-bar-chart__group">
+              <div class="station-bar-chart__bar station-bar-chart__bar--normal station-bar-chart__bar--normal-snow"><span>7.4</span></div>
+              <div class="station-bar-chart__bar station-bar-chart__bar--alert station-bar-chart__bar--alert-snow"><span>18.3</span></div>
+              <strong>대설</strong>
+            </div>
+            <div class="station-bar-chart__group">
+              <div class="station-bar-chart__bar station-bar-chart__bar--normal station-bar-chart__bar--normal-wind"><span>6.8</span></div>
+              <div class="station-bar-chart__bar station-bar-chart__bar--alert station-bar-chart__bar--alert-wind"><span>12.4</span></div>
+              <strong>강풍</strong>
+            </div>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="station-detail-grid" aria-labelledby="station-detail-analysis-title">
+      <h2 class="sr-only" id="station-detail-analysis-title">특보 통계 및 과거 사례</h2>
+
+      <article class="station-detail-card" aria-labelledby="alert-stat-title">
+        <header class="station-detail-card__header">
+          <h3 class="station-detail-card__title" id="alert-stat-title">특보별 영향 통계</h3>
+          <span class="station-detail-card__subtitle">최근 3개월</span>
+        </header>
+        <div class="station-alert-table-wrap">
+          <table class="station-alert-table">
+            <caption class="sr-only">최근 3개월 특보별 영향 통계</caption>
+            <thead>
+              <tr>
+                <th scope="col">특보 종류</th>
+                <th scope="col">발생 횟수</th>
+                <th scope="col">평균 지연(분)</th>
+                <th scope="col">지연률</th>
+                <th scope="col">운행 중단률</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row"><img src="./assets/icons/cloud-rain.svg" alt="" aria-hidden="true"><span>호우 경보</span></th>
+                <td>8 회</td>
+                <td>22.7</td>
+                <td>16.7%</td>
+                <td>6.3%</td>
+              </tr>
+              <tr>
+                <th scope="row"><img src="./assets/icons/cloud-rain.svg" alt="" aria-hidden="true"><span>호우 주의보</span></th>
+                <td>15 회</td>
+                <td>14.3</td>
+                <td>10.2%</td>
+                <td>3.1%</td>
+              </tr>
+              <tr>
+                <th scope="row"><img src="./assets/icons/wind.svg" alt="" aria-hidden="true"><span>강풍 주의보</span></th>
+                <td>11 회</td>
+                <td>8.6</td>
+                <td>6.1%</td>
+                <td>1.2%</td>
+              </tr>
+              <tr>
+                <th scope="row"><img src="./assets/icons/snowflake.svg" alt="" aria-hidden="true"><span>대설 주의보</span></th>
+                <td>6 회</td>
+                <td>11.2</td>
+                <td>7.4%</td>
+                <td>2.8%</td>
+              </tr>
+              <tr>
+                <th scope="row"><img src="./assets/icons/sun.svg" alt="" aria-hidden="true"><span>폭염 주의보</span></th>
+                <td>7 회</td>
+                <td>6.4</td>
+                <td>4.2%</td>
+                <td>0.8%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="station-detail-card" aria-labelledby="history-title">
+        <header class="station-detail-card__header">
+          <h3 class="station-detail-card__title" id="history-title">과거 주요 사례</h3>
+          <span class="station-detail-card__subtitle">최근 3건</span>
+        </header>
+        <ul class="station-history-list" aria-label="과거 주요 사례 목록">
+          <li class="station-history-item">
+            <span class="station-history-item__label station-history-item__label--high">호우 경보</span>
+            <div class="station-history-item__content">
+              <strong>2026.06.29 호우 경보</strong>
+              <p>강수량 128mm/일 · 누적 210mm</p>
+              <p>평균 지연 32.1분 · 운행 중단률 7.6%</p>
+            </div>
+            <button class="station-history-item__button" type="button">상세보기</button>
+          </li>
+          <li class="station-history-item">
+            <span class="station-history-item__label station-history-item__label--warning">호우 주의보</span>
+            <div class="station-history-item__content">
+              <strong>2026.06.17 호우 주의보</strong>
+              <p>강수량 65mm/일 · 누적 98mm</p>
+              <p>평균 지연 15.3분 · 운행 중단률 3.2%</p>
+            </div>
+            <button class="station-history-item__button" type="button">상세보기</button>
+          </li>
+          <li class="station-history-item">
+            <span class="station-history-item__label station-history-item__label--interest">강풍 주의보</span>
+            <div class="station-history-item__content">
+              <strong>2026.05.28 강풍 주의보</strong>
+              <p>최대 풍속 15m/s</p>
+              <p>평균 지연 9.1분 · 운행 중단률 1.1%</p>
+            </div>
+            <button class="station-history-item__button" type="button">상세보기</button>
+          </li>
+        </ul>
+      </article>
+    </section>
+
+    <p class="station-metric-description">
+      <img src="./assets/icons/circle-info.svg" alt="" aria-hidden="true">
+      지표 설명: 평균 지연 증가량은 평상시 평균 지연 시간 대비 특보 발생 시 평균 지연 시간의 증가 수치입니다.
+    </p>
+  </main>
+
+  <script src="./sidebar.js" defer></script>
+</body>
+</html>

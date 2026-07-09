@@ -42,3 +42,4 @@ document.addEventListener("keydown", (event) => {
 });
 
 setSidebarState(false);
+
