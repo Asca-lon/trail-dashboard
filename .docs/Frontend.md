@@ -1233,3 +1233,2365 @@ rg -n "station-global-header__right|station-global-header__timestamp|station-glo
 ## Timestamp
 
 2026-07-09 11:40:00 (KST)
+
+---
+
+# 역 상세 Mock 데이터 연결 계획
+
+## 개요
+
+역 상세 화면 `frontend/station-detail.html`에 `mock/station_details.json`과 `mock/vulnerability_stations.json` 데이터를 연결합니다.
+
+## 구현 목적
+
+정적 HTML에 직접 작성된 역명, 위험도, 주요 지표 값을 mock 데이터 기준으로 렌더링하여 실제 API 전환이 쉬운 구조로 만듭니다.
+
+## 구현 내용
+
+이번 1차 범위는 역 상세 상단 영역입니다.
+
+- 역 정보 카드
+- 현재 위험도 박스
+- 주요 지표 카드 4개
+
+## 코드 설명
+
+신규 `frontend/station-detail.js`를 생성해 역 상세 데이터만 독립적으로 관리합니다.
+
+`station-detail.js`는 다음 mock 파일을 불러옵니다.
+
+- `mock/station_details.json`
+- `mock/vulnerability_stations.json`
+
+## API
+
+이번 작업에서는 실제 API를 직접 연결하지 않습니다.
+
+향후 전환 예상 API:
+
+- `GET /stations/{stationId}/detail`
+- `GET /vulnerability/stations`
+
+## Database
+
+이번 작업에서는 Database 변경이 없습니다.
+
+## 주의사항
+
+- `station_details.json`에는 역 주소가 없으므로 기존 정적 주소를 유지합니다.
+- `station_details.json`에는 현재 위험도 필드가 없으므로 `vulnerability_stations.json`의 `delay_rate` 기준으로 계산합니다.
+- `station_details.json`에는 전일 대비 증감값이 없으므로 지표 카드의 비교 문구는 mock 기준 설명으로 대체합니다.
+
+## Mock 데이터 매핑
+
+| 화면 영역 | Mock 파일 | 주요 필드 | 렌더링 내용 | 비어 있을 때 처리 |
+|---|---|---|---|---|
+| 역명 | `mock/station_details.json` | `station` | `대전역` | `역 정보 없음` |
+| 노선 배지 | `mock/vulnerability_stations.json` | `line` | `경부선` | `노선 정보 없음` |
+| 주소 | 기존 HTML | 정적 문구 | `대전광역시 동구 중앙로 215` | 기존 문구 유지 |
+| 현재 위험도 | `mock/vulnerability_stations.json` | `stations[].delay_rate` | 높음/주의/관심 | `정보 없음` |
+| 위험도 설명 | `mock/vulnerability_stations.json` | `alert_type`, `alert_level` | `폭염 경보 기준` | `기준 정보 없음` |
+| 평균 지연 시간 | `mock/vulnerability_stations.json` | `stations[].avg_delay` | `12.7분` | `-분` |
+| 평균 지연 증가량 | `mock/vulnerability_stations.json` | `stations[].delta_delay` | `+8.9분` | `-분` |
+| 지연률 | `mock/vulnerability_stations.json` | `stations[].delay_rate` | `44.0%` | `-%` |
+| 운행 중단률 | `mock/vulnerability_stations.json` | `stations[].stop_rate` | `1.0%` | `-%` |
+
+## 위험도 기준
+
+| 기준 데이터 | 관심 | 주의 | 높음 |
+|---|---:|---:|---:|
+| `delay_rate` | 0.00 이상 0.25 미만 | 0.25 이상 0.40 미만 | 0.40 이상 |
+
+## 다음 작업
+
+- `frontend/station-detail.js` 생성
+- `station-detail.html`에 렌더링 대상 `data-*` 속성 추가
+- 역 정보와 주요 지표 카드 mock 연결
+- JavaScript 문법 검사
+- mock JSON 파싱 검사
+
+## Change Log
+
+2026-07-09
+
+- 역 상세 mock 데이터 연결 매핑 추가
+
+## Timestamp
+
+2026-07-09 13:12:30 (KST)
+
+---
+
+# 역 상세 Station ID 전환 작업 요약
+
+# 개요
+
+`mock/vulnerability_stations.json`에 `station_id`를 추가하고, 대시보드에서 역 상세 화면으로 이동할 때 `station_id` query string을 우선 사용하도록 변경했습니다.
+
+새 URL 형식:
+
+```text
+station-detail.html?station_id=daejeon
+```
+
+기존 URL 형식도 fallback으로 유지합니다.
+
+```text
+station-detail.html?station=대전
+```
+
+# 구현 목적
+
+역명은 화면 표시용 데이터이고, `station_id`는 시스템에서 안정적으로 사용할 수 있는 식별자입니다.
+
+역명이 바뀌거나 괄호, 공백, 동명이역 문제가 생겨도 링크와 데이터 매핑이 안전하게 유지되도록 id 기반으로 전환했습니다.
+
+# 구현 내용
+
+- `mock/vulnerability_stations.json`
+  - 각 역에 `station_id` 추가
+  - 예: `daejeon`, `dongdaegu`, `gimcheon_gumi`, `suwon`, `miryang`
+
+- `frontend/dashboard.js`
+  - `STATION_ID_QUERY_PARAM` 추가
+  - `createStationDetailUrl()`이 `station_id`를 우선 사용하도록 변경
+  - 취약 역 랭킹 링크가 `station_id` 기반 URL을 생성하도록 변경
+  - 우선 점검 대상 역 링크도 `station_id` 기반으로 이동
+
+- `frontend/station-detail.js`
+  - `station_id` query를 우선 해석
+  - 기존 `station` query는 fallback으로 유지
+  - 역 선택 select의 value를 `station_id`로 변경
+  - select 변경 시 URL을 `station_id` 기준으로 갱신
+
+# 코드 설명
+
+## 왜 필요한가
+
+`?station=김천(구미)`처럼 역명을 URL에 직접 넣으면 인코딩과 명칭 변경에 영향을 받습니다.
+
+반면 `?station_id=gimcheon_gumi`는 사람이 보기에는 덜 직관적이지만, 시스템 식별자로 더 안정적입니다.
+
+## 어떤 원리인가
+
+1. station mock에 `station_id`를 추가합니다.
+2. 대시보드 링크 생성 시 역명이 아니라 `station_id`를 query string에 넣습니다.
+3. 역 상세 화면은 `station_id`를 먼저 읽습니다.
+4. `station_id`가 유효하면 해당 station 객체의 `station` 값을 찾아 화면에 렌더링합니다.
+5. `station_id`가 없으면 기존 `station` query를 읽어 하위 호환성을 유지합니다.
+
+## 장점
+
+- URL이 안정적인 식별자를 사용합니다.
+- 한글 역명 인코딩 부담이 줄어듭니다.
+- 역명 변경에도 링크 구조가 덜 흔들립니다.
+- 실제 API 설계 방식에 더 가까워집니다.
+
+## 단점
+
+- URL만 보고 역명을 바로 알기 어렵습니다.
+- station id와 역명 매핑을 관리해야 합니다.
+- 기존 `station` query와 새 `station_id` query를 함께 지원하는 동안 코드가 조금 복잡해집니다.
+
+## 다른 구현 방법
+
+- path parameter로 `/stations/daejeon` 형태 사용
+- `station_id`만 지원하고 기존 `station` query 제거
+- station metadata mock을 별도로 만들고 모든 화면에서 join
+- API에서 상세 URL을 직접 내려주는 방식
+
+# API
+
+API 변경 사항은 없습니다.
+
+변경된 mock 예시:
+
+```json
+{
+  "station_id": "daejeon",
+  "station": "대전"
+}
+```
+
+지원하는 query string:
+
+```text
+station_id=daejeon
+station=대전
+```
+
+# Database
+
+DB 변경 사항은 없습니다.
+
+실제 DB에서는 `stations` 테이블 또는 컬렉션의 primary key로 `station_id`를 사용하는 구조가 적합합니다.
+
+# 테스트 방법
+
+1. JavaScript 문법 검사
+
+```bash
+node --check frontend/dashboard.js
+node --check frontend/station-detail.js
+```
+
+예상 결과:
+
+- 오류 없이 종료됩니다.
+
+2. station id 매핑 확인
+
+```bash
+node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('mock/vulnerability_stations.json','utf8')); const ids=data.stations.map((station)=>station.station_id+':'+station.station); console.log(ids.join('\n'));"
+```
+
+예상 결과:
+
+```text
+daejeon:대전
+dongdaegu:동대구
+gimcheon_gumi:김천(구미)
+suwon:수원
+miryang:밀양
+```
+
+3. 새 URL 확인
+
+```text
+http://127.0.0.1:8765/frontend/station-detail.html?station_id=daejeon
+```
+
+4. 기존 URL fallback 확인
+
+```text
+http://127.0.0.1:8765/frontend/station-detail.html?station=%EB%8C%80%EC%A0%84
+```
+
+검증 기준:
+
+- 두 URL 모두 HTTP 200으로 열립니다.
+- `station_id=daejeon`은 대전역으로 렌더링됩니다.
+- 대시보드의 취약 역 링크는 `station_id` query를 사용합니다.
+- 역 상세 select 변경 시 URL이 `station_id` 기준으로 갱신됩니다.
+
+# 주의사항
+
+현재 `dashboard.js`에는 `STATION_NAME_BY_ID` 상수가 남아 있습니다.
+
+장기적으로는 `vulnerability_stations.json`의 `station_id`를 기준으로 모든 매핑을 처리하도록 정리하는 것이 좋습니다.
+
+# 변경 이력
+
+2026-07-09
+
+- `vulnerability_stations.json`에 `station_id` 추가
+- 대시보드 역 상세 링크를 `station_id` 기반으로 변경
+- 역 상세 화면 query 해석을 `station_id` 우선으로 변경
+- 기존 `station` query fallback 유지
+
+# 다음 작업
+
+- `STATION_NAME_BY_ID` 상수를 mock 기반 lookup으로 제거
+- `vulnerability_segments.json`에 `segment_id` 추가
+- 구간 상세 화면 설계
+
+# 작업 요약
+
+## 완료한 내용
+
+- 역 mock에 station id 추가
+- 대시보드에서 id 기반 상세 링크 생성
+- 역 상세 화면에서 id 기반 초기 선택 처리
+- 기존 역명 query fallback 유지
+- 테스트 및 문서화
+
+## 수정한 파일
+
+- `mock/vulnerability_stations.json`
+- `frontend/dashboard.js`
+- `frontend/station-detail.js`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+역명 기반 URL은 표시명 변경과 인코딩 문제에 취약합니다.
+
+`station_id` 기반 URL은 실제 서비스에서 더 안정적인 데이터 계약을 만들 수 있습니다.
+
+## 변경 사항
+
+- `station_id` 필드 추가
+- `station_id` query 추가
+- 역 상세 select value를 id 기반으로 변경
+- 기존 `station` query fallback 유지
+
+## 새롭게 배운 개념
+
+- Stable Identifier
+- Query Compatibility
+- ID-based Routing
+- Backward Compatibility
+
+## 실무에서는
+
+실무에서는 사용자가 보는 이름과 내부 식별자를 분리합니다.
+
+URL, API 요청, DB join에는 id를 사용하고, 화면에는 label/name을 표시하는 방식이 일반적입니다.
+
+## 개선 가능한 부분
+
+- station id lookup을 mock 데이터 기반으로 통일
+- 구간 데이터에도 segment id 추가
+- URL query를 모두 id 기반으로 정리
+- 기존 station query 제거 시점 결정
+
+## 다음 작업
+
+- `STATION_NAME_BY_ID` 상수를 제거하고 `vulnerability_stations.json` 기반 lookup으로 통일
+
+## 복습 문제
+
+1. `station_id` 기반 URL이 역명 기반 URL보다 안정적인 이유는 무엇인가요?
+2. 기존 `station` query fallback을 유지하는 이유는 무엇인가요?
+3. 화면 표시명과 내부 식별자를 분리하면 어떤 유지보수 이점이 있나요?
+
+## 오늘 배운 내용
+
+- Station ID
+- Backward Compatibility
+- ID-based Query String
+- Stable URL Contract
+
+## Change Log
+
+2026-07-09
+
+- 역 상세 URL을 station id 기반으로 전환
+- 기존 station query fallback 유지
+- 문서 업데이트
+
+## Timestamp
+
+2026-07-09 14:05:30 (KST)
+
+---
+
+# Checklist Mock 대상 타입 구조화 작업 요약
+
+# 개요
+
+`mock/checklist.json`의 우선 점검 대상 항목에 `target_type`, `station_id`, `segment_id`를 추가했습니다.
+
+기존에는 `대전역`이라는 문자열을 보고 역 대상인지 추론했지만, 이제는 구조화된 필드를 우선 사용해 역 상세 링크를 생성합니다.
+
+# 구현 목적
+
+문자열 파싱에 의존하면 데이터 형식이 조금만 바뀌어도 링크 연결이 깨질 수 있습니다.
+
+실무에서는 화면에 보이는 이름과 시스템이 사용하는 식별자를 분리하므로, mock 단계에서도 이 구조를 먼저 반영했습니다.
+
+# 구현 내용
+
+- `mock/checklist.json`
+  - 구간 대상에 `target_type: "segment"` 추가
+  - 구간 대상에 `segment_id` 추가
+  - 역 대상에 `target_type: "station"` 추가
+  - 역 대상에 `station_id` 추가
+
+- `frontend/dashboard.js`
+  - `STATION_NAME_BY_ID` 추가
+  - `getStationNameFromInspectionItem()` 추가
+  - 우선 점검 대상 링크 판별 시 `target_type`, `station_id`를 우선 사용
+  - 기존 문자열 판별은 fallback으로 유지
+
+# 코드 설명
+
+## 왜 필요한가
+
+`target: "대전역"`처럼 화면 표시용 문자열만 있으면 프론트엔드는 이 값이 역인지 구간인지 추론해야 합니다.
+
+이 방식은 빠르게 구현할 수 있지만, 유지보수성이 낮습니다.
+
+`target_type`과 id를 분리하면 프론트엔드는 명확한 계약에 따라 링크와 화면 표시를 결정할 수 있습니다.
+
+## 어떤 원리인가
+
+1. checklist item에 `target_type`을 추가합니다.
+2. `target_type`이 `station`이면 `station_id`를 읽습니다.
+3. `station_id`를 `STATION_NAME_BY_ID`로 역명에 매핑합니다.
+4. 역명이 mock 역 목록에 있으면 역 상세 링크를 생성합니다.
+5. `target_type`이 없거나 station id를 찾지 못하면 기존 문자열 판별 로직을 fallback으로 사용합니다.
+
+## 장점
+
+- 문자열 형식 변화에 덜 취약합니다.
+- 역 대상과 구간 대상을 명확히 구분할 수 있습니다.
+- 이후 구간 상세 화면을 붙일 때 `segment_id`를 바로 활용할 수 있습니다.
+- mock 데이터가 실제 API 계약에 가까워집니다.
+
+## 단점
+
+- mock 데이터 필드가 늘어납니다.
+- `station_id`와 실제 역명 매핑을 별도로 관리해야 합니다.
+- 현재는 `STATION_NAME_BY_ID`가 프론트엔드 코드에 있어, 장기적으로는 mock/API에서 역 메타데이터로 내려주는 편이 좋습니다.
+
+## 다른 구현 방법
+
+- checklist item에 `detail_url`을 직접 넣는 방식
+- station mock에 `id` 필드를 추가하고 id 기준으로 join하는 방식
+- 모든 대상 정보를 `targets.json` 같은 별도 mock으로 분리하는 방식
+- 프론트엔드 라우터를 도입해 id 기반 route로 이동하는 방식
+
+# API
+
+API 변경 사항은 없습니다.
+
+변경된 mock 필드:
+
+```json
+{
+  "target_type": "station",
+  "station_id": "daejeon"
+}
+```
+
+```json
+{
+  "target_type": "segment",
+  "segment_id": "daejeon-gimcheon_gumi"
+}
+```
+
+# Database
+
+DB 변경 사항은 없습니다.
+
+다만 실제 DB를 설계한다면 우선 점검 대상 테이블에 다음 필드가 필요합니다.
+
+- `target_type`
+- `target_id`
+- `station_id`
+- `segment_id`
+
+# 테스트 방법
+
+1. JavaScript 문법 검사
+
+```bash
+node --check frontend/dashboard.js
+```
+
+예상 결과:
+
+- 오류 없이 종료됩니다.
+
+2. checklist JSON 파싱 검사
+
+```bash
+node -e "const fs=require('fs'); JSON.parse(fs.readFileSync('mock/checklist.json','utf8')); console.log('checklist json OK');"
+```
+
+예상 결과:
+
+```text
+checklist json OK
+```
+
+3. 구조화 필드 기반 링크 확인
+
+```bash
+node -e "const fs=require('fs'); const checklist=JSON.parse(fs.readFileSync('mock/checklist.json','utf8')); const nameById={daejeon:'대전',dongdaegu:'동대구',gimcheon_gumi:'김천(구미)',suwon:'수원',miryang:'밀양'}; const result=checklist.items.map((item)=>{ const station=item.target_type==='station' ? nameById[item.station_id] : null; const href=station ? './station-detail.html?'+new URLSearchParams({station}).toString() : '-'; return [item.rank,item.target_type,item.station_id||item.segment_id,item.target,href].join(' | '); }); console.log(result.join('\n'));"
+```
+
+예상 결과:
+
+```text
+1 | segment | daejeon-gimcheon_gumi | 대전→김천(구미) 구간 | -
+2 | segment | cheonan-daejeon | 천안→대전 구간 | -
+3 | station | daejeon | 대전역 | ./station-detail.html?station=%EB%8C%80%EC%A0%84
+4 | segment | yeongdeungpo-suwon | 영등포→수원 구간 | -
+```
+
+4. 브라우저 확인
+
+```text
+http://127.0.0.1:8765/frontend/dashboard.html
+```
+
+검증 기준:
+
+- 대시보드가 정상 로드됩니다.
+- 우선 점검 대상의 `대전역`은 역 상세 링크로 표시됩니다.
+- 구간 대상은 일반 텍스트로 유지됩니다.
+- checklist mock은 HTTP 200으로 로드됩니다.
+
+# 주의사항
+
+현재 `station_id`와 역명 매핑은 `dashboard.js`의 `STATION_NAME_BY_ID`에 있습니다.
+
+장기적으로는 `vulnerability_stations.json`에도 `station_id`를 추가해 mock끼리 같은 id로 join하는 구조가 더 좋습니다.
+
+# 변경 이력
+
+2026-07-09
+
+- checklist mock에 `target_type`, `station_id`, `segment_id` 추가
+- dashboard 링크 판별 로직을 구조화 필드 우선 방식으로 변경
+- 문자열 기반 판별은 fallback으로 유지
+
+# 다음 작업
+
+- `vulnerability_stations.json`에 `station_id` 추가
+- `vulnerability_segments.json`에 `segment_id` 추가
+- 구간 상세 화면 설계
+
+# 작업 요약
+
+## 완료한 내용
+
+- checklist mock 구조화
+- station id 기반 역 상세 링크 생성
+- segment id 기반 확장 준비
+- 테스트 및 문서화
+
+## 수정한 파일
+
+- `mock/checklist.json`
+- `frontend/dashboard.js`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+문자열 기반 판별은 빠르지만 확장에 약합니다.
+
+이번 변경으로 mock 데이터가 실제 서비스 API 구조에 더 가까워졌고, 이후 구간 상세 화면 연결도 쉬워졌습니다.
+
+## 변경 사항
+
+- `target_type` 추가
+- `station_id` 추가
+- `segment_id` 추가
+- 구조화 필드 기반 링크 판별 함수 추가
+
+## 새롭게 배운 개념
+
+- Structured Mock Data
+- Stable Identifier
+- Fallback Logic
+- Data Contract
+
+## 실무에서는
+
+실무에서는 화면 표시명과 시스템 식별자를 분리합니다.
+
+사용자에게는 `대전역`을 보여주지만, 내부 링크와 API 요청에는 `station_id`처럼 변하지 않는 값을 사용합니다.
+
+## 개선 가능한 부분
+
+- 모든 station mock에 id 추가
+- 모든 segment mock에 id 추가
+- `STATION_NAME_BY_ID`를 mock 데이터로 분리
+- URL query를 station name이 아니라 station id 기반으로 전환
+
+## 다음 작업
+
+- `vulnerability_stations.json`에 `station_id`를 추가하고 역 상세 URL을 id 기반으로 전환
+
+## 복습 문제
+
+1. 화면 표시명과 시스템 식별자를 분리해야 하는 이유는 무엇인가요?
+2. fallback 로직을 남겨두면 어떤 장점이 있나요?
+3. `station_id` 기반 URL이 역명 기반 URL보다 안전한 이유는 무엇인가요?
+
+## 오늘 배운 내용
+
+- Target Type
+- Station ID
+- Segment ID
+- Mock Data Contract
+
+## Change Log
+
+2026-07-09
+
+- checklist mock 대상 타입 구조화
+- station id 기반 링크 판별 추가
+- 문서 업데이트
+
+## Timestamp
+
+2026-07-09 14:00:31 (KST)
+
+---
+
+# 우선 점검 대상 역 상세 링크 작업 요약
+
+# 개요
+
+우선 점검 대상 중 `대전역`처럼 역 단위 대상인 항목을 역 상세 화면으로 이동할 수 있게 연결했습니다.
+
+구간 대상은 아직 구간 상세 화면이 없으므로 링크로 만들지 않고, 역 대상만 `station-detail.html?station=대전` 형태로 연결했습니다.
+
+# 구현 목적
+
+우선 점검 대상에서 역 단위 위험 항목을 발견했을 때, 사용자가 바로 역 상세 화면으로 이동해 더 자세한 지표를 확인할 수 있게 하기 위함입니다.
+
+이전 단계에서 역 상세 화면이 `station` query string을 지원하므로, 이번 단계에서는 우선 점검 대상과 역 상세 화면의 진입점을 연결했습니다.
+
+# 구현 내용
+
+- `frontend/dashboard.js`
+  - `getStationNamesFromData()` 추가
+  - `getStationNameFromInspectionTarget()` 추가
+  - `createStationDetailLink()` 추가
+  - `createInspectionTargetCell()` 추가
+  - 우선 점검 대상 렌더링 시 `vulnerability_stations.json`의 역 목록을 함께 사용
+  - `대전역`처럼 mock 역 목록에 존재하는 역 대상만 링크로 렌더링
+  - 상세 패널의 `대상` 값도 역 대상이면 링크로 표시
+
+- `frontend/style.css`
+  - `.inspection-link` 스타일 추가
+  - hover/focus-visible 상태 추가
+
+# 코드 설명
+
+## 왜 필요한가
+
+우선 점검 대상은 운영자가 조치해야 할 항목을 보여주는 영역입니다.
+
+그중 역 단위 대상은 이미 역 상세 화면이 있으므로, 바로 이동할 수 있어야 분석 흐름이 끊기지 않습니다.
+
+## 어떤 원리인가
+
+1. `vulnerability_stations.json`에서 사용 가능한 역 목록을 가져옵니다.
+2. 우선 점검 대상의 `target`이 `역`으로 끝나는지 확인합니다.
+3. `역` 접미사를 제거한 이름이 mock 역 목록에 있는지 확인합니다.
+4. 존재하면 `station-detail.html?station=역명` 링크를 생성합니다.
+5. 존재하지 않거나 구간 대상이면 일반 텍스트로 표시합니다.
+
+## 장점
+
+- 역 대상만 안전하게 상세 화면으로 연결합니다.
+- 구간 대상을 잘못 역 상세 화면으로 보내지 않습니다.
+- 한글 역명은 `URLSearchParams`를 통해 안전하게 인코딩됩니다.
+- 표와 상세 패널 모두 같은 링크 생성 함수를 재사용합니다.
+
+## 단점
+
+- 현재는 target 문자열이 `대전역`처럼 일정한 형식이어야 합니다.
+- 역명 기반 매칭이라 동명이역이 생기면 한계가 있습니다.
+- 구간 상세 화면은 아직 연결하지 않았습니다.
+
+## 다른 구현 방법
+
+- checklist mock에 `target_type`, `station_id`, `segment_id`를 명시하는 방식
+- API 응답에서 상세 URL을 직접 내려주는 방식
+- target 문자열 파싱 대신 View Model 변환 단계에서 링크 가능 여부를 계산하는 방식
+- 구간 상세 화면을 먼저 만들고 구간 대상도 링크로 연결하는 방식
+
+# API
+
+API 변경 사항은 없습니다.
+
+사용한 mock 데이터:
+
+- `GET ../mock/checklist.json`
+- `GET ../mock/vulnerability_stations.json`
+
+# Database
+
+DB 변경 사항은 없습니다.
+
+# 테스트 방법
+
+1. JavaScript 문법 검사
+
+```bash
+node --check frontend/dashboard.js
+```
+
+예상 결과:
+
+- 오류 없이 종료됩니다.
+
+2. 우선 점검 대상 링크 생성 확인
+
+```bash
+node -e "const fs=require('fs'); const checklist=JSON.parse(fs.readFileSync('mock/checklist.json','utf8')); const stations=JSON.parse(fs.readFileSync('mock/vulnerability_stations.json','utf8')).stations.map((item)=>item.station); const links=checklist.items.map((item)=>{ const station=item.target.endsWith('역') ? item.target.slice(0,-1) : null; const href=station&&stations.includes(station) ? './station-detail.html?'+new URLSearchParams({station}).toString() : '-'; return item.target+' => '+href; }); console.log(links.join('\n'));"
+```
+
+예상 결과:
+
+```text
+대전→김천(구미) 구간 => -
+천안→대전 구간 => -
+대전역 => ./station-detail.html?station=%EB%8C%80%EC%A0%84
+영등포→수원 구간 => -
+```
+
+3. 브라우저 확인
+
+```text
+http://127.0.0.1:8765/frontend/dashboard.html
+```
+
+검증 기준:
+
+- 우선 점검 대상의 `대전역`은 링크로 표시됩니다.
+- `대전역` 링크를 클릭하면 역 상세 화면으로 이동합니다.
+- 이동 URL은 `station=%EB%8C%80%EC%A0%84` 값을 포함합니다.
+- 구간 대상은 링크가 아니라 일반 텍스트로 유지됩니다.
+
+# 주의사항
+
+현재는 문자열 기반으로 역 대상을 판별합니다.
+
+실무에서는 `target_type: "station"`과 `station_id`를 mock/API에 포함하는 편이 더 안전합니다.
+
+# 변경 이력
+
+2026-07-09
+
+- 우선 점검 대상 역 항목 상세 링크 추가
+- 상세 패널 대상 값 링크 처리
+- 구간 대상은 일반 텍스트 유지
+
+# 다음 작업
+
+- checklist mock에 `target_type`, `station_id`, `segment_id` 추가 설계
+- 구간 상세 화면 설계
+- 구간 대상 상세 링크 연결
+
+# 작업 요약
+
+## 완료한 내용
+
+- 우선 점검 대상 중 역 대상만 역 상세 화면으로 연결
+- 상세 패널 대상 값 링크 처리
+- 구간 대상 오연결 방지
+- 테스트 및 문서화
+
+## 수정한 파일
+
+- `frontend/dashboard.js`
+- `frontend/style.css`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+대시보드에서 점검 대상과 상세 화면이 연결되면 운영자가 더 빠르게 원인과 지표를 확인할 수 있습니다.
+
+단, 아직 구간 상세 화면은 없으므로 역 대상만 연결해 기능 범위를 명확히 제한했습니다.
+
+## 변경 사항
+
+- 역 대상 판별 함수 추가
+- 우선 점검 대상 target 셀 링크 처리
+- 상세 패널 target 값 링크 처리
+- inspection link 스타일 추가
+
+## 새롭게 배운 개념
+
+- 조건부 링크 렌더링
+- 문자열 기반 target 판별
+- Mock 데이터 간 매칭
+
+## 실무에서는
+
+실무에서는 문자열을 파싱해서 대상 타입을 추론하지 않습니다.
+
+API 응답에 `target_type`, `target_id`, `detail_url` 같은 필드를 포함해 프론트엔드가 안전하게 라우팅할 수 있게 만듭니다.
+
+## 개선 가능한 부분
+
+- checklist mock 구조 개선
+- station id 기반 URL 전환
+- 구간 상세 화면 추가
+- 구간 대상 링크 연결
+
+## 다음 작업
+
+- checklist mock에 대상 타입과 id를 추가하는 구조 설계
+
+## 복습 문제
+
+1. 문자열 파싱으로 대상 타입을 판단하는 방식의 한계는 무엇인가요?
+2. 역 대상만 링크로 만들고 구간 대상은 일반 텍스트로 둔 이유는 무엇인가요?
+3. `target_type`과 `target_id`를 mock/API에 추가하면 어떤 장점이 있나요?
+
+## 오늘 배운 내용
+
+- Conditional Link Rendering
+- Mock Cross-reference
+- Target Type Detection
+
+## Change Log
+
+2026-07-09
+
+- 우선 점검 대상 역 상세 링크 추가
+- 상세 패널 대상 링크 처리
+- 문서 업데이트
+
+## Timestamp
+
+2026-07-09 13:54:38 (KST)
+
+---
+
+# 우선 점검 대상 기본 선택 작업 요약
+
+# 개요
+
+대시보드의 `우선 점검 대상` 상세 패널이 첫 번째 항목을 기본으로 표시하도록 개선했습니다.
+
+이제 사용자가 `상세보기` 버튼을 누르기 전에도 1순위 점검 대상의 상세 근거를 바로 확인할 수 있습니다.
+
+# 구현 목적
+
+우선 점검 대상은 순위가 있는 데이터입니다.
+
+가장 중요한 1순위 항목은 사용자가 별도 조작을 하지 않아도 바로 보여주는 편이 운영 화면에서 더 자연스럽습니다.
+
+# 구현 내용
+
+- `frontend/dashboard.js`
+  - `setSelectedInspectionRow()` 추가
+  - 테이블 렌더링 후 첫 번째 item을 상세 패널에 자동 렌더링
+  - 첫 번째 row에 선택 상태 적용
+  - 상세보기 버튼 클릭 시 선택 row 갱신
+
+- `frontend/style.css`
+  - `.inspection-table__row--selected` 스타일 추가
+  - 선택된 row의 텍스트 강조 처리
+
+# 코드 설명
+
+## 왜 필요한가
+
+기존 상세 패널은 안내 문구만 표시되었고, 사용자가 버튼을 눌러야 의미 있는 데이터가 나타났습니다.
+
+운영 대시보드에서는 가장 중요한 항목을 즉시 보여주는 것이 더 효율적입니다.
+
+## 어떤 원리인가
+
+1. `checklist.items[]`를 rank 기준으로 정렬합니다.
+2. 정렬된 첫 번째 item으로 테이블 첫 번째 row를 만듭니다.
+3. 테이블 렌더링이 끝나면 `renderInspectionDetail(items[0])`을 호출합니다.
+4. `setSelectedInspectionRow(rows[0])`로 첫 번째 행에 선택 상태를 부여합니다.
+5. 다른 행의 상세보기 버튼을 누르면 선택 상태가 해당 행으로 이동합니다.
+
+## 장점
+
+- 사용자가 바로 1순위 점검 근거를 확인할 수 있습니다.
+- 상세 패널이 빈 안내 상태로 남지 않습니다.
+- 현재 선택된 행이 시각적으로 구분됩니다.
+
+## 단점
+
+- 기본 선택 기준이 항상 `rank` 1순위로 고정됩니다.
+- 사용자가 마지막으로 선택한 항목을 기억하지는 않습니다.
+- 행 선택 상태는 현재 세션의 화면 렌더링에만 유지됩니다.
+
+## 다른 구현 방법
+
+- 마지막 선택 항목을 `localStorage`에 저장하는 방식
+- URL query string으로 선택한 점검 항목을 관리하는 방식
+- 위험도가 가장 높은 항목을 기본 선택하는 방식
+- 사용자가 직접 선택하기 전까지 상세 패널을 접어두는 방식
+
+# API
+
+API 변경 사항은 없습니다.
+
+사용한 mock 데이터:
+
+- `GET ../mock/checklist.json`
+
+# Database
+
+DB 변경 사항은 없습니다.
+
+# 테스트 방법
+
+1. JavaScript 문법 검사
+
+```bash
+node --check frontend/dashboard.js
+```
+
+예상 결과:
+
+- 오류 없이 종료됩니다.
+
+2. 첫 번째 항목 기대값 확인
+
+```bash
+node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('mock/checklist.json','utf8')); const item=data.items.slice().sort((a,b)=>a.rank-b.rank)[0]; const risk=item.avg_delay_incr>=12?'높음':item.avg_delay_incr>=7?'주의':'관심'; console.log([item.target+' 상세', risk, item.reason, '+'+item.avg_delay_incr.toFixed(1)+'분', item.sample_n+'건'].join(' | '));"
+```
+
+예상 결과:
+
+```text
+대전→김천(구미) 구간 상세 | 높음 | 호우 경보 시 평균 +14.6분 | +14.6분 | 37건
+```
+
+3. 브라우저 확인
+
+```text
+http://127.0.0.1:8765/frontend/dashboard.html
+```
+
+검증 기준:
+
+- 페이지 로드 직후 상세 패널 제목이 `대전→김천(구미) 구간 상세`로 표시됩니다.
+- 첫 번째 우선 점검 대상 행이 선택 상태로 강조됩니다.
+- 다른 행의 `상세보기`를 클릭하면 상세 패널과 선택 행이 함께 변경됩니다.
+
+# 주의사항
+
+현재 기본 선택 기준은 `rank` 정렬 결과의 첫 번째 항목입니다.
+
+향후 사용자의 마지막 선택을 유지하려면 URL query string 또는 localStorage를 추가로 설계해야 합니다.
+
+# 변경 이력
+
+2026-07-09
+
+- 우선 점검 대상 첫 번째 항목 기본 상세 표시
+- 선택 행 강조 스타일 추가
+- 상세보기 클릭 시 선택 상태 갱신
+
+# 다음 작업
+
+- 우선 점검 대상 중 역 대상은 역 상세 화면 링크로 연결
+- 구간 대상 상세 화면 설계
+- 조치 체크리스트 mock 확장
+
+# 작업 요약
+
+## 완료한 내용
+
+- 첫 번째 우선 점검 대상 기본 선택
+- 선택 행 시각 강조
+- 상세보기 클릭 시 선택 상태 갱신
+- 테스트 및 문서화
+
+## 수정한 파일
+
+- `frontend/dashboard.js`
+- `frontend/style.css`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+대시보드에서는 사용자가 가장 먼저 봐야 할 정보를 자동으로 노출하는 것이 중요합니다.
+
+1순위 점검 대상 상세를 기본 표시하면 의사결정 속도를 높일 수 있습니다.
+
+## 변경 사항
+
+- `setSelectedInspectionRow()` 추가
+- 첫 번째 item 자동 상세 렌더링
+- 선택 row 클래스 추가
+
+## 새롭게 배운 개념
+
+- Default Selection
+- Selected Row State
+- UI State Synchronization
+
+## 실무에서는
+
+실무 운영 도구에서는 첫 번째 항목 기본 선택 패턴을 자주 사용합니다.
+
+특히 알림, 점검 대상, 장애 목록처럼 우선순위가 있는 데이터는 가장 중요한 항목을 자동으로 열어두는 방식이 효율적입니다.
+
+## 개선 가능한 부분
+
+- 마지막 선택 항목 기억
+- URL query string으로 선택 점검 항목 공유
+- 선택 행에 키보드 탐색 지원 추가
+
+## 다음 작업
+
+- 우선 점검 대상 중 `대전역` 같은 역 대상은 역 상세 화면으로 이동할 수 있게 연결
+
+## 복습 문제
+
+1. 기본 선택 상태를 제공하면 사용자 경험이 어떻게 좋아지나요?
+2. 선택된 행을 class로 관리하는 방식의 장점은 무엇인가요?
+3. 마지막 선택 항목을 유지하려면 어떤 저장 방식을 사용할 수 있나요?
+
+## 오늘 배운 내용
+
+- Default Selected Item
+- Selected State Styling
+- Table Row State
+
+## Change Log
+
+2026-07-09
+
+- 우선 점검 대상 기본 선택 상태 추가
+- 선택 행 강조 스타일 추가
+- 문서 업데이트
+
+## Timestamp
+
+2026-07-09 13:50:18 (KST)
+
+---
+
+# 우선 점검 대상 상세보기 작업 요약
+
+# 개요
+
+대시보드의 `우선 점검 대상` 테이블에서 `상세보기` 버튼을 클릭하면 선택한 항목의 상세 요약 패널이 표시되도록 구현했습니다.
+
+별도 페이지를 만들지 않고, 현재 대시보드 화면 안에서 선택 항목의 위험 사유와 대응 권고를 확인할 수 있게 했습니다.
+
+# 구현 목적
+
+표에는 핵심 정보만 표시되기 때문에 사용자가 왜 이 대상이 우선 점검 대상인지 빠르게 확인하기 어렵습니다.
+
+상세 패널을 추가하면 테이블의 밀도는 유지하면서도 클릭 시 필요한 근거 정보를 더 자세히 보여줄 수 있습니다.
+
+# 구현 내용
+
+- `frontend/dashboard.html`
+  - 우선 점검 대상 테이블 아래에 `inspection-detail-panel` 추가
+  - 기본 안내 문구 추가
+
+- `frontend/dashboard.js`
+  - `data-dashboard-inspection-detail` 요소 연결
+  - `renderInspectionDetail()` 추가
+  - `상세보기` 버튼 클릭 이벤트 추가
+  - 선택 항목의 대상, 위험도, 기상특보, 주요 위험, 평균 지연 증가, 분석 표본, 대응 권고 표시
+  - 데이터 없음 상태에서도 상세 패널 안내 문구 표시
+
+- `frontend/style.css`
+  - 상세 패널 레이아웃 추가
+  - 상세 항목 `dl/dt/dd` 스타일 추가
+  - 모바일에서 상세 항목이 1열로 내려가도록 반응형 처리
+
+# 코드 설명
+
+## 왜 필요한가
+
+운영자는 우선 점검 대상 목록을 보고 바로 조치 판단을 해야 합니다.
+
+테이블만 있으면 각 행의 근거가 압축되어 있어, 상세보기 클릭 시 점검 근거와 권고 조치를 한 번 더 풀어서 보여주는 흐름이 필요합니다.
+
+## 어떤 원리인가
+
+1. `checklist.json`의 각 항목으로 테이블 행을 렌더링합니다.
+2. 행마다 `상세보기` 버튼을 생성합니다.
+3. 버튼에 해당 item을 닫아둔 click 이벤트를 연결합니다.
+4. 클릭 시 `renderInspectionDetail(item)`을 호출합니다.
+5. 상세 패널을 `replaceChildren()`으로 갱신합니다.
+
+## 장점
+
+- 새 페이지 없이 현재 화면 안에서 빠르게 상세 내용을 확인할 수 있습니다.
+- mock 데이터 구조를 크게 바꾸지 않고 구현할 수 있습니다.
+- 테이블은 간결하게 유지하고 상세 정보는 필요할 때만 보여줄 수 있습니다.
+
+## 단점
+
+- 현재 mock에는 상세 설명 전용 필드가 없습니다.
+- 상세 패널은 기존 표 데이터를 재구성해서 보여줍니다.
+- 여러 항목을 동시에 비교하는 상세 보기에는 적합하지 않습니다.
+
+## 다른 구현 방법
+
+- 상세보기 클릭 시 modal을 여는 방식
+- 행 아래에 expandable row를 추가하는 방식
+- 별도 상세 페이지로 이동하는 방식
+- 우측 drawer 패널을 여는 방식
+
+# API
+
+API 변경 사항은 없습니다.
+
+사용한 mock 데이터:
+
+- `GET ../mock/checklist.json`
+
+# Database
+
+DB 변경 사항은 없습니다.
+
+# 테스트 방법
+
+1. JavaScript 문법 검사
+
+```bash
+node --check frontend/dashboard.js
+```
+
+예상 결과:
+
+- 오류 없이 종료됩니다.
+
+2. mock 상세값 계산 확인
+
+```bash
+node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('mock/checklist.json','utf8')); const item=data.items[2]; const risk=item.avg_delay_incr>=12?'높음':item.avg_delay_incr>=7?'주의':'관심'; console.log([item.target, risk, item.reason, '+'+item.avg_delay_incr.toFixed(1)+'분', item.sample_n+'건'].join(' | '));"
+```
+
+예상 결과:
+
+```text
+대전역 | 주의 | 폭염 경보 시 지연율 44% | +8.9분 | 61건
+```
+
+3. 브라우저 확인
+
+```text
+http://127.0.0.1:8765/frontend/dashboard.html
+```
+
+검증 기준:
+
+- 우선 점검 대상 테이블 아래에 기본 상세 안내 패널이 표시됩니다.
+- `대전역` 행의 상세보기를 누르면 상세 패널 제목이 `대전역 상세`로 바뀝니다.
+- 상세 패널에 위험도, 기상특보, 주요 위험, 평균 지연 증가, 분석 표본, 대응 권고가 표시됩니다.
+
+# 주의사항
+
+현재 `checklist.json`에는 상세 설명 전용 필드가 없습니다.
+
+더 풍부한 상세 화면을 만들려면 `description`, `action_items`, `last_checked_at`, `owner_team` 같은 필드를 mock 또는 API에 추가하는 것이 좋습니다.
+
+# 변경 이력
+
+2026-07-09
+
+- 우선 점검 대상 상세 패널 추가
+- 상세보기 버튼 클릭 이벤트 연결
+- 선택 항목 상세 정보 렌더링
+
+# 다음 작업
+
+- 상세 패널에 조치 체크리스트 추가
+- `대전역` 같은 역 대상은 역 상세 화면 링크와 함께 제공
+- 구간 대상은 구간 상세 화면 설계 후 연결
+
+# 작업 요약
+
+## 완료한 내용
+
+- 우선 점검 대상 상세보기 버튼 동작 구현
+- 선택 항목 상세 패널 렌더링
+- 빈 상태 안내 처리
+- 테스트 및 문서화
+
+## 수정한 파일
+
+- `frontend/dashboard.html`
+- `frontend/dashboard.js`
+- `frontend/style.css`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+우선 점검 대상은 운영 의사결정과 직접 연결되는 영역입니다.
+
+상세보기 버튼이 실제 정보를 보여주면 사용자가 점검 우선순위와 대응 이유를 더 쉽게 이해할 수 있습니다.
+
+## 변경 사항
+
+- 상세 패널 DOM 추가
+- 상세 패널 렌더링 함수 추가
+- 상세보기 클릭 이벤트 추가
+- 상세 패널 스타일 추가
+
+## 새롭게 배운 개념
+
+- Inline Detail Panel
+- Event Handler Closure
+- `dl/dt/dd`를 활용한 상세 정보 표현
+- `aria-live`를 활용한 동적 영역 안내
+
+## 실무에서는
+
+실무에서는 상세 패널에 단순 요약뿐 아니라 조치 이력, 담당 부서, 마지막 점검 시간, 근거 데이터 링크를 함께 제공합니다.
+
+또한 위험도 높은 항목은 버튼 클릭 없이도 첫 번째 항목을 기본 선택 상태로 보여주는 방식을 자주 사용합니다.
+
+## 개선 가능한 부분
+
+- 첫 번째 우선 점검 대상을 기본 선택으로 표시
+- 조치 체크리스트 mock 추가
+- 담당자/부서 정보 추가
+- 상세 패널 닫기 또는 고정 기능 추가
+
+## 다음 작업
+
+- 첫 번째 우선 점검 대상을 기본 선택 상태로 표시
+
+## 복습 문제
+
+1. 상세 패널을 별도 페이지 대신 현재 화면에 표시하는 장점은 무엇인가요?
+2. 버튼 클릭 이벤트에서 item 데이터를 사용할 수 있는 이유는 무엇인가요?
+3. 상세 정보 표현에 `dl/dt/dd` 구조를 사용할 때의 장점은 무엇인가요?
+
+## 오늘 배운 내용
+
+- Inline Detail Pattern
+- Event-driven Rendering
+- Definition List
+- Dynamic Detail Panel
+
+## Change Log
+
+2026-07-09
+
+- 우선 점검 대상 상세보기 패널 추가
+- 상세보기 클릭 이벤트 연결
+- 상세 패널 스타일 및 문서 업데이트
+
+## Timestamp
+
+2026-07-09 13:47:09 (KST)
+
+---
+
+# 대시보드 취약 역 상세 이동 작업 요약
+
+# 개요
+
+대시보드의 `취약 역 TOP 5` 랭킹에서 역명을 클릭하면 역 상세 화면으로 이동하도록 연결했습니다.
+
+이동 시 선택한 역명을 `station` query string으로 전달합니다.
+
+예시:
+
+```text
+./station-detail.html?station=%EA%B9%80%EC%B2%9C%28%EA%B5%AC%EB%AF%B8%29
+```
+
+# 구현 목적
+
+대시보드에서 위험한 역을 발견한 뒤, 사용자가 바로 해당 역의 상세 지표를 확인할 수 있는 흐름을 만들기 위함입니다.
+
+이전 단계에서 역 상세 화면이 `station` query string을 읽도록 구현했기 때문에, 이번 단계에서는 대시보드에서 그 값을 전달하는 진입점을 연결했습니다.
+
+# 구현 내용
+
+- `frontend/dashboard.js`
+  - `STATION_DETAIL_URL` 상수 추가
+  - `STATION_QUERY_PARAM` 상수 추가
+  - `createStationDetailUrl()` 추가
+  - `createStationLinkCell()` 추가
+  - 취약 역 랭킹의 역명 셀을 텍스트에서 링크로 변경
+
+- `frontend/style.css`
+  - `.ranking-table__link` 스타일 추가
+  - hover 상태 추가
+  - focus-visible 상태 추가
+
+# 코드 설명
+
+## 왜 필요한가
+
+대시보드는 전체 위험 상황을 파악하는 화면이고, 역 상세 화면은 특정 역을 분석하는 화면입니다.
+
+두 화면이 연결되지 않으면 사용자가 랭킹에서 역을 확인한 뒤 다시 직접 역 상세 화면에서 선택해야 합니다.
+
+## 어떤 원리인가
+
+1. `vulnerability_stations.json`의 역 목록으로 취약 역 랭킹을 렌더링합니다.
+2. 각 역명 셀을 `a` 태그로 생성합니다.
+3. 링크 URL은 `URLSearchParams`로 안전하게 만듭니다.
+4. 사용자가 역명을 클릭하면 `station-detail.html?station=역명`으로 이동합니다.
+5. 역 상세 화면은 query string의 `station` 값을 읽어 해당 역 기준으로 렌더링합니다.
+
+## 장점
+
+- 대시보드와 상세 화면의 사용자 흐름이 연결됩니다.
+- 한글과 괄호가 포함된 역명도 `URLSearchParams`로 안전하게 인코딩됩니다.
+- 링크이기 때문에 새 탭 열기, 복사, 접근성 측면에서 버튼보다 자연스럽습니다.
+
+## 단점
+
+- 현재는 역명을 query key로 사용합니다.
+- 역명이 바뀌거나 중복되면 station id 기반으로 변경해야 합니다.
+- 구간 상세 화면은 아직 없기 때문에 취약 구간 TOP 5는 연결하지 않았습니다.
+
+## 다른 구현 방법
+
+- 역명 대신 station id를 전달하는 방식
+- 랭킹 행 전체를 클릭 가능하게 만드는 방식
+- 상세 화면을 페이지 이동이 아니라 modal로 여는 방식
+- 프론트엔드 라우터를 도입해 `/stations/:stationId` 형태로 관리하는 방식
+
+# API
+
+API 변경 사항은 없습니다.
+
+사용한 mock 데이터:
+
+- `GET ../mock/vulnerability_stations.json`
+
+# Database
+
+DB 변경 사항은 없습니다.
+
+# 테스트 방법
+
+1. JavaScript 문법 검사
+
+```bash
+node --check frontend/dashboard.js
+node --check frontend/station-detail.js
+```
+
+예상 결과:
+
+- 오류 없이 종료됩니다.
+
+2. URL 생성 검증
+
+```bash
+node -e "const params=new URLSearchParams({station:'김천(구미)'}); console.log('./station-detail.html?'+params.toString());"
+```
+
+예상 결과:
+
+```text
+./station-detail.html?station=%EA%B9%80%EC%B2%9C%28%EA%B5%AC%EB%AF%B8%29
+```
+
+3. 브라우저 확인
+
+```text
+http://127.0.0.1:8765/frontend/dashboard.html
+```
+
+검증 기준:
+
+- 취약 역 TOP 5의 역명이 링크처럼 동작합니다.
+- `김천(구미)`를 클릭하면 역 상세 화면으로 이동합니다.
+- 이동 URL에 `station=%EA%B9%80%EC%B2%9C%28%EA%B5%AC%EB%AF%B8%29`가 포함됩니다.
+- 역 상세 화면은 김천(구미)역 기준 주요 지표를 표시합니다.
+
+# 주의사항
+
+현재 취약 역 랭킹만 상세 화면과 연결했습니다.
+
+취약 구간 랭킹은 아직 구간 상세 화면이 없으므로 링크를 추가하지 않았습니다.
+
+# 변경 이력
+
+2026-07-09
+
+- 대시보드 취약 역 랭킹 역명 링크 추가
+- 역 상세 화면으로 `station` query 전달
+- 랭킹 링크 스타일 추가
+
+# 다음 작업
+
+- 대시보드 우선 점검 대상의 상세보기 버튼 연결 설계
+- 취약 구간 상세 화면 설계
+- station id 기반 mock 구조 설계
+
+# 작업 요약
+
+## 완료한 내용
+
+- 취약 역 TOP 5 역명 클릭 이동 구현
+- `URLSearchParams` 기반 query string 생성
+- 링크 hover/focus 스타일 추가
+- 테스트 및 문서화
+
+## 수정한 파일
+
+- `frontend/dashboard.js`
+- `frontend/style.css`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+사용자는 대시보드에서 위험한 역을 확인한 직후 상세 지표를 보고 싶어 합니다.
+
+따라서 랭킹과 상세 화면을 연결하면 분석 흐름이 끊기지 않습니다.
+
+## 변경 사항
+
+- 취약 역명 텍스트를 링크로 변경
+- 선택 역을 `station` query string으로 전달
+- 링크 접근성 문구 추가
+
+## 새롭게 배운 개념
+
+- URLSearchParams
+- 페이지 간 상태 전달
+- 링크 기반 내비게이션
+- 접근 가능한 링크 라벨
+
+## 실무에서는
+
+실무에서는 역명보다 `stationId`를 링크에 전달하는 편이 안전합니다.
+
+예를 들어 `station-detail.html?stationId=daejeon`처럼 불변 id를 사용하면 역명이 바뀌어도 링크가 깨지지 않습니다.
+
+## 개선 가능한 부분
+
+- mock에 station id 추가
+- 취약 구간 상세 페이지 추가
+- 우선 점검 대상 상세보기 버튼 연결
+- 랭킹 행 전체 클릭 영역 검토
+
+## 다음 작업
+
+- 우선 점검 대상 `상세보기` 버튼 동작 설계
+
+## 복습 문제
+
+1. 한글 역명을 URL에 넣을 때 `URLSearchParams`를 사용하는 이유는 무엇인가요?
+2. 버튼보다 링크가 더 적절한 경우는 언제인가요?
+3. 역명 대신 station id를 사용하는 것이 실무에서 더 안전한 이유는 무엇인가요?
+
+## 오늘 배운 내용
+
+- URL Encoding
+- Link Navigation
+- Dashboard to Detail Flow
+- Accessible Link Label
+
+## Change Log
+
+2026-07-09
+
+- 대시보드 취약 역 랭킹 상세 이동 연결
+- `station` query string 전달
+- 랭킹 링크 스타일 추가
+
+## Timestamp
+
+2026-07-09 13:43:58 (KST)
+
+---
+
+# 역 상세 URL Query String 연결 작업 요약
+
+# 개요
+
+역 상세 화면의 선택 역 상태를 URL query string과 연결했습니다.
+
+이제 `station-detail.html?station=동대구`처럼 접속하면 해당 역이 초기 선택값으로 렌더링됩니다.
+
+# 구현 목적
+
+사용자가 선택한 역을 새로고침, 공유 링크, 브라우저 뒤로가기 흐름에서도 유지하기 위함입니다.
+
+UI 내부 상태만 사용하면 페이지를 새로고침했을 때 항상 기본 역으로 돌아가지만, URL에 상태를 남기면 화면 상태를 더 안정적으로 복원할 수 있습니다.
+
+# 구현 내용
+
+- `frontend/station-detail.js`
+  - `station` query parameter를 읽는 로직 추가
+  - URL의 역명이 mock 역 목록에 존재하면 해당 역으로 초기 렌더링
+  - 역 선택 select 변경 시 `history.pushState()`로 URL 갱신
+  - 브라우저 뒤로가기/앞으로가기 시 `popstate` 이벤트로 화면 재렌더링
+  - query string이 있는 경우 select를 처음부터 표시
+
+# 코드 설명
+
+## 왜 필요한가
+
+사용자가 특정 역 상세 화면을 공유하거나 새로고침했을 때 같은 역이 유지되어야 합니다.
+
+예를 들어 운영자가 `동대구역` 위험도를 보고 있다가 URL을 공유하면, 받는 사람도 같은 역 상태로 화면을 확인할 수 있어야 합니다.
+
+## 어떤 원리인가
+
+1. 페이지 초기화 시 `window.location.search`에서 `station` 값을 읽습니다.
+2. 읽은 역명이 `vulnerability_stations.stations[]`에 존재하는지 확인합니다.
+3. 존재하면 해당 역을 선택 역으로 사용합니다.
+4. 존재하지 않으면 기본값인 `station_details.station` 또는 첫 번째 mock 역을 사용합니다.
+5. 사용자가 select를 변경하면 `history.pushState()`로 URL의 `station` 값을 갱신합니다.
+6. 브라우저 뒤로가기/앞으로가기를 누르면 `popstate` 이벤트에서 URL 값을 다시 읽어 화면을 갱신합니다.
+
+## 장점
+
+- 새로고침해도 선택 역이 유지됩니다.
+- 특정 역 화면을 링크로 공유할 수 있습니다.
+- 실제 라우팅 구조로 확장하기 쉽습니다.
+- 브라우저 뒤로가기/앞으로가기 UX가 자연스러워집니다.
+
+## 단점
+
+- URL에 노출되는 역명과 mock 역명이 정확히 일치해야 합니다.
+- 한글 query string은 브라우저에서 percent encoding 형태로 보일 수 있습니다.
+- 지금은 station id가 아니라 역명을 key로 사용하므로, 동명이역이 생기면 id 기반 구조로 바꿔야 합니다.
+
+## 다른 구현 방법
+
+- `?stationId=daejeon`처럼 안정적인 id를 사용하는 방식
+- path parameter로 `/stations/daejeon` 형태를 사용하는 방식
+- `localStorage`에 마지막 선택 역을 저장하는 방식
+- 서버 라우팅에서 선택 역을 처리하는 방식
+
+# API
+
+API 변경 사항은 없습니다.
+
+사용한 mock 데이터:
+
+- `GET ../mock/station_details.json`
+- `GET ../mock/vulnerability_stations.json`
+
+# Database
+
+DB 변경 사항은 없습니다.
+
+# 테스트 방법
+
+1. JavaScript 문법 검사
+
+```bash
+node --check frontend/station-detail.js
+```
+
+예상 결과:
+
+- 오류 없이 종료됩니다.
+
+2. query string 기대값 확인
+
+```bash
+node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('mock/vulnerability_stations.json','utf8')); const params=new URLSearchParams('station=%EB%8F%99%EB%8C%80%EA%B5%AC'); const selected=params.get('station'); const station=data.stations.find((item)=>item.station===selected); const risk=station.delay_rate>=0.4?'높음':station.delay_rate>=0.25?'주의':'관심'; console.log([selected+'역', data.line, risk, station.avg_delay.toFixed(1)+'분', '+'+station.delta_delay.toFixed(1)+'분', (station.delay_rate*100).toFixed(1)+'%'].join(' | '));"
+```
+
+예상 결과:
+
+```text
+동대구역 | 경부선 | 주의 | 10.2분 | +6.5분 | 38.0%
+```
+
+3. 브라우저 확인
+
+```text
+http://127.0.0.1:8765/frontend/station-detail.html?station=%EB%8F%99%EB%8C%80%EA%B5%AC
+```
+
+검증 기준:
+
+- 초기 화면이 `동대구역` 기준으로 렌더링됩니다.
+- 위험도는 `주의`로 표시됩니다.
+- 평균 지연 시간은 `10.2분`으로 표시됩니다.
+- 역 선택 select가 표시됩니다.
+- 다른 역을 선택하면 주소창의 `station` 값이 변경됩니다.
+- 브라우저 뒤로가기를 누르면 이전 선택 역으로 돌아갑니다.
+
+# 주의사항
+
+현재 query key는 역명입니다.
+
+실무에서는 역명이 바뀌거나 중복될 수 있으므로 `stationId` 같은 불변 식별자를 사용하는 것이 더 안전합니다.
+
+# 변경 이력
+
+2026-07-09
+
+- 역 상세 선택 상태를 `station` query string과 연결
+- select 변경 시 URL 갱신
+- popstate 기반 뒤로가기/앞으로가기 처리 추가
+
+# 다음 작업
+
+- 역별 상세 mock 데이터 구조 설계
+- query string을 `stationId` 기반으로 전환
+- 대시보드 랭킹에서 역 상세 화면으로 이동할 때 station query 전달
+
+# 작업 요약
+
+## 완료한 내용
+
+- URL query string 기반 초기 역 선택
+- select 변경 시 URL 동기화
+- 브라우저 뒤로가기/앞으로가기 대응
+- 테스트 방법과 검증 기준 문서화
+
+## 수정한 파일
+
+- `frontend/station-detail.js`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+상세 화면의 상태는 사용자가 공유하거나 새로고침해도 유지되어야 합니다.
+
+URL query string은 이 요구를 가장 단순하고 명확하게 만족시키는 방법입니다.
+
+## 변경 사항
+
+- `station` query parameter 추가
+- `getInitialSelectedStationName()` 추가
+- `updateStationQueryString()` 추가
+- `popstate` 이벤트 처리 추가
+
+## 새롭게 배운 개념
+
+- URLSearchParams
+- History API
+- pushState
+- popstate
+
+## 실무에서는
+
+실무에서는 화면 상태를 URL에 남기는 기준을 정해둡니다.
+
+검색어, 필터, 정렬, 페이지 번호, 선택한 리소스처럼 사용자가 공유하거나 복원해야 하는 상태는 URL에 남기는 편이 좋습니다.
+
+## 개선 가능한 부분
+
+- 역명을 station id로 변경
+- 잘못된 query 값이 들어왔을 때 사용자 안내 메시지 추가
+- 대시보드에서 상세 화면으로 이동할 때 station query 전달
+
+## 다음 작업
+
+- 대시보드 취약 역 랭킹에서 역 상세 화면으로 station query를 전달
+
+## 복습 문제
+
+1. UI 상태를 URL query string에 저장하면 어떤 장점이 있나요?
+2. `pushState()`와 `popstate`는 각각 언제 사용하나요?
+3. 역명보다 station id를 query key로 사용하는 것이 더 안전한 이유는 무엇인가요?
+
+## 오늘 배운 내용
+
+- URL Query String
+- History API
+- Browser Navigation State
+- Shareable UI State
+
+## Change Log
+
+2026-07-09
+
+- 역 상세 URL query string 연결
+- select 변경 시 URL 동기화
+- 뒤로가기/앞으로가기 렌더링 처리
+
+## Timestamp
+
+2026-07-09 13:41:07 (KST)
+
+---
+
+# 역 상세 역 변경 Mock 연결 작업 요약
+
+# 개요
+
+역 상세 화면의 `역 변경` 버튼을 `mock/vulnerability_stations.json`의 역 목록과 연결했습니다.
+
+사용자가 역 변경 버튼을 누르면 역 선택 select가 열리고, 선택한 역 기준으로 상단 역명, 위험도, 주요 지표 카드가 다시 렌더링됩니다.
+
+# 구현 목적
+
+정적 상세 화면을 단일 역 화면에서 mock 데이터 기반의 역 선택 화면으로 확장하기 위함입니다.
+
+이번 단계에서는 새로운 페이지 이동이나 API를 만들지 않고, 기존 역 상세 화면 내부에서 선택 상태만 변경합니다.
+
+# 구현 내용
+
+- `frontend/station-detail.html`
+  - `역 변경` 버튼에 `data-station-select-toggle` 추가
+  - 역 선택 select 영역 추가
+
+- `frontend/station-detail.js`
+  - `vulnerability_stations.stations[]`를 select option으로 변환
+  - 선택한 역의 `avg_delay`, `delta_delay`, `delay_rate`, `stop_rate`를 주요 지표 카드에 반영
+  - 선택한 역의 `delay_rate` 기준으로 위험도 계산
+  - 대전역 외 다른 역은 상세 통계와 과거 사례 mock이 없으므로 빈 상태로 표시
+
+- `frontend/style.css`
+  - 역 선택 select 스타일 추가
+  - 모바일에서 select가 카드 폭에 맞게 내려가도록 반응형 스타일 추가
+  - select focus-visible 스타일 추가
+
+# 코드 설명
+
+## 왜 필요한가
+
+역 상세 화면은 특정 역 하나만 보는 화면이 아니라, 사용자가 관심 역을 바꿔가며 비교할 수 있어야 합니다.
+
+mock 단계에서는 모든 역의 상세 사례 데이터가 없기 때문에, 역별 공통 지표는 갱신하고 상세 사례는 데이터 없음 상태로 분리했습니다.
+
+## 어떤 원리인가
+
+1. 페이지 로드 시 `station_details.json`과 `vulnerability_stations.json`을 병렬로 불러옵니다.
+2. `vulnerability_stations.stations[]`를 select option으로 렌더링합니다.
+3. 사용자가 역을 선택하면 선택한 역 이름으로 mock 배열에서 지표를 찾습니다.
+4. 찾은 지표를 상단 정보 카드와 주요 지표 카드에 다시 렌더링합니다.
+5. `station_details.json`에 존재하지 않는 역의 상세 통계와 사례는 빈 상태 메시지로 표시합니다.
+
+## 장점
+
+- 기존 화면 구조를 유지합니다.
+- API 없이 mock 데이터만으로 역 선택 흐름을 검증할 수 있습니다.
+- mock에 없는 데이터를 억지로 만들어 표시하지 않아 데이터 신뢰도를 유지합니다.
+
+## 단점
+
+- 현재는 대전역만 상세 통계와 과거 사례가 있습니다.
+- 다른 역을 선택하면 상단 지표만 갱신되고 하단 상세 영역은 비어 있습니다.
+- 주소 데이터가 mock에 없기 때문에 대전역 외에는 `주소 정보 없음(mock 미제공)`으로 표시합니다.
+
+## 다른 구현 방법
+
+- 역 변경 시 URL query string을 변경하는 방식
+- 역별 상세 mock 파일을 별도로 만드는 방식
+- 모든 역의 상세 데이터를 하나의 API 응답으로 받는 방식
+- 선택 UI를 select가 아니라 modal 또는 command palette로 구현하는 방식
+
+# API
+
+이번 작업에서는 API를 추가하지 않았습니다.
+
+사용한 mock 데이터:
+
+- `GET ../mock/station_details.json`
+- `GET ../mock/vulnerability_stations.json`
+
+# Database
+
+DB 변경 사항은 없습니다.
+
+# 테스트 방법
+
+1. JS 문법 검사
+
+```bash
+node --check frontend/station-detail.js
+```
+
+예상 결과:
+
+- 오류 없이 종료됩니다.
+
+2. 선택 역 기대값 확인
+
+```bash
+node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('mock/vulnerability_stations.json','utf8')); const selected='동대구'; const station=data.stations.find((item)=>item.station===selected); const risk=station.delay_rate>=0.4?'높음':station.delay_rate>=0.25?'주의':'관심'; console.log([selected+'역', data.line, risk, station.avg_delay.toFixed(1)+'분', '+'+station.delta_delay.toFixed(1)+'분', (station.delay_rate*100).toFixed(1)+'%'].join(' | '));"
+```
+
+예상 결과:
+
+```text
+동대구역 | 경부선 | 주의 | 10.2분 | +6.5분 | 38.0%
+```
+
+3. 브라우저 확인
+
+```text
+http://127.0.0.1:8765/frontend/station-detail.html
+```
+
+검증 기준:
+
+- `역 변경` 버튼을 누르면 역 선택 select가 나타납니다.
+- `동대구역`을 선택하면 평균 지연 시간은 `10.2분`으로 변경됩니다.
+- `동대구역`을 선택하면 위험도는 `주의`로 변경됩니다.
+- `대전역` 외 역을 선택하면 특보별 영향 통계와 과거 주요 사례는 데이터 없음 상태로 표시됩니다.
+
+# 주의사항
+
+현재 mock 상세 데이터는 `대전` 역 기준입니다.
+
+다른 역까지 상세 통계와 사례를 표시하려면 `station_details.json` 구조를 역별 배열 또는 station key 기반 객체로 확장해야 합니다.
+
+# 변경 이력
+
+2026-07-09
+
+- 역 상세 화면 역 변경 select 연결
+- 선택한 역 기준 주요 지표 카드 재렌더링
+- mock 미제공 상세 데이터 빈 상태 처리
+
+# 다음 작업
+
+- 역별 상세 mock 데이터 구조 설계
+- 역 선택 상태를 URL query string으로 유지
+- 사례 상세보기 버튼 동작 설계
+
+# 작업 요약
+
+## 완료한 내용
+
+- 역 변경 버튼과 mock 역 목록 연결
+- 선택한 역의 위험도와 주요 지표 카드 갱신
+- mock에 없는 상세 데이터의 빈 상태 처리
+- 테스트 방법과 검증 기준 문서화
+
+## 수정한 파일
+
+- `frontend/station-detail.html`
+- `frontend/station-detail.js`
+- `frontend/style.css`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+대시보드에서 특정 역을 상세히 확인하는 흐름은 이후 실제 API 전환 시 핵심 사용자 흐름이 됩니다.
+
+따라서 mock 단계에서 먼저 선택 상태, 데이터 매핑, 빈 상태를 검증했습니다.
+
+## 변경 사항
+
+- 버튼 클릭 시 select 표시
+- select 변경 시 화면 재렌더링
+- 역별 상세 mock이 없는 경우 하단 영역 데이터 없음 처리
+
+## 새롭게 배운 개념
+
+- 선택 상태 기반 렌더링
+- mock 데이터 범위와 UI 표시 범위 분리
+- 빈 상태 UX
+
+## 실무에서는
+
+실무에서는 선택한 역을 URL query string 또는 route parameter로 관리합니다.
+
+예를 들어 `/station-detail.html?station=동대구`처럼 상태를 URL에 남기면 새로고침, 공유, 뒤로가기 흐름을 더 안정적으로 만들 수 있습니다.
+
+## 개선 가능한 부분
+
+- 역별 주소 mock 추가
+- 역별 상세 통계 mock 추가
+- 선택 상태 URL 반영
+- 선택 UI 접근성 문구 보강
+
+## 다음 작업
+
+- 역 선택 상태를 URL query string과 연결
+
+## 복습 문제
+
+1. 선택한 역의 상세 mock 데이터가 없을 때 빈 상태를 보여주는 이유는 무엇인가요?
+2. select option을 mock 배열에서 동적으로 만드는 방식의 장점은 무엇인가요?
+3. URL query string으로 선택 상태를 관리하면 어떤 장점이 있나요?
+
+## 오늘 배운 내용
+
+- Select 기반 상태 변경
+- View 재렌더링
+- Empty State
+- Mock 데이터 한계 처리
+
+## Change Log
+
+2026-07-09
+
+- 역 상세 화면 역 변경 mock 연결
+- 선택 역 기준 주요 지표 재렌더링
+- 문서 업데이트
+
+## Timestamp
+
+2026-07-09 13:38:17 (KST)
+
+---
+
+# 역 상세 특보별 영향 통계 Mock 연결 작업 요약
+
+## 완료한 내용
+
+- 특보별 영향 통계 테이블을 `mock/station_details.json`의 `by_alert[]` 데이터와 연결했습니다.
+- `by_alert[].alert_type`, `by_alert[].alert_level`, `by_alert[].sample_n`, `by_alert[].avg_delay` 값을 테이블에 렌더링했습니다.
+- mock에 없는 지연률과 운행 중단률은 `-`로 표시했습니다.
+- 데이터가 비어 있을 때 안내 행을 표시하도록 처리했습니다.
+
+## 수정한 파일
+
+- `frontend/station-detail.html`
+- `frontend/station-detail.js`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+특보별 영향 통계는 특정 역이 어떤 기상특보에서 얼마나 영향을 받는지 보여주는 핵심 분석 영역입니다.
+
+정적 테이블을 유지하면 mock 데이터와 화면 내용이 달라질 수 있으므로, mock 데이터 기준으로 행을 동적으로 렌더링했습니다.
+
+## 변경 사항
+
+- `station-detail.html`의 특보별 영향 통계 `<tbody>`에 `data-station-detail-alert-table-body` 속성을 추가했습니다.
+- `station-detail.js`에 특보별 통계 행 생성 함수를 추가했습니다.
+- 특보 종류에 따라 아이콘을 선택하는 `getAlertIconPath()` 함수를 추가했습니다.
+- `by_alert[]`가 비어 있으면 `특보별 영향 통계 데이터가 없습니다.` 문구를 표시합니다.
+
+## 테스트 방법
+
+1. JavaScript 문법 검사
+
+```bash
+node --check frontend/station-detail.js
+```
+
+예상 결과: 오류 메시지가 없어야 합니다.
+
+2. Mock 데이터 확인
+
+```bash
+node -e "const fs=require('fs'); const d=JSON.parse(fs.readFileSync('mock/station_details.json','utf8')); console.log(JSON.stringify(d.by_alert.map(a=>a.alert_type+' '+a.alert_level+':'+a.sample_n+':'+a.avg_delay)))"
+```
+
+예상 결과:
+
+- `호우 경보:34:15.2`
+- `폭염 경보:61:12.7`
+- `호우 주의보:52:8.4`
+- `폭염 주의보:70:6.1`
+
+3. 로컬 서버 경로 검사
+
+```bash
+python -m http.server 8765 --bind 127.0.0.1
+```
+
+브라우저에서 아래 주소로 접속합니다.
+
+```text
+http://127.0.0.1:8765/frontend/station-detail.html
+```
+
+검증 기준:
+
+- 특보별 영향 통계 테이블에 4개 행이 표시됩니다.
+- 발생 횟수 열에는 `sample_n` 값이 `회` 단위로 표시됩니다.
+- 평균 지연 열에는 `avg_delay` 값이 표시됩니다.
+- 지연률과 운행 중단률은 mock에 없으므로 `-`로 표시됩니다.
+
+## 새롭게 배운 개념
+
+- 테이블 행 동적 렌더링
+- mock에 없는 데이터의 명시적 빈 값 처리
+- 특보 종류별 아이콘 매핑
+
+## 실무에서는
+
+실무에서는 테이블에 필요한 모든 값이 API 계약에 명시되어야 합니다.
+
+이번처럼 `지연률`, `운행 중단률`이 mock에 없을 때 프론트엔드에서 임의 계산하거나 추정하면 의미가 왜곡될 수 있으므로, 실서비스에서는 백엔드 또는 분석 레이어에서 정확한 값을 내려주는 것이 좋습니다.
+
+## 개선 가능한 부분
+
+- `by_alert[]`에 `delay_rate`, `stop_rate` 필드 추가
+- 특보별 발생 횟수와 표본 수를 구분하는 필드 추가
+- 테이블 정렬 기준 명시
+
+## 다음 작업
+
+- 과거 주요 사례를 `station_details.cases[]`와 연결
+
+## 복습 문제
+
+1. mock에 없는 값을 `-`로 표시하는 방식이 사용자에게 주는 장점은 무엇인가요?
+2. 표본 수 `sample_n`과 실제 발생 횟수는 어떻게 다를 수 있나요?
+3. 테이블 행을 동적으로 렌더링할 때 빈 데이터 상태를 처리해야 하는 이유는 무엇인가요?
+
+## 오늘 배운 내용
+
+- Dynamic Table Rendering
+- Empty State
+- Mock Field Gap
+
+## Change Log
+
+2026-07-09
+
+- 역 상세 특보별 영향 통계 테이블 mock 데이터 연결
+
+## Timestamp
+
+2026-07-09 13:18:49 (KST)
+
+---
+
+# 역 상세 과거 주요 사례 Mock 연결 작업 요약
+
+## 완료한 내용
+
+- 과거 주요 사례 목록을 `mock/station_details.json`의 `cases[]` 데이터와 연결했습니다.
+- `cases[].date`, `cases[].alert_type`, `cases[].delay_min` 값을 리스트에 렌더링했습니다.
+- `alert_type`이 `null`인 사례는 `평상시`로 표시했습니다.
+- 데이터가 비어 있을 때 안내 항목을 표시하도록 처리했습니다.
+
+## 수정한 파일
+
+- `frontend/station-detail.html`
+- `frontend/station-detail.js`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+과거 주요 사례는 특정 역에서 실제로 지연이 발생했던 이력을 보여주는 영역입니다.
+
+정적 사례 문구에는 mock에 없는 강수량, 운행 중단률 등이 포함되어 있었기 때문에, mock에 실제로 존재하는 날짜, 특보 종류, 지연 시간 중심으로 의미를 명확히 바꿨습니다.
+
+## 변경 사항
+
+- `station-detail.html`의 과거 주요 사례 `<ul>`에 `data-station-detail-history-list` 속성을 추가했습니다.
+- `station-detail.js`에 과거 사례 항목 생성 함수를 추가했습니다.
+- 날짜를 `YYYY.MM.DD` 형식으로 표시하도록 변환했습니다.
+- 지연 시간은 `기록된 지연 N분` 형식으로 표시합니다.
+- 상세보기 버튼에 사례별 접근성 라벨을 추가했습니다.
+
+## 테스트 방법
+
+1. JavaScript 문법 검사
+
+```bash
+node --check frontend/station-detail.js
+```
+
+예상 결과: 오류 메시지가 없어야 합니다.
+
+2. Mock 데이터 확인
+
+```bash
+node -e "const fs=require('fs'); const d=JSON.parse(fs.readFileSync('mock/station_details.json','utf8')); console.log(JSON.stringify(d.cases.map(c=>(c.date+':'+(c.alert_type||'평상시')+':'+c.delay_min))))"
+```
+
+예상 결과:
+
+- `2026-06-28:호우:22`
+- `2026-06-22:폭염:15`
+- `2026-06-15:호우:11`
+- `2026-06-09:평상시:7`
+
+3. 로컬 서버 경로 검사
+
+```bash
+python -m http.server 8765 --bind 127.0.0.1
+```
+
+브라우저에서 아래 주소로 접속합니다.
+
+```text
+http://127.0.0.1:8765/frontend/station-detail.html
+```
+
+검증 기준:
+
+- 과거 주요 사례 목록에 4개 항목이 표시됩니다.
+- 첫 번째 항목은 `2026.06.28 호우`와 `기록된 지연 22분`을 표시합니다.
+- 네 번째 항목은 특보가 없으므로 `평상시`로 표시합니다.
+
+## 새롭게 배운 개념
+
+- 동적 리스트 렌더링
+- null 데이터 표시 정책
+- 날짜 포맷 변환
+
+## 실무에서는
+
+실무에서는 과거 사례 데이터에 기상 수치, 운행 중단률, 상세 링크 ID가 함께 내려오는 것이 좋습니다.
+
+현재 mock은 최소 필드만 가지고 있으므로, 프론트엔드는 존재하지 않는 정보를 꾸며내지 않고 명확히 표시 가능한 값만 렌더링했습니다.
+
+## 개선 가능한 부분
+
+- `cases[]`에 상세 ID 추가
+- `cases[]`에 강수량, 풍속, 중단률 같은 원인 지표 추가
+- 상세보기 버튼 클릭 시 상세 모달 연결
+
+## 다음 작업
+
+- 역 상세 화면 전체 mock 연결 검수
+- 상세보기 버튼 동작 설계
+
+## 복습 문제
+
+1. `null` 값을 화면에 표시할 때 `평상시`처럼 의미 있는 라벨로 바꾸는 이유는 무엇인가요?
+2. mock에 없는 강수량 정보를 화면에서 제거한 이유는 무엇인가요?
+3. 리스트 렌더링에서 빈 배열 처리가 필요한 이유는 무엇인가요?
+
+## 오늘 배운 내용
+
+- Dynamic List Rendering
+- Null Handling
+- Date Formatting
+
+## Change Log
+
+2026-07-09
+
+- 역 상세 과거 주요 사례 mock 데이터 연결
+
+## Timestamp
+
+2026-07-09 13:21:29 (KST)
+
+---
+
+# 역 상세 전체 Mock 연결 검수 작업 요약
+
+## 완료한 내용
+
+- 역 상세 화면의 mock 데이터 연결 상태를 전체 검수했습니다.
+- `station-detail.js`와 `sidebar.js` 문법 검사를 수행했습니다.
+- `station_details.json`, `vulnerability_stations.json` 파싱을 확인했습니다.
+- 로컬 서버 기준으로 HTML, JS, CSS, mock JSON 접근 상태를 확인했습니다.
+- 현재 mock 기준 화면 표시 예상값을 정리했습니다.
+
+## 수정한 파일
+
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+역 상세 화면은 여러 mock 데이터를 조합해 렌더링합니다.
+
+기능을 추가한 뒤에는 코드가 동작하는지만 보는 것이 아니라, 어떤 값이 화면에 표시되어야 하는지 기준을 문서로 남겨야 이후 API 전환이나 리팩토링 때 회귀를 빠르게 확인할 수 있습니다.
+
+## 변경 사항
+
+- 역 상세 전체 mock 연결 검수 기록을 추가했습니다.
+- 로컬 서버 경로 검증 결과를 문서화했습니다.
+- 화면 표시 예상값을 문서화했습니다.
+
+## 테스트 방법
+
+1. JavaScript 문법 검사
+
+```bash
+node --check frontend/station-detail.js
+node --check frontend/sidebar.js
+```
+
+예상 결과: 오류 메시지가 없어야 합니다.
+
+2. Mock 데이터 파싱 검사
+
+```bash
+node -e "const fs=require('fs'); JSON.parse(fs.readFileSync('mock/station_details.json','utf8')); JSON.parse(fs.readFileSync('mock/vulnerability_stations.json','utf8')); console.log('station detail mock json OK')"
+```
+
+예상 결과:
+
+- `station detail mock json OK`
+
+3. 로컬 서버 경로 검사
+
+```bash
+python -m http.server 8765 --bind 127.0.0.1
+```
+
+검증 대상:
+
+- `/frontend/station-detail.html`
+- `/frontend/station-detail.js`
+- `/frontend/sidebar.js`
+- `/frontend/style.css`
+- `/mock/station_details.json`
+- `/mock/vulnerability_stations.json`
+
+모두 `200`으로 응답해야 합니다.
+
+## 검증 기준
+
+역 상세 상단:
+
+- 역명: `대전역`
+- 노선: `경부선`
+- 현재 위험도: `높음`
+- 기준 문구: `폭염 경보 기준`
+
+주요 지표:
+
+- 평균 지연 시간: `12.7분`
+- 평균 지연 증가량: `+8.9분`
+- 지연률: `44.0%`
+- 운행 중단률: `1.0%`
+
+특보별 영향 통계:
+
+- `호우 경보` / `34회` / `15.2분`
+- `폭염 경보` / `61회` / `12.7분`
+- `호우 주의보` / `52회` / `8.4분`
+- `폭염 주의보` / `70회` / `6.1분`
+
+과거 주요 사례:
+
+- `2026-06-28` / `호우` / `22분`
+- `2026-06-22` / `폭염` / `15분`
+- `2026-06-15` / `호우` / `11분`
+- `2026-06-09` / `평상시` / `7분`
+
+## 새롭게 배운 개념
+
+- 연결 검수 기준 문서화
+- 회귀 검증 기준값
+- mock 기반 화면 검수
+
+## 실무에서는
+
+실무에서는 화면에 표시되어야 하는 기대값을 테스트 코드나 스냅샷으로 관리합니다.
+
+현재 프로젝트는 Vanilla HTML/CSS/JS 구조이므로 우선 문서에 기대값을 명확히 남기고, 이후 Playwright 같은 브라우저 자동화 도구를 도입하면 이 기준을 테스트로 옮길 수 있습니다.
+
+## 개선 가능한 부분
+
+- 브라우저 자동화 테스트 도입
+- 역 상세 화면 기대값 테스트 스크립트 추가
+- mock 데이터 스키마 검증 추가
+
+## 다음 작업
+
+- 상세보기 버튼 동작 설계
+- 역 변경 버튼 동작 설계
+- 실제 API 전환 계획 수립
+
+## 복습 문제
+
+1. 화면 검수에서 “기대값”을 문서로 남기는 이유는 무엇인가요?
+2. mock 데이터 기반 검수와 실제 API 기반 검수의 차이는 무엇인가요?
+3. 브라우저 자동화 테스트를 도입하면 어떤 반복 작업을 줄일 수 있나요?
+
+## 오늘 배운 내용
+
+- Rendering Verification
+- Regression Criteria
+- Mock Validation
+
+## Change Log
+
+2026-07-09
+
+- 역 상세 화면 전체 mock 연결 검수
+- 표시 예상값 문서화
+
+## Timestamp
+
+2026-07-09 13:26:33 (KST)
+
+---
+
+# 역 상세 주요 지표 Mock 연결 작업 요약
+
+## 완료한 내용
+
+- `frontend/station-detail.js`를 생성했습니다.
+- `mock/station_details.json`과 `mock/vulnerability_stations.json`을 불러오도록 연결했습니다.
+- 역명, 노선 배지, 현재 위험도, 주요 지표 카드 4개를 mock 데이터 기준으로 렌더링했습니다.
+- 데이터가 없거나 fetch에 실패할 때 기본 빈 상태를 표시하도록 처리했습니다.
+
+## 수정한 파일
+
+- `frontend/station-detail.html`
+- `frontend/station-detail.js`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+역 상세 화면의 상단 정보와 주요 지표는 사용자가 가장 먼저 확인하는 핵심 정보입니다.
+
+정적 숫자를 유지하면 mock/API 데이터와 화면이 달라질 수 있으므로, 실제 데이터 연결에 앞서 mock 기반 렌더링 구조를 만들었습니다.
+
+## 변경 사항
+
+- `station-detail.html`에 `data-station-detail-*` 렌더링 대상 속성을 추가했습니다.
+- `station-detail.html`에 `station-detail.js`를 연결했습니다.
+- `station-detail.js`에서 역 상세 mock과 취약 역 mock을 병렬로 불러옵니다.
+- `delay_rate` 기준으로 현재 위험도를 계산합니다.
+- 주요 지표 카드의 값과 보조 문구를 mock 기준으로 갱신합니다.
+
+## 테스트 방법
+
+1. JavaScript 문법 검사
+
+```bash
+node --check frontend/station-detail.js
+node --check frontend/sidebar.js
+```
+
+예상 결과: 오류 메시지가 없어야 합니다.
+
+2. Mock JSON 파싱 검사
+
+```bash
+node -e "const fs=require('fs'); JSON.parse(fs.readFileSync('mock/station_details.json','utf8')); JSON.parse(fs.readFileSync('mock/vulnerability_stations.json','utf8')); console.log('station detail mock json OK')"
+```
+
+예상 결과:
+
+- `station detail mock json OK`
+
+3. 로컬 서버 경로 검사
+
+```bash
+python -m http.server 8765 --bind 127.0.0.1
+```
+
+브라우저에서 아래 주소로 접속합니다.
+
+```text
+http://127.0.0.1:8765/frontend/station-detail.html
+```
+
+검증 기준:
+
+- 역명은 `대전역`으로 표시됩니다.
+- 노선은 `경부선`으로 표시됩니다.
+- 현재 위험도는 `높음`으로 표시됩니다.
+- 기준 문구는 `폭염 경보 기준`으로 표시됩니다.
+- 평균 지연 시간은 `12.7분`으로 표시됩니다.
+- 평균 지연 증가량은 `+8.9분`으로 표시됩니다.
+- 지연률은 `44.0%`로 표시됩니다.
+- 운행 중단률은 `1.0%`로 표시됩니다.
+
+## 새롭게 배운 개념
+
+- 상세 화면 View Model
+- 비율 데이터를 퍼센트로 변환하는 방식
+- mock에 없는 필드를 정적 UI로 유지하는 방식
+
+## 실무에서는
+
+실무에서는 역 상세 화면의 상단 요약 데이터를 `/stations/{stationId}/summary` 같은 단일 API로 내려주는 편이 좋습니다.
+
+프론트엔드는 API 응답을 그대로 DOM에 넣기보다 화면 표시용 View Model로 변환하고, mock에 없는 주소나 기준 시간 같은 값은 API 계약에 포함할지 별도 정책으로 남길지 결정합니다.
+
+## 개선 가능한 부분
+
+- 역 주소를 mock 또는 API에 추가
+- 기준 시간을 mock 또는 API에 추가
+- 특보별 영향 통계 테이블 연결
+- 과거 주요 사례 연결
+- 역 변경 버튼 동작 설계
+
+## 다음 작업
+
+- 특보별 영향 통계 테이블을 `station_details.by_alert[]`와 연결
+- 과거 주요 사례를 `station_details.cases[]`와 연결
+
+## 복습 문제
+
+1. `delay_rate`처럼 0~1 사이 비율 데이터를 화면에서 퍼센트로 표시할 때 주의할 점은 무엇인가요?
+2. mock에 없는 주소 필드를 기존 정적 문구로 유지하는 방식의 장단점은 무엇인가요?
+3. 상세 화면 데이터를 View Model로 변환하면 어떤 유지보수 이점이 있나요?
+
+## 오늘 배운 내용
+
+- Station Detail Mock 연결
+- View Model
+- 빈 상태 처리
+- 비율 데이터 포맷팅
+
+## Change Log
+
+2026-07-09
+
+- 역 상세 상단 정보와 주요 지표 카드 mock 데이터 연결
+- `frontend/station-detail.js` 추가
+
+## Timestamp
+
+2026-07-09 13:12:30 (KST)

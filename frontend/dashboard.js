@@ -16,6 +16,18 @@ const RISK_LEVELS = {
   none: { label: "-", color: "#D1D5DB" },
 };
 
+const STATION_DETAIL_URL = "./station-detail.html";
+const STATION_QUERY_PARAM = "station";
+const STATION_ID_QUERY_PARAM = "station_id";
+
+const STATION_NAME_BY_ID = {
+  daejeon: "대전",
+  dongdaegu: "동대구",
+  gimcheon_gumi: "김천(구미)",
+  suwon: "수원",
+  miryang: "밀양",
+};
+
 const alertElements = {
   updatedTime: document.querySelector("[data-dashboard-updated-time]"),
   banner: document.querySelector("[data-dashboard-alert-banner]"),
@@ -57,6 +69,7 @@ const rankingElements = {
 
 const inspectionElements = {
   body: document.querySelector("[data-dashboard-inspection-body]"),
+  detail: document.querySelector("[data-dashboard-inspection-detail]"),
 };
 
 function formatDateTime(isoDateString) {
@@ -556,6 +569,69 @@ function createRankingCell(text, className = "") {
   return cell;
 }
 
+function getStationIdByName(stationName) {
+  return Object.entries(STATION_NAME_BY_ID).find(([, name]) => name === stationName)?.[0] || null;
+}
+
+function createStationDetailUrl(stationName, stationId = getStationIdByName(stationName)) {
+  const params = new URLSearchParams({
+    [stationId ? STATION_ID_QUERY_PARAM : STATION_QUERY_PARAM]: stationId || stationName,
+  });
+
+  return `${STATION_DETAIL_URL}?${params.toString()}`;
+}
+
+function createStationLinkCell(stationName, stationId) {
+  const cell = document.createElement("td");
+  const link = document.createElement("a");
+
+  cell.className = "ranking-table__target";
+  link.className = "ranking-table__link";
+  link.href = createStationDetailUrl(stationName, stationId);
+  link.textContent = stationName;
+  link.setAttribute("aria-label", `${stationName}역 상세 화면으로 이동`);
+  cell.append(link);
+
+  return cell;
+}
+
+function getStationNamesFromData(vulnerabilityStationsData) {
+  return Array.isArray(vulnerabilityStationsData.stations)
+    ? vulnerabilityStationsData.stations.map((station) => station.station)
+    : [];
+}
+
+function getStationNameFromInspectionTarget(target, stationNames) {
+  if (!target || !target.endsWith("역")) {
+    return null;
+  }
+
+  const stationName = target.slice(0, -1);
+
+  return stationNames.includes(stationName) ? stationName : null;
+}
+
+function getStationNameFromInspectionItem(item, stationNames) {
+  if (item.target_type === "station" && item.station_id) {
+    const stationName = STATION_NAME_BY_ID[item.station_id];
+
+    return stationNames.includes(stationName) ? stationName : null;
+  }
+
+  return getStationNameFromInspectionTarget(item.target, stationNames);
+}
+
+function createStationDetailLink(stationName, label, stationId = getStationIdByName(stationName)) {
+  const link = document.createElement("a");
+
+  link.className = "inspection-link";
+  link.href = createStationDetailUrl(stationName, stationId);
+  link.textContent = label;
+  link.setAttribute("aria-label", `${label} 상세 화면으로 이동`);
+
+  return link;
+}
+
 function createEmptyRankingRow(message, columnCount) {
   const row = document.createElement("tr");
   const cell = document.createElement("td");
@@ -615,7 +691,7 @@ function createStationRankingRow(station, index, lineName) {
   riskCell.append(createRiskBadge(riskLevel));
   row.append(
     createRankingCell(String(index + 1)),
-    createRankingCell(station.station, "ranking-table__target"),
+    createStationLinkCell(station.station, station.station_id),
     createRankingCell(lineName),
     riskCell,
     createRankingCell(String(station.sample_n ?? "-"), "ranking-table__number"),
@@ -679,7 +755,77 @@ function getInspectionRecommendation(riskLevel) {
   return "상황 모니터링";
 }
 
-function createInspectionRow(item) {
+function renderInspectionDetail(item, stationNames = []) {
+  if (!inspectionElements.detail) {
+    return;
+  }
+
+  const riskLevel = getRiskLevelByDelayIncrease(item.avg_delay_incr);
+  const stationName = getStationNameFromInspectionItem(item, stationNames);
+  const title = document.createElement("h3");
+  const list = document.createElement("dl");
+  const fields = [
+    ["대상", item.target || "-"],
+    ["위험도", RISK_LEVELS[riskLevel].label],
+    ["기상특보", getAlertLabelFromReason(item.reason)],
+    ["주요 위험", item.reason || "-"],
+    ["평균 지연 증가", Number.isFinite(item.avg_delay_incr) ? `+${item.avg_delay_incr.toFixed(1)}분` : "-"],
+    ["분석 표본", Number.isFinite(item.sample_n) ? `${item.sample_n}건` : "-"],
+    ["대응 권고", getInspectionRecommendation(riskLevel)],
+  ];
+
+  title.className = "inspection-detail-panel__title";
+  title.textContent = `${item.target || "점검 대상"} 상세`;
+  list.className = "inspection-detail-panel__list";
+
+  fields.forEach(([label, value]) => {
+    const term = document.createElement("dt");
+    const description = document.createElement("dd");
+
+    term.textContent = label;
+
+    if (label === "대상" && stationName) {
+      description.append(createStationDetailLink(stationName, value));
+    } else {
+      description.textContent = value;
+    }
+
+    list.append(term, description);
+  });
+
+  inspectionElements.detail.replaceChildren(title, list);
+}
+
+function setSelectedInspectionRow(selectedRow) {
+  if (!inspectionElements.body) {
+    return;
+  }
+
+  inspectionElements.body.querySelectorAll("tr").forEach((row) => {
+    const isSelected = row === selectedRow;
+
+    row.classList.toggle("inspection-table__row--selected", isSelected);
+    row.setAttribute("aria-selected", String(isSelected));
+  });
+}
+
+function createInspectionTargetCell(item, stationNames) {
+  const cell = document.createElement("td");
+  const stationName = getStationNameFromInspectionItem(item, stationNames);
+
+  cell.className = "inspection-table__target";
+
+  if (stationName) {
+    cell.append(createStationDetailLink(stationName, item.target));
+    return cell;
+  }
+
+  cell.textContent = item.target;
+
+  return cell;
+}
+
+function createInspectionRow(item, stationNames) {
   const row = document.createElement("tr");
   const riskLevel = getRiskLevelByDelayIncrease(item.avg_delay_incr);
   const riskCell = document.createElement("td");
@@ -691,11 +837,15 @@ function createInspectionRow(item) {
   detailButton.type = "button";
   detailButton.textContent = "상세보기";
   detailButton.setAttribute("aria-label", `${item.target} 상세보기`);
+  detailButton.addEventListener("click", () => {
+    renderInspectionDetail(item, stationNames);
+    setSelectedInspectionRow(row);
+  });
   detailCell.append(detailButton);
 
   row.append(
     riskCell,
-    createRankingCell(item.target, "inspection-table__target"),
+    createInspectionTargetCell(item, stationNames),
     createRankingCell(getAlertLabelFromReason(item.reason)),
     createRankingCell(item.reason || "-"),
     createRankingCell(getInspectionRecommendation(riskLevel)),
@@ -711,21 +861,38 @@ function renderEmptyInspectionTable() {
   }
 
   inspectionElements.body.replaceChildren(createTableMessageRow("우선 점검 대상 데이터가 없습니다.", 6));
+
+  if (inspectionElements.detail) {
+    const title = document.createElement("h3");
+    const description = document.createElement("p");
+
+    title.className = "inspection-detail-panel__title";
+    title.textContent = "점검 상세";
+    description.className = "inspection-detail-panel__description";
+    description.textContent = "표시할 우선 점검 대상 데이터가 없습니다.";
+    inspectionElements.detail.replaceChildren(title, description);
+  }
 }
 
-function renderInspectionTable(checklistData) {
+function renderInspectionTable(checklistData, vulnerabilityStationsData) {
   if (!inspectionElements.body) {
     return;
   }
 
+  const stationNames = getStationNamesFromData(vulnerabilityStationsData);
   const items = getChecklistItems(checklistData)
     .slice()
     .sort((a, b) => a.rank - b.rank);
-  const rows = items.map(createInspectionRow);
+  const rows = items.map((item) => createInspectionRow(item, stationNames));
 
   inspectionElements.body.replaceChildren(
     ...(rows.length > 0 ? rows : [createTableMessageRow("우선 점검 대상 데이터가 없습니다.", 6)]),
   );
+
+  if (items.length > 0) {
+    renderInspectionDetail(items[0], stationNames);
+    setSelectedInspectionRow(rows[0]);
+  }
 }
 
 async function fetchJson(url) {
@@ -761,7 +928,7 @@ async function initializeDashboard() {
     renderSummaryCards(alertsData, checklistData, vulnerabilitySegmentsData);
     renderHeatmap(heatmapData, alertsData.updated_at);
     renderRankings(vulnerabilitySegmentsData, vulnerabilityStationsData);
-    renderInspectionTable(checklistData);
+    renderInspectionTable(checklistData, vulnerabilityStationsData);
   } catch (error) {
     console.error(error);
     updateRecentUpdatedTime(null);

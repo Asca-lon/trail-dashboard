@@ -95,19 +95,23 @@
         </div>
         <div class="station-info-card__identity">
           <div class="station-info-card__name-row">
-            <h2 class="station-info-card__name" id="station-name">대전역</h2>
-            <span class="station-line-badge">경부선</span>
+            <h2 class="station-info-card__name" id="station-name" data-station-detail-name>대전역</h2>
+            <span class="station-line-badge" data-station-detail-line>경부선</span>
           </div>
-          <p class="station-info-card__address">대전광역시 동구 중앙로 215</p>
+          <p class="station-info-card__address" data-station-detail-address>대전광역시 동구 중앙로 215</p>
         </div>
-        <button class="station-info-card__change" type="button" aria-label="조회할 역 변경">역 변경</button>
+        <button class="station-info-card__change" type="button" aria-label="조회할 역 변경" data-station-select-toggle>역 변경</button>
+        <label class="station-info-card__selector" data-station-selector hidden>
+          <span class="sr-only">조회할 역 선택</span>
+          <select class="station-info-card__select" aria-label="조회할 역 선택" data-station-select></select>
+        </label>
       </div>
 
-      <aside class="station-risk-status" aria-labelledby="station-risk-title">
+      <aside class="station-risk-status" aria-labelledby="station-risk-title" data-station-detail-risk-card>
         <img class="station-risk-status__icon" src="./assets/icons/triangle-alert.svg" alt="" aria-hidden="true">
         <div>
-          <h3 class="station-risk-status__title" id="station-risk-title">현재 위험도: 높음</h3>
-          <p class="station-risk-status__text">호우 경보 · 07.07 14:00 기준</p>
+          <h3 class="station-risk-status__title" id="station-risk-title" data-station-detail-risk-title>현재 위험도: 높음</h3>
+          <p class="station-risk-status__text" data-station-detail-risk-text>호우 경보 · 07.07 14:00 기준</p>
         </div>
       </aside>
     </section>
@@ -115,47 +119,47 @@
     <section class="station-metric-grid" aria-labelledby="station-metric-title">
       <h2 class="sr-only" id="station-metric-title">역 상세 주요 지표</h2>
 
-      <article class="station-metric-card" aria-label="평균 지연 시간 18.4분, 전일 대비 7.2분 증가">
+      <article class="station-metric-card" aria-label="평균 지연 시간 18.4분, 전일 대비 7.2분 증가" data-station-detail-metric="avg-delay">
         <div class="station-metric-card__icon station-metric-card__icon--delay" aria-hidden="true">
           <img src="./assets/icons/clock-4.svg" alt="">
         </div>
         <div class="station-metric-card__body">
           <h3 class="station-metric-card__title">평균 지연 시간</h3>
-          <p class="station-metric-card__value"><strong>18.4</strong><span>분</span></p>
-          <p class="station-metric-card__comparison">전일 대비 <strong>+7.2 분 ↑</strong></p>
+          <p class="station-metric-card__value"><strong data-station-detail-metric-value>18.4</strong><span data-station-detail-metric-unit>분</span></p>
+          <p class="station-metric-card__comparison" data-station-detail-metric-comparison>전일 대비 <strong>+7.2 분 ↑</strong></p>
         </div>
       </article>
 
-      <article class="station-metric-card" aria-label="평균 지연 증가량 10.2분, 전일 대비 2.8분 증가">
+      <article class="station-metric-card" aria-label="평균 지연 증가량 10.2분, 전일 대비 2.8분 증가" data-station-detail-metric="delta-delay">
         <div class="station-metric-card__icon station-metric-card__icon--increase" aria-hidden="true">
           <img src="./assets/icons/trending-up.svg" alt="">
         </div>
         <div class="station-metric-card__body">
           <h3 class="station-metric-card__title">평균 지연 증가량</h3>
-          <p class="station-metric-card__value"><strong>+10.2</strong><span>분</span></p>
-          <p class="station-metric-card__comparison">전일 대비 <strong>+2.8 분 ↑</strong></p>
+          <p class="station-metric-card__value"><strong data-station-detail-metric-value>+10.2</strong><span data-station-detail-metric-unit>분</span></p>
+          <p class="station-metric-card__comparison" data-station-detail-metric-comparison>전일 대비 <strong>+2.8 분 ↑</strong></p>
         </div>
       </article>
 
-      <article class="station-metric-card" aria-label="지연률 12.6퍼센트, 전일 대비 3.1퍼센트 포인트 증가">
+      <article class="station-metric-card" aria-label="지연률 12.6퍼센트, 전일 대비 3.1퍼센트 포인트 증가" data-station-detail-metric="delay-rate">
         <div class="station-metric-card__icon station-metric-card__icon--rate" aria-hidden="true">
           <img src="./assets/icons/percent.svg" alt="">
         </div>
         <div class="station-metric-card__body">
           <h3 class="station-metric-card__title">지연률</h3>
-          <p class="station-metric-card__value"><strong>12.6</strong><span>%</span></p>
-          <p class="station-metric-card__comparison">전일 대비 <strong>+3.1 %p ↑</strong></p>
+          <p class="station-metric-card__value"><strong data-station-detail-metric-value>12.6</strong><span data-station-detail-metric-unit>%</span></p>
+          <p class="station-metric-card__comparison" data-station-detail-metric-comparison>전일 대비 <strong>+3.1 %p ↑</strong></p>
         </div>
       </article>
 
-      <article class="station-metric-card" aria-label="운행 중단률 4.8퍼센트, 전일 대비 1.9퍼센트 포인트 증가">
+      <article class="station-metric-card" aria-label="운행 중단률 4.8퍼센트, 전일 대비 1.9퍼센트 포인트 증가" data-station-detail-metric="stop-rate">
         <div class="station-metric-card__icon station-metric-card__icon--suspend" aria-hidden="true">
           <img src="./assets/icons/circle-minus.svg" alt="">
         </div>
         <div class="station-metric-card__body">
           <h3 class="station-metric-card__title">운행 중단률</h3>
-          <p class="station-metric-card__value"><strong>4.8</strong><span>%</span></p>
-          <p class="station-metric-card__comparison">전일 대비 <strong>+1.9 %p ↑</strong></p>
+          <p class="station-metric-card__value"><strong data-station-detail-metric-value>4.8</strong><span data-station-detail-metric-unit>%</span></p>
+          <p class="station-metric-card__comparison" data-station-detail-metric-comparison>전일 대비 <strong>+1.9 %p ↑</strong></p>
         </div>
       </article>
     </section>
@@ -260,7 +264,7 @@
                 <th scope="col">운행 중단률</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody data-station-detail-alert-table-body>
               <tr>
                 <th scope="row"><img src="./assets/icons/cloud-rain.svg" alt="" aria-hidden="true"><span>호우 경보</span></th>
                 <td>8 회</td>
@@ -306,7 +310,7 @@
           <h3 class="station-detail-card__title" id="history-title">과거 주요 사례</h3>
           <span class="station-detail-card__subtitle">최근 3건</span>
         </header>
-        <ul class="station-history-list" aria-label="과거 주요 사례 목록">
+        <ul class="station-history-list" aria-label="과거 주요 사례 목록" data-station-detail-history-list>
           <li class="station-history-item">
             <span class="station-history-item__label station-history-item__label--high">호우 경보</span>
             <div class="station-history-item__content">
@@ -345,5 +349,6 @@
   </main>
 
   <script src="./sidebar.js" defer></script>
+  <script src="./station-detail.js" defer></script>
 </body>
 </html>
