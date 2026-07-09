@@ -20,6 +20,14 @@
   --radius-card: 12px;
   --radius-control: 8px;
   --section-gap: 24px;
+  --sidebar-width: 200px;
+  --sidebar-menu-width: 176px;
+  --sidebar-background: #001B3F;
+  --sidebar-active: #2563EB;
+  --sidebar-text: #E5E7EB;
+  --sidebar-muted-text: #CBD5E1;
+  --sidebar-divider: rgba(255, 255, 255, 0.12);
+  --sidebar-hover: rgba(255, 255, 255, 0.08);
 }
 
 * {
@@ -73,22 +81,246 @@ select {
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
-  color: var(--color-main-text);
-  text-decoration: none;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-control);
+  cursor: pointer;
 }
 
 .brand__logo {
   flex: 0 0 auto;
   width: 32px;
   height: 32px;
-  background: var(--color-border);
+  display: block;
 }
 
-.brand__title {
-  font-size: 18px;
+.brand:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.24);
+  outline-offset: 2px;
+}
+
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  width: var(--sidebar-width);
+  height: 100vh;
+  pointer-events: none;
+}
+
+.sidebar__panel {
+  display: flex;
+  flex-direction: column;
+  width: var(--sidebar-width);
+  height: 100vh;
+  padding: 24px 12px 16px;
+  background: var(--sidebar-background);
+  border-radius: 0 8px 8px 0;
+  box-shadow: 16px 0 40px rgba(0, 0, 0, 0.18);
+  transform: translateX(-100%);
+  transition: transform 180ms ease;
+  pointer-events: auto;
+}
+
+.sidebar--open .sidebar__panel {
+  transform: translateX(0);
+}
+
+.sidebar__logo-area {
+  display: flex;
+  align-items: center;
+  width: var(--sidebar-menu-width);
+  height: 48px;
+  gap: 10px;
+  padding: 0 12px;
+  margin: 0 auto 40px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-control);
+  color: var(--color-surface);
+  text-decoration: none;
+}
+
+.sidebar__logo-icon {
+  display: block;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  background: var(--color-surface);
+  mask: url("./assets/icons/cloud-sun-rain.svg") center / contain no-repeat;
+  -webkit-mask: url("./assets/icons/cloud-sun-rain.svg") center / contain no-repeat;
+}
+
+.sidebar__logo-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sidebar__logo-title {
+  color: var(--color-surface);
+  font-size: 16px;
   font-weight: 700;
-  line-height: 24px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.sidebar__logo-subtitle {
+  color: var(--sidebar-muted-text);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.sidebar__navigation-list {
+  display: flex;
+  flex-direction: column;
+  width: var(--sidebar-menu-width);
+  gap: 8px;
+  padding: 0;
+  margin: 0 auto;
+  list-style: none;
+}
+
+.sidebar__navigation-link,
+.sidebar__standard-link {
+  display: flex;
+  align-items: center;
+  width: var(--sidebar-menu-width);
+  color: var(--sidebar-text);
+  text-decoration: none;
+}
+
+.sidebar__navigation-link {
+  height: 44px;
+  gap: 12px;
+  padding: 0 14px;
+  border-radius: var(--radius-control);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.sidebar__navigation-link:hover,
+.sidebar__navigation-link:focus-visible,
+.sidebar__standard-link:hover,
+.sidebar__standard-link:focus-visible {
+  background: var(--sidebar-hover);
+}
+
+.sidebar__navigation-link:focus-visible,
+.sidebar__standard-link:focus-visible,
+.sidebar__collapse-button:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.36);
+  outline-offset: 2px;
+}
+
+.sidebar__navigation-link--active {
+  background: var(--sidebar-active);
+  color: var(--color-surface);
+  font-weight: 600;
+}
+
+.sidebar__navigation-icon {
+  display: block;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  background: var(--sidebar-text);
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+}
+
+.sidebar__navigation-link--active .sidebar__navigation-icon {
+  background: var(--color-surface);
+}
+
+.sidebar__navigation-icon--home {
+  mask-image: url("./assets/icons/house.svg");
+  -webkit-mask-image: url("./assets/icons/house.svg");
+}
+
+.sidebar__navigation-icon--station {
+  mask-image: url("./assets/icons/train-front.svg");
+  -webkit-mask-image: url("./assets/icons/train-front.svg");
+}
+
+.sidebar__navigation-icon--route {
+  mask-image: url("./assets/icons/route.svg");
+  -webkit-mask-image: url("./assets/icons/route.svg");
+}
+
+.sidebar__navigation-icon--rag {
+  mask-image: url("./assets/icons/sparkles.svg");
+  -webkit-mask-image: url("./assets/icons/sparkles.svg");
+}
+
+.sidebar__navigation-icon--analytics {
+  mask-image: url("./assets/icons/chart-no-axes-column.svg");
+  -webkit-mask-image: url("./assets/icons/chart-no-axes-column.svg");
+}
+
+.sidebar__bottom {
+  width: var(--sidebar-menu-width);
+  margin: auto auto 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--sidebar-divider);
+}
+
+.sidebar__standard-link {
+  height: 40px;
+  gap: 10px;
+  padding: 0 12px;
+  border-radius: var(--radius-control);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.sidebar__standard-icon {
+  display: block;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  background: var(--sidebar-text);
+  mask: url("./assets/icons/circle-question-mark.svg") center / contain no-repeat;
+  -webkit-mask: url("./assets/icons/circle-question-mark.svg") center / contain no-repeat;
+}
+
+.sidebar__collapse-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 40px;
+  padding: 0;
+  margin: 16px 0 0 auto;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+.sidebar__collapse-button:hover {
+  background: var(--sidebar-hover);
+}
+
+.sidebar__collapse-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+  background: var(--sidebar-muted-text);
+  mask: url("./assets/icons/chevrons-left.svg") center / contain no-repeat;
+  -webkit-mask: url("./assets/icons/chevrons-left.svg") center / contain no-repeat;
 }
 
 .dashboard-main {
@@ -798,9 +1030,14 @@ select {
     height: 28px;
   }
 
-  .brand__title {
-    font-size: 14px;
-    line-height: 20px;
+  .brand {
+    width: 36px;
+    height: 36px;
+  }
+
+  .sidebar,
+  .sidebar__panel {
+    width: min(var(--sidebar-width), 88vw);
   }
 
   .dashboard-main {

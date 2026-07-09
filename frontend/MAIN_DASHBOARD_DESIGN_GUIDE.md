@@ -441,3 +441,104 @@ Detail button:
 - Do not add a sidebar to the main dashboard.
 - Main content must be centered with 64px left/right margins.
 - Use table layout for TOP 5 cards, not simple list layout.
+
+## 16. Sidebar / Left Navigation
+
+메인 대시보드의 왼쪽 고정 내비게이션 영역이다.
+
+### Sidebar Container
+
+- Width: `200px`
+- Height: `100vh`
+- Background: `#001B3F`
+- Padding: `20px 12px`
+- Position: `fixed left`
+- Text color default: `#E5E7EB`
+
+### Logo Area
+
+- Size: `176 × 48px`
+- Layout: horizontal
+- Gap: `10px`
+- Margin bottom: `28px`
+
+Logo icon:
+- Size: `32 × 32px`
+- Color: `#FFFFFF`
+
+Title:
+- Text: `기상-철도 리스크`
+- Font: `16px / 700`
+- Color: `#FFFFFF`
+
+Subtitle:
+- Text: `의사결정 지원 시스템`
+- Font: `11px / 400`
+- Color: `#CBD5E1`
+
+### Navigation List
+
+- Width: `176px`
+- Layout: vertical
+- Gap: `8px`
+
+### Navigation Item
+
+Default:
+- Size: `176 × 44px`
+- Border radius: `8px`
+- Padding: `0 14px`
+- Layout: horizontal
+- Gap: `12px`
+- Icon size: `18 × 18px`
+- Icon color: `#E5E7EB`
+- Text: `14px / 500`
+- Text color: `#E5E7EB`
+
+Active:
+- Background: `#2563EB`
+- Icon color: `#FFFFFF`
+- Text color: `#FFFFFF`
+- Font weight: `600`
+
+Hover:
+- Background: `rgba(255,255,255,0.08)`
+
+### Menu Items
+
+1. `대시보드`
+   - Icon: `Home`
+   - Active on main dashboard
+
+2. `역 상세`
+   - Icon: `TrainFront`
+
+3. `구간 상세`
+   - Icon: `GitBranch` or `Route`
+
+4. `RAG 심층 설명`
+   - Icon: `CircleHelp` or `Sparkles`
+
+5. `데이터 분석·통계`
+   - Icon: `BarChart3`
+
+### Bottom Area
+
+- Position: bottom
+- Width: `176px`
+
+Divider:
+- Height: `1px`
+- Color: `rgba(255,255,255,0.12)`
+- Margin bottom: `16px`
+
+Data standard item:
+- Size: `176 × 40px`
+- Icon: `CircleHelp`
+- Icon size: `16 × 16px`
+- Text: `데이터 기준 안내`
+- Text style: `13px / 500 / #E5E7EB`
+
+Collapse icon:
+- Size: `16 × 16px`
+- Color: `#CBD5E1`

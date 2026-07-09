@@ -9,12 +9,66 @@
 <body>
   <header class="site-header">
     <div class="site-header__inner">
-      <a class="brand" href="./dashboard.html" aria-label="기상-철도 리스크 의사결정 지원 시스템 홈">
-        <span class="brand__logo" aria-hidden="true"></span>
-        <span class="brand__title">기상-철도 리스크 의사결정 지원 시스템</span>
-      </a>
+      <button class="brand" type="button" aria-label="사이드바 열기" aria-controls="main-sidebar" aria-expanded="false" data-sidebar-toggle>
+        <img class="brand__logo" src="./assets/icons/menu.svg" alt="" aria-hidden="true">
+      </button>
     </div>
   </header>
+
+  <nav class="sidebar" id="main-sidebar" aria-label="메인 대시보드 내비게이션" data-sidebar hidden>
+    <div class="sidebar__panel">
+      <a class="sidebar__logo-area" href="./dashboard.html" aria-label="기상-철도 리스크 의사결정 지원 시스템 홈">
+        <span class="sidebar__logo-icon" aria-hidden="true"></span>
+        <span class="sidebar__logo-text">
+          <strong class="sidebar__logo-title">기상-철도 리스크</strong>
+          <span class="sidebar__logo-subtitle">의사결정 지원 시스템</span>
+        </span>
+      </a>
+
+      <ul class="sidebar__navigation-list" aria-label="주요 메뉴">
+        <li class="sidebar__navigation-item">
+          <a class="sidebar__navigation-link sidebar__navigation-link--active" href="./dashboard.html" aria-current="page">
+            <span class="sidebar__navigation-icon sidebar__navigation-icon--home" aria-hidden="true"></span>
+            <span>대시보드</span>
+          </a>
+        </li>
+        <li class="sidebar__navigation-item">
+          <a class="sidebar__navigation-link" href="#">
+            <span class="sidebar__navigation-icon sidebar__navigation-icon--station" aria-hidden="true"></span>
+            <span>역 상세</span>
+          </a>
+        </li>
+        <li class="sidebar__navigation-item">
+          <a class="sidebar__navigation-link" href="#">
+            <span class="sidebar__navigation-icon sidebar__navigation-icon--route" aria-hidden="true"></span>
+            <span>구간 상세</span>
+          </a>
+        </li>
+        <li class="sidebar__navigation-item">
+          <a class="sidebar__navigation-link" href="#">
+            <span class="sidebar__navigation-icon sidebar__navigation-icon--rag" aria-hidden="true"></span>
+            <span>RAG 심층 설명</span>
+          </a>
+        </li>
+        <li class="sidebar__navigation-item">
+          <a class="sidebar__navigation-link" href="#">
+            <span class="sidebar__navigation-icon sidebar__navigation-icon--analytics" aria-hidden="true"></span>
+            <span>데이터 분석·통계</span>
+          </a>
+        </li>
+      </ul>
+
+      <div class="sidebar__bottom">
+        <a class="sidebar__standard-link" href="#">
+          <span class="sidebar__standard-icon" aria-hidden="true"></span>
+          <span>데이터 기준 안내</span>
+        </a>
+        <button class="sidebar__collapse-button" type="button" aria-label="사이드바 닫기" data-sidebar-close>
+          <span class="sidebar__collapse-icon" aria-hidden="true"></span>
+        </button>
+      </div>
+    </div>
+  </nav>
 
   <main class="dashboard-main">
     <section class="page-title" aria-labelledby="dashboard-title">
@@ -374,6 +428,7 @@
     </section>
   </main>
   <script src="./dashboard.js" defer></script>
+  <script src="./sidebar.js" defer></script>
 </body>
 </html>
 
