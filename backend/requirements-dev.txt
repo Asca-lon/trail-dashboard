@@ -1,0 +1,5 @@
+# 테스트 도구. 런타임에는 불필요.
+#   pip install -r requirements-dev.txt  (requirements.txt 도 함께 설치됨)
+-r requirements.txt
+pytest
+httpx          # fastapi TestClient 가 내부적으로 사용

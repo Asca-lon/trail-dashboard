@@ -54,15 +54,6 @@ Settings → Pages → Source: `main` 브랜치 `/ (root)` 로 배포하면:
 
 C는 이 URL 로 화면을 만들고, 백엔드 완성 후 **base URL 만 교체**한다(파싱 코드는 그대로 — 계약이 지켜지면 그래야 한다).
 
-## 백엔드 실행
-
-```bash
-cd backend
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp ../.env.example ../.env      # USE_MOCK=1 로 시작
-uvicorn api:app --reload --port 8000
-```
 
 - 문서: http://localhost:8000/docs
 - `USE_MOCK=1` (기본): A의 DB 없이 `mock/*.json` 으로 응답 → 오늘 바로 워킹 스켈레톤.

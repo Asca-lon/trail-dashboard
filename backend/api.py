@@ -36,7 +36,7 @@ CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
 KST = timezone(timedelta(hours=9))
 
 # 필터 허용값 (§5-1 (4)) — C가 자유 입력하지 않도록 B가 방어.
-ALERT_TYPES = {"대설", "호우", "폭염", "강풍", "태풍", "한파"}
+ALERT_TYPES = {"호우", "폭염"}   # 스코프 한정(CONTRACT §1: 호우·폭염만)
 ALERT_LEVELS = {"주의보", "경보"}
 TRAIN_TYPES = {"all", "KTX", "무궁화", "새마을"}
 
@@ -173,12 +173,18 @@ def get_heatmap(line: str = "경부선", alert_type: str = "호우"):
         return lo, span
     lo_n, sp_n = norm([r["avg_delay"] for r in nodes])
     lo_e, sp_e = norm([r["avg_delay_incr"] for r in edges])
+
+    def scale(v, lo, span):
+        # 계약 §5-1(2)·§2-1(3): 표본 없음은 null(=데이터 없음). 0.0(취약도 낮음)과 구분해야 한다.
+        # (v or lo) 로 NULL 을 최솟값으로 대체하면 '데이터 없음'과 '가장 덜 취약'이 뭉개진다.
+        return None if v is None else round((v - lo) / span, 3)
+
     return {
         "line": line,
         "nodes": [{"station": r["station"], "lat": r["lat"], "lon": r["lon"],
-                   "vuln": round(((r["avg_delay"] or lo_n) - lo_n) / sp_n, 3)} for r in nodes],
+                   "vuln": scale(r["avg_delay"], lo_n, sp_n)} for r in nodes],
         "edges": [{"from": r["from"], "to": r["to"],
-                   "vuln": round(((r["avg_delay_incr"] or lo_e) - lo_e) / sp_e, 3)} for r in edges],
+                   "vuln": scale(r["avg_delay_incr"], lo_e, sp_e)} for r in edges],
     }
 
 
@@ -186,30 +192,42 @@ def get_heatmap(line: str = "경부선", alert_type: str = "호우"):
 @app.get("/station/{code}", response_model=StationDetail)
 def get_station_detail(code: str):
     if USE_MOCK:
-        d = _mock("station_detail.json")
+        d = _mock("station_details.json")
         d["station"] = code   # 어떤 역을 조회하든 상세 모양을 보여준다(값은 mock)
         return d
-    from db import fetch_all
+    from db import fetch_all, fetch_one
+    # 계약 §5의 다른 응답은 모두 역'이름'을 쓴다("station": "대전").
+    # 그런데 station_vulnerability 는 역'코드'로 저장된다(segment_vulnerability 는 역이름).
+    # C가 화면에서 얻는 값은 역이름이므로, 이름을 코드로 해석해 준다. 코드로 직접 불러도 동작.
+    row = fetch_one(
+        "SELECT station_code, station_name FROM stations "
+        "WHERE station_name=%(c)s OR station_code=%(c)s LIMIT 1",
+        {"c": code},
+    )
+    if row is None:
+        raise AppError(404, "STATION_NOT_FOUND", f"알 수 없는 역: {code}")
+    station_code, station_name = row["station_code"], row["station_name"]
+
     by_alert = fetch_all(
         "SELECT alert_type, alert_level, avg_delay, sample_n "
         "FROM station_vulnerability WHERE station_code=%(c)s ORDER BY avg_delay DESC NULLS LAST",
-        {"c": code},
+        {"c": station_code},
     )
     # cases: 최근 지연 사례. 특보 종류 매칭은 A의 분석 영역이라 여기선 최근 지연만.
     cases = fetch_all(
         "SELECT run_date::text AS date, NULL::text AS alert_type, delay_min "
         "FROM train_stops WHERE station_code=%(c)s AND status='지연' "
         "ORDER BY event_time DESC LIMIT 10",
-        {"c": code},
+        {"c": station_code},
     )
-    return {"station": code, "by_alert": by_alert, "cases": cases}
+    return {"station": station_name, "by_alert": by_alert, "cases": cases}
 
 
 # ── GET /segment/{frm}/{to} (상세) ────────────────────────────
 @app.get("/segment/{frm}/{to}", response_model=SegmentDetail)
 def get_segment_detail(frm: str, to: str):
     if USE_MOCK:
-        d = _mock("segment_detail.json")
+        d = _mock("segments_details.json")
         d["from"], d["to"] = frm, to
         return d
     from db import fetch_all
@@ -258,12 +276,14 @@ def get_alerts_active(line: str = "경부선"):
         return d
     from db import fetch_all
     # 현재 발효 = end_time IS NULL (§1-1). 호우·폭염만.
+    # region_code 기준으로 묶는다. 한 특보구역에 여러 region_name 이 매핑될 수 있어
+    # (예: 같은 구역코드에 '김천'·'대구'), region_name 으로 묶으면 특보 1건이 중복 노출된다.
     active_rows = fetch_all(
-        "SELECT DISTINCT s.region_name, wa.alert_type, wa.alert_level, "
-        "  MIN(wa.start_time) AS since, wa.region_code "
+        "SELECT wa.region_code, MIN(s.region_name) AS region_name, "
+        "  wa.alert_type, wa.alert_level, MIN(wa.start_time) AS since "
         "FROM weather_alerts wa JOIN stations s ON s.region_code=wa.region_code "
         "WHERE wa.end_time IS NULL AND wa.alert_type IN ('호우','폭염') AND s.line=%(line)s "
-        "GROUP BY s.region_name, wa.alert_type, wa.alert_level, wa.region_code",
+        "GROUP BY wa.region_code, wa.alert_type, wa.alert_level",
         {"line": line},
     )
     active = []
@@ -283,7 +303,8 @@ def get_alerts_active(line: str = "경부선"):
         active.append({
             "region_name": a["region_name"], "alert_type": a["alert_type"],
             "alert_level": a["alert_level"],
-            "since": a["since"].isoformat() if a["since"] else now,
+            # 계약 §2-1(2): 모든 시각은 KST 로 표기. psycopg 는 TIMESTAMPTZ 를 UTC 로 돌려주므로 변환.
+            "since": a["since"].astimezone(KST).isoformat(timespec="seconds") if a["since"] else now,
             "affected": affected,
         })
     return {"line": line, "updated_at": now, "active": active}
