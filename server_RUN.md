@@ -1,4 +1,4 @@
-# RUN.md — 서버 실행 안내 (팀원용)
+# server_RUN.md — 서버 실행 안내 (팀원용)
 
 API-LXC 컨테이너에서 **대시보드와 API를 한 서버로** 띄우는 방법.
 Tailscale VPN에 연결된 팀원 PC의 브라우저에서 접속한다.
