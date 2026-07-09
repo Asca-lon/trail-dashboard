@@ -32,8 +32,8 @@ MOCK_MODEL_MAP = {
     "heatmap.json": models.HeatmapResponse,
     "checklist.json": models.ChecklistResponse,
     "alerts_active.json": models.AlertsActiveResponse,
-    "station_detail.json": models.StationDetail,
-    "segment_detail.json": models.SegmentDetail,
+    "station_details.json": models.StationDetail,
+    "segment_details.json": models.SegmentDetail,
 }
 
 

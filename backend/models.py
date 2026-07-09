@@ -14,7 +14,7 @@ from typing import Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 # 필터 허용값 고정 (§5-1 (4)). 자유 입력 금지.
-AlertType = Literal["대설", "호우", "폭염", "강풍", "태풍", "한파"]
+AlertType = Literal["호우", "폭염"]   # 스코프 한정(CONTRACT §1)
 AlertLevel = Literal["주의보", "경보"]
 TrainType = Literal["all", "KTX", "무궁화", "새마을"]
 
@@ -65,15 +65,18 @@ class StationsResponse(BaseModel):
 # ── GET /heatmap ──────────────────────────────────────────────
 class HeatmapNode(BaseModel):
     station: str
-    lat: float
-    lon: float
-    vuln: float
+    # stations.lat/lon 은 DDL 상 nullable — 좌표 매핑 전인 역이 있을 수 있다(§4).
+    # C는 좌표 없는 노드를 지도에서 건너뛴다.
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+    # null = 해당 특보 표본 없음(데이터 없음). 0.0(가장 덜 취약)과 구분한다.
+    vuln: Optional[float] = None
 
 class HeatmapEdge(BaseModel):
     model_config = _ALIAS
     from_: str = Field(alias="from")
     to: str
-    vuln: float
+    vuln: Optional[float] = None
 
 class HeatmapResponse(BaseModel):
     line: str
