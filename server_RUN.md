@@ -27,11 +27,18 @@ ssh root@100.81.215.29
 ```bash
 cd ~/trail-dashboard
 source .venv/bin/activate
-uvicorn serve:app --host 0.0.0.0 --port 8000
+uvicorn serve:app --host 100.81.215.29 --port 8000
 ```
+```bash
+Uvicorn running on http://100.81.215.29:8000
+```
+형태의 응답을 받을 수 있다. 해당 주소로 웹에 접속한다.
+
+**`--host 0.0.0.0`을 tailscale IP로 수정함. -> Ctrl + 마우스 좌 클릭으로 바로 접속 가능**
 
 **`--host 0.0.0.0` 은 필수.** 생략하면 `127.0.0.1` 에만 바인딩돼서
 Tailscale로 들어오는 요청을 받지 못한다(컨테이너 안에서만 열림).
+
 
 ### SSH를 끊어도 계속 띄워두려면
 
