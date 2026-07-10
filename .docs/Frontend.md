@@ -8229,3 +8229,453 @@ node --check frontend/dashboard.js
 ## Timestamp
 
 2026-07-10 10:40:43 (KST)
+---
+
+# 역 상세 과거 주요 사례 상세보기 버튼 제거 작업 요약
+
+## 완료한 내용
+
+- 역 상세 화면의 `과거 주요 사례` 목록에서 기능이 연결되지 않은 `상세보기` 버튼을 제거했습니다.
+- JS에서 과거 사례 항목을 동적으로 렌더링할 때도 `상세보기` 버튼을 생성하지 않도록 정리했습니다.
+- 더 이상 사용하지 않는 `station-history-item__button` CSS 규칙과 포커스/반응형 참조를 제거했습니다.
+
+## 수정한 파일
+
+- `frontend/station-detail.html`
+- `frontend/station-detail.js`
+- `frontend/style.css`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+해당 버튼은 클릭 가능한 UI처럼 보였지만 실제 모달, 상세 패널, 페이지 이동 기능이 없었습니다. 사용자가 동작을 기대하고 눌렀을 때 아무 반응이 없으면 혼란을 줄 수 있으므로 버튼을 제거했습니다.
+
+## 변경 사항
+
+- 정적 HTML 예시 목록의 `상세보기` 버튼 제거
+- `createHistoryItem()`에서 버튼 생성 및 append 로직 제거
+- 버튼 전용 CSS 제거
+
+## 새롭게 배운 개념
+
+- Dead UI 제거
+- 동적 렌더링 코드와 정적 fallback HTML 동시 정리
+- 미사용 CSS 제거
+
+## 실무에서는
+
+실무에서는 기능이 아직 없는 버튼을 남기기보다 제거하거나 `disabled` 상태와 명확한 안내를 제공합니다. 현재 화면에서는 상세 기능 자체가 필요 없다고 판단했으므로 제거가 가장 단순하고 안전합니다.
+
+## 개선 가능한 부분
+
+- 추후 과거 사례 상세 분석이 필요해지면 상세 모달 또는 상세 패널로 별도 설계
+- 과거 사례 항목 전체를 클릭 가능한 카드로 바꿀지 검토
+
+## 다음 작업
+
+- 구간 상세의 기능 없는 버튼/링크 정리
+- 지도 카드 `전체 보기` 기능 여부 결정
+
+## 프로젝트 진행률
+
+■■■■■■■■□□ 80%
+
+완료
+
+- 역 상세 과거 주요 사례 `상세보기` 버튼 제거
+
+진행 중
+
+- 디자인만 있는 버튼/링크 정리
+
+예정
+
+- 구간 상세 과거 사례 필터/페이지네이션 점검
+
+## 복습 문제
+
+1. 기능이 없는 버튼을 화면에 남겨두면 어떤 UX 문제가 생길까요?
+2. 정적 HTML과 JS 동적 렌더링을 함께 쓰는 화면에서 UI를 제거할 때 어디를 같이 확인해야 할까요?
+3. 사용하지 않는 CSS를 제거하면 유지보수 측면에서 어떤 장점이 있을까요?
+
+## 오늘 배운 내용
+
+- Dead UI
+- Dynamic Rendering Cleanup
+- Unused CSS Cleanup
+
+## README 반영 여부
+
+기능 제거 범위가 화면 내부의 미동작 버튼 정리이므로 README 변경은 필요하지 않습니다.
+
+## 추천 Commit Message
+
+`refactor: 역 상세 과거 사례 상세보기 버튼 제거`
+
+## Change Log
+
+2026-07-10
+
+- 역 상세 과거 주요 사례 상세보기 버튼 제거
+- 관련 JS 생성 로직과 CSS 제거
+
+## Timestamp
+
+2026-07-10 10:58:06 (KST)
+
+---
+
+# 구간 상세 위험도 산정 기준 아코디언 구현 작업 요약
+
+# 개요
+
+구간 상세 페이지의 `위험도 산정 기준 보기` 버튼을 클릭하면 위험도 기준 목록이 펼쳐지도록 구현했습니다.
+
+# 구현 목적
+
+사용자가 현재 위험도 배지가 어떤 기준으로 산정되는지 화면 안에서 바로 확인할 수 있도록 하기 위함입니다.
+
+# 구현 내용
+
+- `frontend/route-detail.html`의 위험도 산정 기준 버튼 3곳에 펼침 패널을 추가했습니다.
+- 각 버튼에 `aria-expanded`, `aria-controls`, `data-route-risk-criteria-toggle`을 추가했습니다.
+- 각 패널에 `높음`, `주의`, `관심`, `데이터 없음` 기준을 표시했습니다.
+- `frontend/route-detail.js`에서 모든 기준 버튼의 클릭 이벤트를 등록했습니다.
+- 위험도 계산 기준을 화면 문구와 맞추기 위해 예상 지연 15분/5분, 운행 중단률 5%/2% 기준으로 정리했습니다.
+- `frontend/style.css`에 펼침 패널, 등급 점, 펼침 아이콘 회전 스타일을 추가했습니다.
+
+# 코드 설명
+
+## 왜 필요한가
+
+위험도 결과만 보여주면 사용자는 `높음`, `주의`, `관심`이 어떤 의미인지 알기 어렵습니다.
+따라서 기준을 버튼 아래에 즉시 펼쳐 보여주면 화면 이해도가 높아집니다.
+
+## 어떤 원리인가
+
+버튼 클릭 시 JS가 `aria-expanded` 값을 `true` 또는 `false`로 바꾸고, 연결된 패널의 `hidden` 속성을 토글합니다.
+CSS는 `aria-expanded="true"` 상태를 기준으로 버튼 모서리와 화살표 회전을 표현합니다.
+
+## 실행 흐름
+
+1. 페이지 로드 시 `[data-route-risk-criteria-toggle]` 버튼 목록을 찾습니다.
+2. 각 버튼의 `aria-controls` 값으로 연결된 패널을 찾습니다.
+3. 버튼 클릭 시 펼침 여부를 계산합니다.
+4. 버튼의 `aria-expanded`와 패널의 `hidden` 상태를 갱신합니다.
+
+# API
+
+API 변경은 없습니다.
+
+# Database
+
+Database 변경은 없습니다.
+
+# 주의사항
+
+- 현재 기준은 프론트엔드 상수로 관리됩니다.
+- 실무에서는 백엔드 분석 기준과 프론트엔드 표시 기준이 어긋나지 않도록 API 응답 또는 공용 설정으로 관리하는 것이 좋습니다.
+- `주의` 기준의 `5~15분`, `2~5%`는 코드상 `15분 이상`, `5% 이상`이면 `높음`으로 우선 판정됩니다.
+
+# 테스트
+
+## 테스트 방법
+
+```bash
+node --check frontend/route-detail.js
+```
+
+```bash
+node -e "const fs=require('fs'); const html=fs.readFileSync('frontend/route-detail.html','utf8'); const toggles=(html.match(/data-route-risk-criteria-toggle/g)||[]).length; const panels=(html.match(/data-route-risk-criteria-panel/g)||[]).length; const labels=['높음','주의','관심','데이터 없음']; console.log('toggles:',toggles); console.log('panels:',panels); console.log('labels:',labels.map((label)=>label+':' +(html.includes(label)?'ok':'missing')).join(', ')); if(toggles!==3||panels!==3||labels.some((label)=>!html.includes(label))) process.exit(1);"
+```
+
+## 예상 결과
+
+- JS 문법 검사 오류가 없어야 합니다.
+- 버튼 수는 `3`, 패널 수는 `3`이어야 합니다.
+- `높음`, `주의`, `관심`, `데이터 없음` 라벨이 모두 `ok`로 표시되어야 합니다.
+
+## 검증 결과
+
+- `node --check frontend/route-detail.js`: 통과
+- 정적 HTML 구조 검증: 통과
+
+# 작업 요약
+
+## 완료한 내용
+
+- 구간 상세 페이지 위험도 산정 기준 펼침 기능 구현
+- 위험도 기준 문구 추가
+- 위험도 산정 기준 상수 정리
+- 접근성 속성 연결
+- 문서 업데이트
+
+## 수정한 파일
+
+- `frontend/route-detail.html`
+- `frontend/route-detail.js`
+- `frontend/style.css`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+기준 안내를 별도 페이지나 문서로 숨기지 않고, 사용자가 위험도 정보를 보는 위치에서 바로 확인하도록 하기 위해 구현했습니다.
+
+## 변경 사항
+
+- 위험도 산정 기준 보기 버튼 클릭 시 패널이 펼쳐집니다.
+- 펼친 상태에서는 화살표 아이콘이 회전합니다.
+- 현재 위험도 계산이 예상 지연과 운행 중단률을 함께 고려합니다.
+
+## 새롭게 배운 개념
+
+- Accordion UI
+- `aria-expanded`
+- `aria-controls`
+- `hidden` 속성 기반 상태 제어
+
+## 실무에서는
+
+실무에서는 위험도 기준을 프론트엔드에만 하드코딩하지 않고, 분석 정책 버전과 함께 API에서 내려주는 방식을 자주 사용합니다.
+이렇게 하면 기준이 바뀌었을 때 화면, 백엔드, 문서가 서로 다르게 동작하는 문제를 줄일 수 있습니다.
+
+## 개선 가능한 부분
+
+- 위험도 기준을 공용 설정 JSON으로 분리
+- 위험도 기준 변경 이력 표시
+- 키보드 포커스 이동과 펼침 상태 테스트 자동화
+
+## 다음 작업
+
+- 역 상세 페이지의 위험도 산정 기준도 동일한 구조로 정리
+- 위험도 기준을 백엔드 계약 문서와 맞춰 공통화
+
+# 프로젝트 진행률
+
+■■■■■■■■□□ 80%
+
+완료
+
+- 구간 상세 위험도 산정 기준 펼침 기능
+
+진행 중
+
+- 상세 화면 보조 UI 정리
+
+예정
+
+- 역 상세 위험도 기준 공통화
+- 분석 기준 API화 검토
+
+# 복습 문제
+
+1. `aria-expanded`와 `hidden` 속성을 함께 사용하는 이유는 무엇일까요?
+2. 위험도 산정 기준을 프론트엔드 상수로만 관리하면 어떤 문제가 생길 수 있을까요?
+3. `15분 이상`과 `5~15분`처럼 경계값이 겹칠 때 우선순위를 정해야 하는 이유는 무엇일까요?
+
+# 오늘 배운 내용
+
+- Accordion UI
+- 접근성 상태 속성
+- 위험도 기준과 표시 기준 동기화
+
+# README 반영 여부
+
+이번 작업은 구간 상세 화면 내부의 보조 UI 동작 추가이므로 README 변경은 필요하지 않습니다.
+
+# 추천 Commit Message
+
+`feat: 구간 상세 위험도 산정 기준 아코디언 추가`
+
+## Change Log
+
+2026-07-10
+
+- 구간 상세 페이지 위험도 산정 기준 펼침 패널 추가
+- 예상 지연 및 운행 중단률 기준으로 위험도 산정 로직 정리
+- 위험도 기준 버튼 접근성 속성 추가
+
+## Timestamp
+
+2026-07-10 11:07:33 (KST)
+
+---
+
+# 대시보드 역별 취약도 화살표 상세 이동 구현 작업 요약
+
+# 개요
+
+대시보드의 `경부선 기상 취약도 현황` 노선 지도에서 각 역 오른쪽 화살표를 누르면 역 상세 화면으로 이동하도록 구현했습니다.
+
+# 구현 목적
+
+사용자가 지도에서 관심, 주의, 높음 상태를 확인한 뒤 해당 역의 상세 화면으로 자연스럽게 이동할 수 있도록 하기 위함입니다.
+
+# 구현 내용
+
+- `frontend/dashboard.html`에서 노선 지도 카드의 `전체 보기` 버튼을 제거했습니다.
+- `frontend/dashboard.js`의 `createRouteMapItem()`에서 화살표를 `span`이 아닌 `a` 링크로 생성하도록 변경했습니다.
+- mock 취약 역 데이터에 존재하는 역은 `station_id`로 이동합니다.
+- mock 취약 역 데이터에 없는 역은 새 mock 값을 추가하지 않고 `station=역명`으로 이동합니다.
+- `frontend/station-detail.js`에서 URL의 `station` 파라미터가 mock 목록에 없어도 해당 역명을 유지하도록 수정했습니다.
+- `frontend/style.css`에서 화살표 링크의 hover/focus 스타일을 추가했습니다.
+
+# 코드 설명
+
+## 왜 필요한가
+
+기존 화살표는 클릭 가능한 것처럼 보이지만 실제 이동 기능이 없었습니다.
+사용자 입장에서는 역별 위험도를 본 뒤 자연스럽게 해당 역 상세로 들어가는 흐름이 필요합니다.
+
+## 어떤 원리인가
+
+대시보드에서 역 이름을 기준으로 `vulnerability_stations.json`의 `station_id`를 찾습니다.
+찾으면 `station-detail.html?station_id=...`로 이동하고, 찾지 못하면 `station-detail.html?station=역명`으로 이동합니다.
+역 상세 화면은 `station` 파라미터를 그대로 받아 제목과 기본 정보를 해당 역명 기준으로 표시합니다.
+
+## 실행 흐름
+
+1. `mock/heatmap.json`의 `nodes[]`를 기준으로 역 목록을 렌더링합니다.
+2. 각 역 이름을 `mock/vulnerability_stations.json`에서 찾습니다.
+3. mock 지표가 있는 역은 `station_id` 링크를 생성합니다.
+4. mock 지표가 없는 역은 `station` 이름 링크를 생성합니다.
+5. 역 상세 화면은 mock 상세 데이터가 없으면 지표와 표를 빈 상태로 보여줍니다.
+
+# API
+
+API 변경은 없습니다.
+
+# Database
+
+Database 변경은 없습니다.
+
+# 주의사항
+
+- 이번 작업에서는 mock 데이터가 없는 역의 값을 새로 추가하지 않았습니다.
+- mock 데이터가 없는 역은 상세 화면으로 이동하지만 지표, 특보별 통계, 과거 사례는 빈 상태로 표시됩니다.
+- 실무에서는 역 기본 정보와 위험도 지표를 분리해, 지표가 없어도 역명/노선/위치 같은 기본 정보는 API에서 제공하는 편이 좋습니다.
+
+# 테스트
+
+## 테스트 방법
+
+```bash
+node --check frontend/dashboard.js
+node --check frontend/station-detail.js
+```
+
+```bash
+node -e "const fs=require('fs'); const heatmap=JSON.parse(fs.readFileSync('mock/heatmap.json','utf8')); const vuln=JSON.parse(fs.readFileSync('mock/vulnerability_stations.json','utf8')); const ids=new Map(vuln.stations.map(s=>[s.station,s.station_id])); const urls=heatmap.nodes.map(n=>ids.has(n.station)?'./station-detail.html?station_id='+ids.get(n.station):'./station-detail.html?station='+encodeURIComponent(n.station)); console.log(urls.join('\n')); if(!urls.some(u=>u.includes('station='))) process.exit(1);"
+```
+
+## 예상 결과
+
+- JS 문법 오류가 없어야 합니다.
+- mock 데이터가 있는 역은 `station_id` URL이 생성되어야 합니다.
+- mock 데이터가 없는 역은 `station` URL이 생성되어야 합니다.
+
+## 검증 결과
+
+- `node --check frontend/dashboard.js`: 통과
+- `node --check frontend/station-detail.js`: 통과
+- 노선 지도 역 상세 URL 생성 검증: 통과
+
+# 작업 요약
+
+## 완료한 내용
+
+- 노선 지도 역별 화살표 링크 구현
+- mock 없는 역명 기반 상세 이동 지원
+- 노선 지도 카드의 전체 보기 버튼 제거
+- 접근 가능한 링크 라벨과 포커스 스타일 추가
+- 문서 업데이트
+
+## 수정한 파일
+
+- `frontend/dashboard.html`
+- `frontend/dashboard.js`
+- `frontend/station-detail.js`
+- `frontend/style.css`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+화면에서 역별 위험도를 확인한 사용자가 추가 정보를 보기 위해 바로 역 상세 화면으로 이동할 수 있어야 하기 때문입니다.
+
+## 변경 사항
+
+- 정적 버튼 형태의 `전체 보기` 제거
+- 역별 화살표를 상세 페이지 링크로 변경
+- mock 데이터가 없는 역도 URL의 역명을 유지하도록 역 상세 초기 선택 로직 변경
+
+## 새롭게 배운 개념
+
+- URL query parameter 기반 화면 상태 전달
+- mock 데이터가 없는 대상의 fallback 렌더링
+- 링크 접근성 라벨
+
+## 실무에서는
+
+실무에서는 역 ID를 모든 역에 대해 안정적으로 관리하고, 상세 지표 유무와 관계없이 역 기본 정보 API를 제공합니다.
+또한 데이터 없음 상태는 단순 빈칸보다 `분석 가능한 데이터가 부족함`처럼 의사결정에 도움이 되는 문구로 명확히 표시합니다.
+
+## 개선 가능한 부분
+
+- 모든 heatmap 역에 고유 station id 부여
+- 역 상세 화면의 데이터 없음 안내 문구 강화
+- 지도 화살표 클릭 이벤트에 E2E 테스트 추가
+
+## 다음 작업
+
+- 역 상세 화면의 데이터 없음 상태 문구를 더 명확하게 개선
+- 노선 지도 역 전체 클릭 영역 확장 검토
+
+# 프로젝트 진행률
+
+■■■■■■■■□□ 82%
+
+완료
+
+- 대시보드 역별 상세 이동
+- 전체 보기 버튼 제거
+
+진행 중
+
+- 상세 화면 간 이동 흐름 정리
+
+예정
+
+- mock 없는 역의 데이터 없음 UX 개선
+- 역 ID 체계 공통화
+
+# 복습 문제
+
+1. mock 데이터가 없는 역도 `station=역명`으로 이동하게 만든 이유는 무엇일까요?
+2. `station_id`와 `station` 쿼리를 함께 지원하면 어떤 장단점이 있을까요?
+3. 클릭 가능한 화살표에 `aria-label`을 넣는 이유는 무엇일까요?
+
+# 오늘 배운 내용
+
+- Query Parameter Routing
+- Fallback Detail Rendering
+- Accessible Link Label
+
+# README 반영 여부
+
+이번 작업은 대시보드 내부 이동 UX 개선이므로 README 변경은 필요하지 않습니다.
+
+# 추천 Commit Message
+
+`feat: 대시보드 역별 상세 이동 링크 추가`
+
+## Change Log
+
+2026-07-10
+
+- 대시보드 노선 지도 역별 화살표를 역 상세 링크로 변경
+- mock 데이터가 없는 역명 기반 상세 이동 지원
+- 노선 지도 카드 전체 보기 버튼 제거
+
+## Timestamp
+
+2026-07-10 11:14:32 (KST)

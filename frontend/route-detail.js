@@ -2,8 +2,10 @@ const SEGMENT_DETAIL_MOCK_URL = "../mock/segments_details.json";
 const VULNERABILITY_SEGMENTS_MOCK_URL = "../mock/vulnerability_segments.json";
 const SEGMENT_ID_QUERY_PARAM = "segment_id";
 
-const HIGH_DELAY_INCREASE_THRESHOLD = 12;
-const WARNING_DELAY_INCREASE_THRESHOLD = 7;
+const HIGH_EXPECTED_DELAY_THRESHOLD = 15;
+const WARNING_EXPECTED_DELAY_THRESHOLD = 5;
+const HIGH_STOP_RATE_THRESHOLD = 0.05;
+const WARNING_STOP_RATE_THRESHOLD = 0.02;
 const LINE_CHART_MAX_VALUE = 40;
 const LINE_CHART_MIN_X = 38;
 const LINE_CHART_MAX_X = 438;
@@ -26,6 +28,7 @@ const RISK_LABELS = {
 
 const routeTabs = Array.from(document.querySelectorAll("[data-route-tab]"));
 const routePanels = Array.from(document.querySelectorAll("[data-route-panel]"));
+const routeRiskCriteriaToggles = Array.from(document.querySelectorAll("[data-route-risk-criteria-toggle]"));
 
 const routeSummaryElements = {
   breadcrumb: document.querySelector("[data-route-detail-breadcrumb]"),
@@ -178,16 +181,25 @@ function formatCompactCaseDate(dateString) {
   return `${parts.year}.${parts.month}.${parts.day}`;
 }
 
-function getRiskLevelByDelayIncrease(delayIncrease) {
-  if (!Number.isFinite(delayIncrease)) {
+function getRiskLevel(expectedDelay, stopRate) {
+  const hasExpectedDelay = Number.isFinite(expectedDelay);
+  const hasStopRate = Number.isFinite(stopRate);
+
+  if (!hasExpectedDelay && !hasStopRate) {
     return "none";
   }
 
-  if (delayIncrease >= HIGH_DELAY_INCREASE_THRESHOLD) {
+  if (
+    (hasExpectedDelay && expectedDelay >= HIGH_EXPECTED_DELAY_THRESHOLD)
+    || (hasStopRate && stopRate >= HIGH_STOP_RATE_THRESHOLD)
+  ) {
     return "high";
   }
 
-  if (delayIncrease >= WARNING_DELAY_INCREASE_THRESHOLD) {
+  if (
+    (hasExpectedDelay && expectedDelay >= WARNING_EXPECTED_DELAY_THRESHOLD)
+    || (hasStopRate && stopRate >= WARNING_STOP_RATE_THRESHOLD)
+  ) {
     return "warning";
   }
 
@@ -894,7 +906,7 @@ function renderRoutePageMeta(segmentDetailData, selectedSegment) {
 function renderRouteSummary(segmentDetailData, vulnerabilitySegmentsData, selectedSegment) {
   const fromStation = selectedSegment?.from || segmentDetailData.from;
   const toStation = selectedSegment?.to || segmentDetailData.to;
-  const riskLevel = getRiskLevelByDelayIncrease(selectedSegment?.avg_delay_incr);
+  const riskLevel = getRiskLevel(selectedSegment?.avg_delay_incr, selectedSegment?.stop_rate);
   const alertText = `${vulnerabilitySegmentsData.alert_type || "특보"} ${vulnerabilitySegmentsData.alert_level || ""}`.trim();
 
   if (routeSummaryElements.fromStation) {
@@ -1020,6 +1032,22 @@ async function initializeRouteDetail() {
 routeTabs.forEach((tab) => {
   tab.addEventListener("click", () => {
     setRouteTab(tab.dataset.routeTab);
+  });
+});
+
+routeRiskCriteriaToggles.forEach((toggle) => {
+  const panelId = toggle.getAttribute("aria-controls");
+  const panel = panelId ? document.getElementById(panelId) : null;
+
+  if (!panel) {
+    return;
+  }
+
+  toggle.addEventListener("click", () => {
+    const isExpanded = toggle.getAttribute("aria-expanded") === "true";
+
+    toggle.setAttribute("aria-expanded", String(!isExpanded));
+    panel.hidden = isExpanded;
   });
 });
 

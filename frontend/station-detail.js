@@ -241,7 +241,7 @@ function getInitialSelectedStationName(stationDetailData, vulnerabilityStationsD
     return stationNameById;
   }
 
-  if (getStationByName(stationNameFromUrl, vulnerabilityStationsData)) {
+  if (stationNameFromUrl) {
     return stationNameFromUrl;
   }
 
@@ -470,7 +470,6 @@ function createHistoryItem(caseItem) {
   const title = document.createElement("strong");
   const alertDescription = document.createElement("p");
   const delayDescription = document.createElement("p");
-  const button = document.createElement("button");
   const alertLabel = caseItem.alert_type || "평상시";
   const riskLevel = getHistoryRiskLevel(caseItem);
   const formattedDate = formatCaseDate(caseItem.date);
@@ -489,12 +488,7 @@ function createHistoryItem(caseItem) {
     : "지연 정보 없음";
   content.append(title, alertDescription, delayDescription);
 
-  button.className = "station-history-item__button";
-  button.type = "button";
-  button.textContent = "상세보기";
-  button.setAttribute("aria-label", `${formattedDate} ${alertLabel} 사례 상세보기`);
-
-  item.append(label, content, button);
+  item.append(label, content);
 
   return item;
 }

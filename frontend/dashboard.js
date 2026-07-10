@@ -417,15 +417,16 @@ function renderSummaryCards(alertsData, checklistData, vulnerabilitySegmentsData
   );
 }
 
-function createRouteMapItem(node) {
+function createRouteMapItem(node, stations = []) {
   const riskLevel = getRiskLevelByVulnerability(node.vuln);
   const risk = RISK_LEVELS[riskLevel];
+  const stationInfo = getStationByName(node.station, stations);
   const item = document.createElement("li");
   const station = document.createElement("span");
   const marker = document.createElement("span");
   const dash = document.createElement("span");
   const status = document.createElement("span");
-  const chevron = document.createElement("span");
+  const chevron = document.createElement("a");
 
   item.className = `route-map__item route-map__item--${riskLevel}`;
   item.setAttribute("aria-label", `${node.station} 취약도 ${risk.label}`);
@@ -440,7 +441,17 @@ function createRouteMapItem(node) {
   status.textContent = risk.label;
 
   chevron.className = "route-map__chevron";
+  chevron.href = createStationDetailUrl(node.station, stationInfo?.station_id);
   chevron.textContent = "›";
+  chevron.setAttribute(
+    "aria-label",
+    stationInfo
+      ? `${node.station}역 상세 화면으로 이동`
+      : `${node.station}역 상세 화면으로 이동, 현재 mock 상세 데이터 없음`,
+  );
+  chevron.title = stationInfo
+    ? `${node.station}역 상세 화면으로 이동`
+    : `${node.station}역 상세 화면으로 이동합니다. 현재 mock 상세 데이터는 없습니다.`;
 
   item.append(station, marker, dash, status, chevron);
 
@@ -506,9 +517,10 @@ function renderEmptyHeatmap() {
   }
 }
 
-function renderHeatmap(heatmapData, updatedAt) {
+function renderHeatmap(heatmapData, updatedAt, vulnerabilityStationsData = {}) {
   const nodes = Array.isArray(heatmapData.nodes) ? heatmapData.nodes : [];
   const edges = Array.isArray(heatmapData.edges) ? heatmapData.edges : [];
+  const stations = getStationsFromData(vulnerabilityStationsData);
   const lineName = heatmapData.line || "노선";
   const edgeCounts = countHeatmapEdgesByRiskLevel(edges);
 
@@ -526,7 +538,7 @@ function renderHeatmap(heatmapData, updatedAt) {
   }
 
   if (heatmapElements.routeList) {
-    heatmapElements.routeList.replaceChildren(...nodes.map(createRouteMapItem));
+    heatmapElements.routeList.replaceChildren(...nodes.map((node) => createRouteMapItem(node, stations)));
     heatmapElements.routeList.style.setProperty("--route-risk-gradient", buildRouteRiskGradient(nodes));
   }
 
@@ -1084,7 +1096,7 @@ function getFilteredDashboardData(state, filters) {
 function renderDashboardData(data) {
   renderAlertBanner(data.alertsData);
   renderSummaryCards(data.alertsData, data.checklistData, data.vulnerabilitySegmentsData);
-  renderHeatmap(data.heatmapData, data.alertsData.updated_at);
+  renderHeatmap(data.heatmapData, data.alertsData.updated_at, data.vulnerabilityStationsData);
   renderRankings(data.vulnerabilitySegmentsData, data.vulnerabilityStationsData);
   renderInspectionTable(data.checklistData, data.vulnerabilityStationsData);
 }

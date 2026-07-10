@@ -341,10 +341,30 @@
             </div>
           </section>
 
-          <button class="route-risk-criteria" type="button" aria-label="위험도 산정 기준 보기">
+          <button class="route-risk-criteria" type="button" aria-label="위험도 산정 기준 보기" aria-expanded="false" aria-controls="route-risk-criteria-summary" data-route-risk-criteria-toggle>
             <span><img src="./assets/icons/circle-info.svg" alt="" aria-hidden="true">위험도 산정 기준 보기</span>
             <img src="./assets/icons/chevron-down.svg" alt="" aria-hidden="true">
           </button>
+          <section class="route-risk-criteria-panel" id="route-risk-criteria-summary" aria-label="위험도 산정 기준" hidden data-route-risk-criteria-panel>
+            <ul class="route-risk-criteria-panel__list">
+              <li class="route-risk-criteria-panel__item route-risk-criteria-panel__item--high">
+                <strong>높음</strong>
+                <span>예상 지연 15분 이상 또는 운행 중단률 5% 이상</span>
+              </li>
+              <li class="route-risk-criteria-panel__item route-risk-criteria-panel__item--warning">
+                <strong>주의</strong>
+                <span>예상 지연 5~15분 또는 운행 중단률 2~5%</span>
+              </li>
+              <li class="route-risk-criteria-panel__item route-risk-criteria-panel__item--interest">
+                <strong>관심</strong>
+                <span>예상 지연 5분 미만 또는 운행 중단률 2% 미만</span>
+              </li>
+              <li class="route-risk-criteria-panel__item route-risk-criteria-panel__item--none">
+                <strong>데이터 없음</strong>
+                <span>분석 가능한 데이터가 부족함</span>
+              </li>
+            </ul>
+          </section>
         </aside>
       </div>
 
@@ -492,10 +512,30 @@
             </div>
           </section>
 
-          <button class="route-risk-criteria" type="button" aria-label="위험도 산정 기준 보기">
+          <button class="route-risk-criteria" type="button" aria-label="위험도 산정 기준 보기" aria-expanded="false" aria-controls="route-risk-criteria-alerts" data-route-risk-criteria-toggle>
             <span><img src="./assets/icons/circle-info.svg" alt="" aria-hidden="true">위험도 산정 기준 보기</span>
             <img src="./assets/icons/chevron-down.svg" alt="" aria-hidden="true">
           </button>
+          <section class="route-risk-criteria-panel" id="route-risk-criteria-alerts" aria-label="위험도 산정 기준" hidden data-route-risk-criteria-panel>
+            <ul class="route-risk-criteria-panel__list">
+              <li class="route-risk-criteria-panel__item route-risk-criteria-panel__item--high">
+                <strong>높음</strong>
+                <span>예상 지연 15분 이상 또는 운행 중단률 5% 이상</span>
+              </li>
+              <li class="route-risk-criteria-panel__item route-risk-criteria-panel__item--warning">
+                <strong>주의</strong>
+                <span>예상 지연 5~15분 또는 운행 중단률 2~5%</span>
+              </li>
+              <li class="route-risk-criteria-panel__item route-risk-criteria-panel__item--interest">
+                <strong>관심</strong>
+                <span>예상 지연 5분 미만 또는 운행 중단률 2% 미만</span>
+              </li>
+              <li class="route-risk-criteria-panel__item route-risk-criteria-panel__item--none">
+                <strong>데이터 없음</strong>
+                <span>분석 가능한 데이터가 부족함</span>
+              </li>
+            </ul>
+          </section>
 
           <section class="route-grade-card" aria-labelledby="route-grade-title">
             <h2 id="route-grade-title">특보 등급 기준</h2>
@@ -700,10 +740,30 @@
             </div>
           </section>
 
-          <button class="route-risk-criteria" type="button" aria-label="위험도 산정 기준 보기">
+          <button class="route-risk-criteria" type="button" aria-label="위험도 산정 기준 보기" aria-expanded="false" aria-controls="route-risk-criteria-history" data-route-risk-criteria-toggle>
             <span><img src="./assets/icons/circle-info.svg" alt="" aria-hidden="true">위험도 산정 기준 보기</span>
             <img src="./assets/icons/chevron-down.svg" alt="" aria-hidden="true">
           </button>
+          <section class="route-risk-criteria-panel" id="route-risk-criteria-history" aria-label="위험도 산정 기준" hidden data-route-risk-criteria-panel>
+            <ul class="route-risk-criteria-panel__list">
+              <li class="route-risk-criteria-panel__item route-risk-criteria-panel__item--high">
+                <strong>높음</strong>
+                <span>예상 지연 15분 이상 또는 운행 중단률 5% 이상</span>
+              </li>
+              <li class="route-risk-criteria-panel__item route-risk-criteria-panel__item--warning">
+                <strong>주의</strong>
+                <span>예상 지연 5~15분 또는 운행 중단률 2~5%</span>
+              </li>
+              <li class="route-risk-criteria-panel__item route-risk-criteria-panel__item--interest">
+                <strong>관심</strong>
+                <span>예상 지연 5분 미만 또는 운행 중단률 2% 미만</span>
+              </li>
+              <li class="route-risk-criteria-panel__item route-risk-criteria-panel__item--none">
+                <strong>데이터 없음</strong>
+                <span>분석 가능한 데이터가 부족함</span>
+              </li>
+            </ul>
+          </section>
 
           <section class="route-similar-card" aria-labelledby="route-similar-title">
             <h2 id="route-similar-title">현재 사례와 유사한 과거 사례</h2>
