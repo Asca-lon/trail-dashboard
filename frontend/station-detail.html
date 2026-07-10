@@ -75,8 +75,8 @@
         </div>
         <div class="station-info-card__identity">
           <div class="station-info-card__name-row">
-            <h2 class="station-info-card__name" id="station-name" data-station-detail-name>대전역</h2>
-            <span class="station-line-badge" data-station-detail-line>경부선</span>
+            <h2 class="station-info-card__name" id="station-name" data-station-detail-name>역 정보 불러오는 중</h2>
+            <span class="station-line-badge" data-station-detail-line>불러오는 중</span>
           </div>
         </div>
         <button class="station-info-card__change" type="button" aria-label="조회할 역 변경" aria-haspopup="dialog" aria-controls="station-change-dialog" aria-expanded="false" data-station-select-toggle>역 변경</button>
@@ -85,8 +85,8 @@
       <aside class="station-risk-status" aria-labelledby="station-risk-title" data-station-detail-risk-card>
         <img class="station-risk-status__icon" src="./assets/icons/triangle-alert.svg" alt="" aria-hidden="true">
         <div>
-          <h3 class="station-risk-status__title" id="station-risk-title" data-station-detail-risk-title>현재 위험도: 높음</h3>
-          <p class="station-risk-status__text" data-station-detail-risk-text>호우 경보 · 07.07 14:00 기준</p>
+          <h3 class="station-risk-status__title" id="station-risk-title" data-station-detail-risk-title>현재 위험도: 불러오는 중</h3>
+          <p class="station-risk-status__text" data-station-detail-risk-text>특보 정보 불러오는 중</p>
         </div>
       </aside>
     </section>
@@ -94,47 +94,47 @@
     <section class="station-metric-grid" aria-labelledby="station-metric-title">
       <h2 class="sr-only" id="station-metric-title">역 상세 주요 지표</h2>
 
-      <article class="station-metric-card" aria-label="평균 지연 시간 18.4분, 전일 대비 7.2분 증가" data-station-detail-metric="avg-delay">
+      <article class="station-metric-card" aria-label="평균 지연 시간 불러오는 중" data-station-detail-metric="avg-delay">
         <div class="station-metric-card__icon station-metric-card__icon--delay" aria-hidden="true">
           <img src="./assets/icons/clock-4.svg" alt="">
         </div>
         <div class="station-metric-card__body">
           <h3 class="station-metric-card__title">평균 지연 시간</h3>
-          <p class="station-metric-card__value"><strong data-station-detail-metric-value>18.4</strong><span data-station-detail-metric-unit>분</span></p>
-          <p class="station-metric-card__comparison" data-station-detail-metric-comparison>전일 대비 <strong>+7.2 분 ↑</strong></p>
+          <p class="station-metric-card__value"><strong data-station-detail-metric-value>-</strong><span data-station-detail-metric-unit></span></p>
+          <p class="station-metric-card__comparison" data-station-detail-metric-comparison>불러오는 중</p>
         </div>
       </article>
 
-      <article class="station-metric-card" aria-label="평균 지연 증가량 10.2분, 전일 대비 2.8분 증가" data-station-detail-metric="delta-delay">
+      <article class="station-metric-card" aria-label="평균 지연 증가량 불러오는 중" data-station-detail-metric="delta-delay">
         <div class="station-metric-card__icon station-metric-card__icon--increase" aria-hidden="true">
           <img src="./assets/icons/trending-up.svg" alt="">
         </div>
         <div class="station-metric-card__body">
           <h3 class="station-metric-card__title">평균 지연 증가량</h3>
-          <p class="station-metric-card__value"><strong data-station-detail-metric-value>+10.2</strong><span data-station-detail-metric-unit>분</span></p>
-          <p class="station-metric-card__comparison" data-station-detail-metric-comparison>전일 대비 <strong>+2.8 분 ↑</strong></p>
+          <p class="station-metric-card__value"><strong data-station-detail-metric-value>-</strong><span data-station-detail-metric-unit></span></p>
+          <p class="station-metric-card__comparison" data-station-detail-metric-comparison>불러오는 중</p>
         </div>
       </article>
 
-      <article class="station-metric-card" aria-label="지연률 12.6퍼센트, 전일 대비 3.1퍼센트 포인트 증가" data-station-detail-metric="delay-rate">
+      <article class="station-metric-card" aria-label="지연률 불러오는 중" data-station-detail-metric="delay-rate">
         <div class="station-metric-card__icon station-metric-card__icon--rate" aria-hidden="true">
           <img src="./assets/icons/percent.svg" alt="">
         </div>
         <div class="station-metric-card__body">
           <h3 class="station-metric-card__title">지연률</h3>
-          <p class="station-metric-card__value"><strong data-station-detail-metric-value>12.6</strong><span data-station-detail-metric-unit>%</span></p>
-          <p class="station-metric-card__comparison" data-station-detail-metric-comparison>전일 대비 <strong>+3.1 %p ↑</strong></p>
+          <p class="station-metric-card__value"><strong data-station-detail-metric-value>-</strong><span data-station-detail-metric-unit></span></p>
+          <p class="station-metric-card__comparison" data-station-detail-metric-comparison>불러오는 중</p>
         </div>
       </article>
 
-      <article class="station-metric-card" aria-label="운행 중단률 4.8퍼센트, 전일 대비 1.9퍼센트 포인트 증가" data-station-detail-metric="stop-rate">
+      <article class="station-metric-card" aria-label="운행 중단률 불러오는 중" data-station-detail-metric="stop-rate">
         <div class="station-metric-card__icon station-metric-card__icon--suspend" aria-hidden="true">
           <img src="./assets/icons/circle-minus.svg" alt="">
         </div>
         <div class="station-metric-card__body">
           <h3 class="station-metric-card__title">운행 중단률</h3>
-          <p class="station-metric-card__value"><strong data-station-detail-metric-value>4.8</strong><span data-station-detail-metric-unit>%</span></p>
-          <p class="station-metric-card__comparison" data-station-detail-metric-comparison>전일 대비 <strong>+1.9 %p ↑</strong></p>
+          <p class="station-metric-card__value"><strong data-station-detail-metric-value>-</strong><span data-station-detail-metric-unit></span></p>
+          <p class="station-metric-card__comparison" data-station-detail-metric-comparison>불러오는 중</p>
         </div>
       </article>
     </section>
@@ -147,7 +147,7 @@
           <h3 class="station-chart-card__title" id="hourly-delay-title">시간대별 평균 지연 시간</h3>
           <span class="station-chart-card__unit">(단위: 분)</span>
         </header>
-        <div class="station-line-chart" role="img" aria-label="평일 평균 지연 시간이 14시에 18.4분으로 표시되는 시간대별 평균 지연 시간 차트" data-station-detail-line-chart>
+        <div class="station-line-chart" role="img" aria-label="시간대별 평균 지연 시간 불러오는 중" data-station-detail-line-chart>
           <div class="station-line-chart__legend">
             <span><i class="station-line-chart__legend-line station-line-chart__legend-line--weekday"></i>평일</span>
             <span><i class="station-line-chart__legend-line station-line-chart__legend-line--holiday"></i>주말/공휴일</span>
@@ -173,12 +173,12 @@
               <text x="532" y="216">20시</text>
               <text x="574" y="216">24시</text>
             </g>
-            <polyline class="station-line-chart__holiday-line" points="42,158 72,150 102,154 132,145 162,142 192,126 222,116 252,136 282,144 312,142 342,118 372,112 402,132 432,146 462,120 492,116 522,124 552,82 590,70" data-station-detail-line-holiday></polyline>
-            <polyline class="station-line-chart__weekday-line" points="42,146 72,136 102,138 132,128 162,112 192,86 222,80 252,104 282,108 312,104 342,86 372,66" data-station-detail-line-weekday></polyline>
-            <circle class="station-line-chart__point" cx="372" cy="66" r="5" data-station-detail-line-point></circle>
+            <polyline class="station-line-chart__holiday-line" points="" data-station-detail-line-holiday></polyline>
+            <polyline class="station-line-chart__weekday-line" points="" data-station-detail-line-weekday></polyline>
+            <circle class="station-line-chart__point" cx="0" cy="0" r="5" data-station-detail-line-point hidden></circle>
             <g class="station-line-chart__tooltip">
-              <rect x="344" y="34" width="58" height="30" rx="6" data-station-detail-line-tooltip-box></rect>
-              <text x="373" y="54" text-anchor="middle" data-station-detail-line-tooltip>18.4분</text>
+              <rect x="0" y="0" width="58" height="30" rx="6" data-station-detail-line-tooltip-box hidden></rect>
+              <text x="0" y="0" text-anchor="middle" data-station-detail-line-tooltip></text>
             </g>
           </svg>
         </div>
@@ -199,21 +199,6 @@
             <span class="station-bar-chart__y station-bar-chart__y--20">20</span>
             <span class="station-bar-chart__y station-bar-chart__y--10">10</span>
             <span class="station-bar-chart__y station-bar-chart__y--0">0</span>
-            <div class="station-bar-chart__group">
-              <div class="station-bar-chart__bar station-bar-chart__bar--normal station-bar-chart__bar--normal-rain"><span>8.2</span></div>
-              <div class="station-bar-chart__bar station-bar-chart__bar--alert station-bar-chart__bar--alert-rain"><span>22.7</span></div>
-              <strong>호우</strong>
-            </div>
-            <div class="station-bar-chart__group">
-              <div class="station-bar-chart__bar station-bar-chart__bar--normal station-bar-chart__bar--normal-snow"><span>7.4</span></div>
-              <div class="station-bar-chart__bar station-bar-chart__bar--alert station-bar-chart__bar--alert-snow"><span>18.3</span></div>
-              <strong>대설</strong>
-            </div>
-            <div class="station-bar-chart__group">
-              <div class="station-bar-chart__bar station-bar-chart__bar--normal station-bar-chart__bar--normal-wind"><span>6.8</span></div>
-              <div class="station-bar-chart__bar station-bar-chart__bar--alert station-bar-chart__bar--alert-wind"><span>12.4</span></div>
-              <strong>강풍</strong>
-            </div>
           </div>
         </div>
       </article>
@@ -239,43 +224,7 @@
                 <th scope="col">운행 중단률</th>
               </tr>
             </thead>
-            <tbody data-station-detail-alert-table-body>
-              <tr>
-                <th scope="row"><img src="./assets/icons/cloud-rain.svg" alt="" aria-hidden="true"><span>호우 경보</span></th>
-                <td>8 회</td>
-                <td>22.7</td>
-                <td>16.7%</td>
-                <td>6.3%</td>
-              </tr>
-              <tr>
-                <th scope="row"><img src="./assets/icons/cloud-rain.svg" alt="" aria-hidden="true"><span>호우 주의보</span></th>
-                <td>15 회</td>
-                <td>14.3</td>
-                <td>10.2%</td>
-                <td>3.1%</td>
-              </tr>
-              <tr>
-                <th scope="row"><img src="./assets/icons/wind.svg" alt="" aria-hidden="true"><span>강풍 주의보</span></th>
-                <td>11 회</td>
-                <td>8.6</td>
-                <td>6.1%</td>
-                <td>1.2%</td>
-              </tr>
-              <tr>
-                <th scope="row"><img src="./assets/icons/snowflake.svg" alt="" aria-hidden="true"><span>대설 주의보</span></th>
-                <td>6 회</td>
-                <td>11.2</td>
-                <td>7.4%</td>
-                <td>2.8%</td>
-              </tr>
-              <tr>
-                <th scope="row"><img src="./assets/icons/sun.svg" alt="" aria-hidden="true"><span>폭염 주의보</span></th>
-                <td>7 회</td>
-                <td>6.4</td>
-                <td>4.2%</td>
-                <td>0.8%</td>
-              </tr>
-            </tbody>
+            <tbody data-station-detail-alert-table-body></tbody>
           </table>
         </div>
       </article>

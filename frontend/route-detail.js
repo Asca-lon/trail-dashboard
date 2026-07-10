@@ -1,5 +1,6 @@
 const SEGMENT_DETAIL_MOCK_URL = "../mock/segments_details.json";
 const VULNERABILITY_SEGMENTS_MOCK_URL = "../mock/vulnerability_segments.json";
+const ACTIVE_ALERTS_MOCK_URL = "../mock/alerts_active.json";
 const SEGMENT_ID_QUERY_PARAM = "segment_id";
 
 const HIGH_EXPECTED_DELAY_THRESHOLD = 15;
@@ -94,6 +95,8 @@ const routeHistoryFilterElements = {
   periodSelect: document.querySelector("[data-route-history-period-select]"),
 };
 
+const activeAlertCardElements = Array.from(document.querySelectorAll("[data-route-active-alert-card]"));
+
 let routeHistoryState = null;
 let isRouteHistoryFilterInitialized = false;
 
@@ -116,6 +119,97 @@ function formatStationName(stationName) {
   }
 
   return stationName.endsWith("역") ? stationName : `${stationName}역`;
+}
+
+function formatAlertDateTime(value) {
+  if (!value) {
+    return "정보 없음";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "정보 없음";
+  }
+
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
+function isAlertMatchingSegment(alert, fromStation, toStation) {
+  if (!alert || !fromStation || !toStation) {
+    return false;
+  }
+
+  const affectedItems = Array.isArray(alert.affected) ? alert.affected : [];
+  const hasMatchingSegment = affectedItems.some((item) => (
+    item.type === "segment"
+    && item.from === fromStation
+    && item.to === toStation
+  ));
+  const hasMatchingEndpointStation = affectedItems.some((item) => (
+    item.type === "station"
+    && (item.station === fromStation || item.station === toStation)
+  ));
+  const hasMatchingEndpointRegion = alert.region_name === fromStation || alert.region_name === toStation;
+
+  return hasMatchingSegment || hasMatchingEndpointStation || hasMatchingEndpointRegion;
+}
+
+function createActiveAlertContent(alert) {
+  const headline = document.createElement("div");
+  const icon = document.createElement("img");
+  const title = document.createElement("strong");
+  const details = document.createElement("dl");
+  const detailItems = [
+    ["발효 지역", alert.region_name || "정보 없음"],
+    ["시작 시간", formatAlertDateTime(alert.since)],
+    ["종료 예상", "정보 없음"],
+  ];
+
+  headline.className = "route-alert-card__headline";
+  icon.src = getAlertIconPath(alert.alert_type);
+  icon.alt = "";
+  icon.setAttribute("aria-hidden", "true");
+  title.textContent = `${alert.alert_type || "특보"} ${alert.alert_level || ""}`.trim();
+  headline.append(icon, title);
+
+  details.className = "route-alert-card__details";
+  detailItems.forEach(([label, value]) => {
+    const item = document.createElement("div");
+    const term = document.createElement("dt");
+    const description = document.createElement("dd");
+
+    term.textContent = label;
+    description.textContent = value;
+    item.append(term, description);
+    details.append(item);
+  });
+
+  return [headline, details];
+}
+
+function renderActiveAlerts(alertsData, selectedSegment) {
+  const activeAlerts = Array.isArray(alertsData?.active) ? alertsData.active : [];
+  const matchingAlerts = activeAlerts.filter((alert) => (
+    isAlertMatchingSegment(alert, selectedSegment?.from, selectedSegment?.to)
+  ));
+
+  activeAlertCardElements.forEach((card) => {
+    if (matchingAlerts.length === 0) {
+      const emptyMessage = document.createElement("p");
+      emptyMessage.textContent = "현재 발효 중인 특보가 없습니다.";
+      card.replaceChildren(emptyMessage);
+      return;
+    }
+
+    card.replaceChildren(...matchingAlerts.flatMap(createActiveAlertContent));
+  });
 }
 
 function formatSegmentLabel(fromStation, toStation) {
@@ -1014,6 +1108,7 @@ function renderEmptyRouteDetail() {
   setMetricCard(routeMetricElements.delayIncrease, "-", "분", "mock 데이터", "없음", "지연 증가량 데이터 없음");
   setMetricCard(routeMetricElements.stopRate, "-", "%", "mock 데이터", "없음", "운행 중단률 데이터 없음");
   setMetricCard(routeMetricElements.sampleCount, "-", "건", "mock 데이터", "없음", "분석 표본 수 데이터 없음");
+  renderActiveAlerts({}, null);
   renderRouteAlertTables({});
   renderRouteHistoryTable({});
   renderRouteCharts({}, null);
@@ -1123,7 +1218,7 @@ function renderRouteMetrics(selectedSegment) {
   );
 }
 
-function renderRouteDetail(segmentDetailsData, vulnerabilitySegmentsData) {
+function renderRouteDetail(segmentDetailsData, vulnerabilitySegmentsData, alertsData) {
   const selectedSegment = getInitialSegment(vulnerabilitySegmentsData, segmentDetailsData);
 
   if (!selectedSegment) {
@@ -1139,6 +1234,7 @@ function renderRouteDetail(segmentDetailsData, vulnerabilitySegmentsData) {
 
   renderRoutePageMeta(selectedSegmentDetail, selectedSegment);
   renderRouteSummary(selectedSegmentDetail, vulnerabilitySegmentsData, selectedSegment);
+  renderActiveAlerts(alertsData, selectedSegment);
   renderRouteMetrics(selectedSegment);
   renderRouteAlertTables(selectedSegmentDetail);
   renderRouteHistoryTable(selectedSegmentDetail);
@@ -1158,12 +1254,13 @@ async function fetchJson(url) {
 
 async function initializeRouteDetail() {
   try {
-    const [segmentDetailData, vulnerabilitySegmentsData] = await Promise.all([
+    const [segmentDetailData, vulnerabilitySegmentsData, alertsData] = await Promise.all([
       fetchJson(SEGMENT_DETAIL_MOCK_URL),
       fetchJson(VULNERABILITY_SEGMENTS_MOCK_URL),
+      fetchJson(ACTIVE_ALERTS_MOCK_URL),
     ]);
 
-    renderRouteDetail(segmentDetailData, vulnerabilitySegmentsData);
+    renderRouteDetail(segmentDetailData, vulnerabilitySegmentsData, alertsData);
   } catch (error) {
     console.error(error);
     renderEmptyRouteDetail();

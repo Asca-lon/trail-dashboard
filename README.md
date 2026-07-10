@@ -45,6 +45,12 @@ trail-dashboard/
 | `mock/` | 공유 | CONTRACT §5 모양의 mock JSON. **협업의 핵심** |
 | `index.html` | B | GitHub Pages 콘솔 — mock 을 안정 URL 로 호스팅 + 살아있는 API 문서 |
 
+### 프론트엔드 초기 표시 원칙
+
+대시보드, 역 상세, 구간 상세 페이지는 HTML에 실제처럼 보이는 예시 데이터를 포함하지 않습니다. 데이터 요청 중에는 `불러오는 중` 상태를 표시하고, 응답이 완료된 뒤 연결된 Mock/API 데이터만 렌더링합니다. 페이지별 데이터 연결 기준은 `.docs/Frontend_Hardcoded_Data_Mapping.md`에서 관리합니다.
+
+구간 상세 페이지의 현재 발효 특보 카드는 `alerts_active.json`에서 선택 구간의 출발역·도착역과 관련된 특보만 필터링하여 표시합니다.
+
 ## GitHub Pages (mock 호스팅)
 
 Settings → Pages → Source: `main` 브랜치 `/ (root)` 로 배포하면:
