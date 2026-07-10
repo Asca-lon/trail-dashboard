@@ -26,6 +26,18 @@ const RISK_LABELS = {
   none: "정보 없음",
 };
 
+const GYEONGBU_HIGH_SPEED_SEGMENTS = [
+  { segment_id: "seoul-gwangmyeong", from: "서울", to: "광명" },
+  { segment_id: "gwangmyeong-cheonan_asan", from: "광명", to: "천안아산" },
+  { segment_id: "cheonan_asan-osong", from: "천안아산", to: "오송" },
+  { segment_id: "osong-daejeon", from: "오송", to: "대전" },
+  { segment_id: "daejeon-gimcheon_gumi", from: "대전", to: "김천(구미)" },
+  { segment_id: "gimcheon_gumi-dongdaegu", from: "김천(구미)", to: "동대구" },
+  { segment_id: "dongdaegu-gyeongju", from: "동대구", to: "경주" },
+  { segment_id: "gyeongju-ulsan", from: "경주", to: "울산" },
+  { segment_id: "ulsan-busan", from: "울산", to: "부산" },
+];
+
 const routeTabs = Array.from(document.querySelectorAll("[data-route-tab]"));
 const routePanels = Array.from(document.querySelectorAll("[data-route-panel]"));
 const routeRiskCriteriaToggles = Array.from(document.querySelectorAll("[data-route-risk-criteria-toggle]"));
@@ -321,8 +333,16 @@ function getInitialSegmentId() {
 function getInitialSegment(vulnerabilitySegmentsData, segmentDetailsData) {
   const segmentIdFromUrl = getInitialSegmentId();
   const firstSegmentDetail = getFirstSegmentDetail(segmentDetailsData);
+  const highSpeedSegment = GYEONGBU_HIGH_SPEED_SEGMENTS.find(
+    (segment) => segment.segment_id === segmentIdFromUrl,
+  );
+  const vulnerabilitySegment = getSegmentById(segmentIdFromUrl, vulnerabilitySegmentsData);
 
-  return getSegmentById(segmentIdFromUrl, vulnerabilitySegmentsData)
+  if (highSpeedSegment) {
+    return { ...highSpeedSegment, ...vulnerabilitySegment };
+  }
+
+  return vulnerabilitySegment
     || getSegmentByEndpoints(firstSegmentDetail || {}, vulnerabilitySegmentsData)
     || getSegments(vulnerabilitySegmentsData)[0]
     || null;
@@ -331,8 +351,14 @@ function getInitialSegment(vulnerabilitySegmentsData, segmentDetailsData) {
 function getSelectedSegmentDetail(selectedSegment, segmentDetailsData) {
   const segmentIdFromUrl = getInitialSegmentId();
 
-  return getSegmentDetailById(segmentIdFromUrl, segmentDetailsData)
-    || getSegmentDetailById(selectedSegment?.segment_id, segmentDetailsData)
+  if (segmentIdFromUrl) {
+    return getSegmentDetailById(segmentIdFromUrl, segmentDetailsData)
+      || getSegmentDetailById(selectedSegment?.segment_id, segmentDetailsData)
+      || getSegmentDetailByEndpoints(selectedSegment, segmentDetailsData)
+      || {};
+  }
+
+  return getSegmentDetailById(selectedSegment?.segment_id, segmentDetailsData)
     || getSegmentDetailByEndpoints(selectedSegment, segmentDetailsData)
     || getFirstSegmentDetail(segmentDetailsData)
     || {};
@@ -1168,15 +1194,6 @@ routeRiskCriteriaToggles.forEach((toggle) => {
 
 initializeRouteDetail();
 
-const ROUTE_CHANGE_SEGMENT_LABELS = {
-  "daejeon-gimcheon_gumi": "대전역 - 김천(구미)역",
-  "cheonan-daejeon": "천안역 - 대전역",
-  "yeongdeungpo-suwon": "영등포역 - 수원역",
-  "dongdaegu-miryang": "동대구역 - 밀양역",
-  "gimcheon_gumi-dongdaegu": "김천(구미)역 - 동대구역",
-  "miryang-busan": "밀양역 - 부산역",
-};
-
 const routeChangeElements = {
   openButton: document.querySelector("[data-route-change-open]"),
   modal: document.querySelector("[data-route-change-modal]"),
@@ -1186,8 +1203,7 @@ const routeChangeElements = {
 };
 
 function getRouteChangeLabel(segment) {
-  return ROUTE_CHANGE_SEGMENT_LABELS[segment.segment_id]
-    || `${segment.from || "출발역"} - ${segment.to || "도착역"}`;
+  return `${formatStationName(segment.from)} - ${formatStationName(segment.to)}`;
 }
 
 function getCurrentRouteSegmentId() {
@@ -1244,17 +1260,12 @@ function renderRouteChangeOptions(segments) {
   }
 }
 
-async function initializeRouteChangeModal() {
+function initializeRouteChangeModal() {
   if (!routeChangeElements.openButton || !routeChangeElements.modal || !routeChangeElements.form) {
     return;
   }
 
-  try {
-    const vulnerabilitySegmentsData = await fetchJson(VULNERABILITY_SEGMENTS_MOCK_URL);
-    renderRouteChangeOptions(getSegments(vulnerabilitySegmentsData));
-  } catch (error) {
-    console.error(error);
-  }
+  renderRouteChangeOptions(GYEONGBU_HIGH_SPEED_SEGMENTS);
 
   routeChangeElements.openButton.addEventListener("click", openRouteChangeModal);
   routeChangeElements.closeButtons.forEach((button) => {

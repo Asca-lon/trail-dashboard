@@ -47,10 +47,6 @@
       </ul>
 
       <div class="sidebar__bottom">
-        <a class="sidebar__standard-link" href="#">
-          <span class="sidebar__standard-icon" aria-hidden="true"></span>
-          <span>데이터 기준 안내</span>
-        </a>
         <button class="sidebar__collapse-button" type="button" aria-label="사이드바 닫기" data-sidebar-close>
           <span class="sidebar__collapse-icon" aria-hidden="true"></span>
         </button>
@@ -93,11 +89,6 @@
           </div>
           <div class="route-info-card__divider" aria-hidden="true"></div>
           <div class="route-info-card__meta-item">
-            <span>구간 거리</span>
-            <strong>114.7 km</strong>
-          </div>
-          <div class="route-info-card__divider" aria-hidden="true"></div>
-          <div class="route-info-card__meta-item">
             <span>기준 시간</span>
             <strong>45 분</strong>
           </div>
@@ -127,7 +118,6 @@
         <div class="route-tabs" role="tablist" aria-label="구간 상세 탭">
           <button class="route-tabs__button route-tabs__button--active" type="button" role="tab" aria-selected="true" aria-controls="route-panel-summary" id="route-tab-summary" data-route-tab="summary">요약</button>
           <button class="route-tabs__button" type="button" role="tab" aria-selected="false" aria-controls="route-panel-alerts" id="route-tab-alerts" data-route-tab="alerts">특보별 분석</button>
-          <button class="route-tabs__button" type="button" role="tab" aria-selected="false" aria-controls="route-panel-history" id="route-tab-history" data-route-tab="history">과거 사례</button>
         </div>
       </header>
 
@@ -810,7 +800,7 @@
           </select>
         </div>
 
-        <p class="route-change-form__hint">현재는 mock 데이터 기준 구간 목록을 사용합니다.</p>
+        <p class="route-change-form__hint">경부선 고속 정차역의 인접 구간 목록을 사용합니다.</p>
 
         <div class="route-change-form__actions">
           <button class="route-change-form__button route-change-form__button--secondary" type="button" data-route-change-close>취소</button>

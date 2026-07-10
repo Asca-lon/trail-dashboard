@@ -187,8 +187,7 @@ select {
   list-style: none;
 }
 
-.sidebar__navigation-link,
-.sidebar__standard-link {
+.sidebar__navigation-link {
   display: flex;
   align-items: center;
   width: var(--sidebar-menu-width);
@@ -207,14 +206,11 @@ select {
 }
 
 .sidebar__navigation-link:hover,
-.sidebar__navigation-link:focus-visible,
-.sidebar__standard-link:hover,
-.sidebar__standard-link:focus-visible {
+.sidebar__navigation-link:focus-visible {
   background: var(--sidebar-hover);
 }
 
 .sidebar__navigation-link:focus-visible,
-.sidebar__standard-link:focus-visible,
 .sidebar__collapse-button:focus-visible {
   outline: 3px solid rgba(37, 99, 235, 0.36);
   outline-offset: 2px;
@@ -264,26 +260,6 @@ select {
   margin: auto auto 0;
   padding-top: 16px;
   border-top: 1px solid var(--sidebar-divider);
-}
-
-.sidebar__standard-link {
-  height: 40px;
-  gap: 10px;
-  padding: 0 12px;
-  border-radius: var(--radius-control);
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 20px;
-}
-
-.sidebar__standard-icon {
-  display: block;
-  flex: 0 0 auto;
-  width: 16px;
-  height: 16px;
-  background: var(--sidebar-text);
-  mask: url("./assets/icons/circle-question-mark.svg") center / contain no-repeat;
-  -webkit-mask: url("./assets/icons/circle-question-mark.svg") center / contain no-repeat;
 }
 
 .sidebar__collapse-button {
