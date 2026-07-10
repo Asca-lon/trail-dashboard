@@ -32,7 +32,11 @@ const alertElements = {
 };
 
 const filterElements = {
+  form: document.querySelector("[data-dashboard-filter-form]"),
   lineSelect: document.querySelector("[data-dashboard-line-select]"),
+  alertTypeSelect: document.querySelector("[data-dashboard-alert-type-select]"),
+  alertLevelSelect: document.querySelector("[data-dashboard-alert-level-select]"),
+  trainTypeSelect: document.querySelector("[data-dashboard-train-type-select]"),
 };
 
 const summaryCardElements = {
@@ -65,6 +69,8 @@ const inspectionElements = {
   body: document.querySelector("[data-dashboard-inspection-body]"),
   detail: document.querySelector("[data-dashboard-inspection-detail]"),
 };
+
+let dashboardState = null;
 
 function formatDateTime(isoDateString) {
   const date = new Date(isoDateString);
@@ -957,6 +963,163 @@ function renderInspectionTable(checklistData, vulnerabilityStationsData) {
   }
 }
 
+function getSelectedFilterValues() {
+  const isAlertLevelAll =
+    !filterElements.alertLevelSelect || filterElements.alertLevelSelect.selectedIndex <= 0;
+
+  return {
+    line: filterElements.lineSelect?.value || "",
+    alertType: filterElements.alertTypeSelect?.value || "",
+    alertLevel: isAlertLevelAll ? "" : filterElements.alertLevelSelect.value,
+    trainType: filterElements.trainTypeSelect?.value || "",
+  };
+}
+
+function isMatchingLine(dataLine, selectedLine) {
+  return !selectedLine || dataLine === selectedLine;
+}
+
+function isMatchingAlertType(alertType, selectedAlertType) {
+  return !selectedAlertType || alertType === selectedAlertType;
+}
+
+function isMatchingAlertLevel(alertLevel, selectedAlertLevel) {
+  return !selectedAlertLevel || alertLevel === selectedAlertLevel;
+}
+
+function includesFilterText(sourceText, filterText) {
+  return !filterText || String(sourceText || "").includes(filterText);
+}
+
+function filterAlertsData(alertsData, filters) {
+  const activeAlerts = Array.isArray(alertsData.active) ? alertsData.active : [];
+
+  if (!isMatchingLine(alertsData.line, filters.line)) {
+    return { ...alertsData, active: [] };
+  }
+
+  return {
+    ...alertsData,
+    active: activeAlerts.filter((alert) =>
+      isMatchingAlertType(alert.alert_type, filters.alertType)
+      && isMatchingAlertLevel(alert.alert_level, filters.alertLevel),
+    ),
+  };
+}
+
+function filterChecklistData(checklistData, filters) {
+  const items = getChecklistItems(checklistData);
+
+  if (!isMatchingLine(checklistData.line, filters.line)) {
+    return { ...checklistData, items: [] };
+  }
+
+  return {
+    ...checklistData,
+    items: items.filter((item) =>
+      includesFilterText(item.reason, filters.alertType)
+      && includesFilterText(item.reason, filters.alertLevel),
+    ),
+  };
+}
+
+function filterVulnerabilitySegmentsData(vulnerabilitySegmentsData, filters) {
+  const segments = Array.isArray(vulnerabilitySegmentsData.segments)
+    ? vulnerabilitySegmentsData.segments
+    : [];
+  const isMatched =
+    isMatchingLine(vulnerabilitySegmentsData.line, filters.line)
+    && isMatchingAlertType(vulnerabilitySegmentsData.alert_type, filters.alertType)
+    && isMatchingAlertLevel(vulnerabilitySegmentsData.alert_level, filters.alertLevel);
+
+  return {
+    ...vulnerabilitySegmentsData,
+    segments: isMatched ? segments : [],
+  };
+}
+
+function filterVulnerabilityStationsData(vulnerabilityStationsData, filters) {
+  const stations = Array.isArray(vulnerabilityStationsData.stations)
+    ? vulnerabilityStationsData.stations
+    : [];
+  const isMatched =
+    isMatchingLine(vulnerabilityStationsData.line, filters.line)
+    && isMatchingAlertType(vulnerabilityStationsData.alert_type, filters.alertType)
+    && isMatchingAlertLevel(vulnerabilityStationsData.alert_level, filters.alertLevel);
+
+  return {
+    ...vulnerabilityStationsData,
+    stations: isMatched ? stations : [],
+  };
+}
+
+function filterHeatmapData(heatmapData, filters) {
+  if (isMatchingLine(heatmapData.line, filters.line)) {
+    return heatmapData;
+  }
+
+  return {
+    ...heatmapData,
+    nodes: [],
+    edges: [],
+  };
+}
+
+function getFilteredDashboardData(state, filters) {
+  return {
+    alertsData: filterAlertsData(state.alertsData, filters),
+    checklistData: filterChecklistData(state.checklistData, filters),
+    vulnerabilitySegmentsData: filterVulnerabilitySegmentsData(
+      state.vulnerabilitySegmentsData,
+      filters,
+    ),
+    vulnerabilityStationsData: filterVulnerabilityStationsData(
+      state.vulnerabilityStationsData,
+      filters,
+    ),
+    heatmapData: filterHeatmapData(state.heatmapData, filters),
+  };
+}
+
+function renderDashboardData(data) {
+  renderAlertBanner(data.alertsData);
+  renderSummaryCards(data.alertsData, data.checklistData, data.vulnerabilitySegmentsData);
+  renderHeatmap(data.heatmapData, data.alertsData.updated_at);
+  renderRankings(data.vulnerabilitySegmentsData, data.vulnerabilityStationsData);
+  renderInspectionTable(data.checklistData, data.vulnerabilityStationsData);
+}
+
+function renderFilteredDashboard() {
+  if (!dashboardState) {
+    return;
+  }
+
+  renderDashboardData(getFilteredDashboardData(dashboardState, getSelectedFilterValues()));
+}
+
+function renderUnfilteredDashboard() {
+  if (!dashboardState) {
+    return;
+  }
+
+  renderDashboardData(dashboardState);
+}
+
+function initializeDashboardFilters() {
+  if (!filterElements.form) {
+    return;
+  }
+
+  filterElements.form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    renderFilteredDashboard();
+  });
+
+  filterElements.form.addEventListener("reset", () => {
+    window.setTimeout(renderUnfilteredDashboard, 0);
+  });
+}
+
 async function fetchJson(url) {
   const response = await fetch(url);
 
@@ -985,12 +1148,18 @@ async function initializeDashboard() {
       fetchJson(HEATMAP_MOCK_URL),
     ]);
 
-    renderAlertBanner(alertsData);
+    dashboardState = {
+      alertsData,
+      linesData,
+      checklistData,
+      vulnerabilitySegmentsData,
+      vulnerabilityStationsData,
+      heatmapData,
+    };
+
     renderLineSelect(linesData);
-    renderSummaryCards(alertsData, checklistData, vulnerabilitySegmentsData);
-    renderHeatmap(heatmapData, alertsData.updated_at);
-    renderRankings(vulnerabilitySegmentsData, vulnerabilityStationsData);
-    renderInspectionTable(checklistData, vulnerabilityStationsData);
+    initializeDashboardFilters();
+    renderUnfilteredDashboard();
   } catch (error) {
     console.error(error);
     updateRecentUpdatedTime(null);

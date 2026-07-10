@@ -88,7 +88,7 @@
     <section class="filter-panel" aria-labelledby="filter-title">
       <h2 class="sr-only" id="filter-title">대시보드 필터</h2>
 
-      <form class="filter-form" action="#" method="get">
+      <form class="filter-form" action="#" method="get" data-dashboard-filter-form>
         <div class="filter-form__fields">
           <div class="filter-group">
             <label class="filter-group__label" for="line-select">노선</label>
@@ -99,15 +99,16 @@
 
           <div class="filter-group">
             <label class="filter-group__label" for="alert-type-select">특보 종류</label>
-            <select class="filter-group__select" id="alert-type-select" name="alertType">
-              <option value="호우" selected>호우</option>
+            <select class="filter-group__select" id="alert-type-select" name="alertType" data-dashboard-alert-type-select>
+              <option value="" selected>전체</option>
+              <option value="호우">호우</option>
               <option value="폭염">폭염</option>
             </select>
           </div>
 
           <div class="filter-group">
             <label class="filter-group__label" for="alert-level-select">특보 등급</label>
-            <select class="filter-group__select" id="alert-level-select" name="alertLevel">
+            <select class="filter-group__select" id="alert-level-select" name="alertLevel" data-dashboard-alert-level-select>
               <option value="전체" selected>전체</option>
               <option value="주의보">주의보</option>
               <option value="경보">경보</option>
@@ -116,7 +117,7 @@
 
           <div class="filter-group">
             <label class="filter-group__label" for="train-type-select">열차 종류</label>
-            <select class="filter-group__select" id="train-type-select" name="trainType">
+            <select class="filter-group__select" id="train-type-select" name="trainType" data-dashboard-train-type-select>
               <option value="전체" selected>전체</option>
               <option value="KTX">KTX</option>
               <option value="무궁화">무궁화</option>
