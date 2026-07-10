@@ -75,6 +75,16 @@ const routeChartElements = {
   },
 };
 
+const routeHistoryFilterElements = {
+  form: document.querySelector("[data-route-history-filter-form]"),
+  alertTypeSelect: document.querySelector("[data-route-history-alert-type-select]"),
+  alertLevelSelect: document.querySelector("[data-route-history-alert-level-select]"),
+  periodSelect: document.querySelector("[data-route-history-period-select]"),
+};
+
+let routeHistoryState = null;
+let isRouteHistoryFilterInitialized = false;
+
 function setRouteTab(targetTab) {
   routeTabs.forEach((tab) => {
     const isActive = tab.dataset.routeTab === targetTab;
@@ -764,6 +774,106 @@ function renderRouteHistoryCharts(segmentDetailData, selectedSegment) {
   );
 }
 
+function getRouteHistoryFilterValues() {
+  return {
+    alertType: routeHistoryFilterElements.alertTypeSelect?.value || "",
+    alertLevel: routeHistoryFilterElements.alertLevelSelect?.value || "all",
+    period: routeHistoryFilterElements.periodSelect?.value || "1y",
+  };
+}
+
+function getHistoryCaseLevel(caseItem) {
+  if (caseItem.delay_min >= 18) {
+    return "high";
+  }
+
+  if (caseItem.delay_min >= 10) {
+    return "warning";
+  }
+
+  return "interest";
+}
+
+function getLatestHistoryCaseDate(cases) {
+  const timestamps = cases
+    .map((caseItem) => new Date(caseItem.date).getTime())
+    .filter(Number.isFinite);
+
+  if (timestamps.length === 0) {
+    return null;
+  }
+
+  return new Date(Math.max(...timestamps));
+}
+
+function getHistoryPeriodStartDate(period, cases) {
+  const monthCountByPeriod = {
+    "3m": 3,
+    "6m": 6,
+    "1y": 12,
+  };
+  const monthCount = monthCountByPeriod[period] || monthCountByPeriod["1y"];
+  const referenceDate = getLatestHistoryCaseDate(cases) || new Date();
+  const startDate = new Date(referenceDate);
+
+  startDate.setMonth(startDate.getMonth() - monthCount);
+  startDate.setHours(0, 0, 0, 0);
+
+  return startDate;
+}
+
+function isHistoryCaseInPeriod(caseItem, period, cases) {
+  const caseDate = new Date(caseItem.date);
+
+  if (Number.isNaN(caseDate.getTime())) {
+    return false;
+  }
+
+  return caseDate >= getHistoryPeriodStartDate(period, cases);
+}
+
+function filterRouteHistoryCases(cases, filters) {
+  return cases.filter((caseItem) => {
+    const isMatchingAlertType = !filters.alertType || caseItem.alert_type === filters.alertType;
+    const isMatchingAlertLevel =
+      filters.alertLevel === "all" || getHistoryCaseLevel(caseItem) === filters.alertLevel;
+
+    return isMatchingAlertType
+      && isMatchingAlertLevel
+      && isHistoryCaseInPeriod(caseItem, filters.period, cases);
+  });
+}
+
+function renderFilteredRouteHistory() {
+  if (!routeHistoryState) {
+    return;
+  }
+
+  const cases = Array.isArray(routeHistoryState.segmentDetailData.cases)
+    ? routeHistoryState.segmentDetailData.cases
+    : [];
+  const filteredSegmentDetailData = {
+    ...routeHistoryState.segmentDetailData,
+    cases: filterRouteHistoryCases(cases, getRouteHistoryFilterValues()),
+  };
+
+  renderRouteHistoryTable(filteredSegmentDetailData);
+  renderRouteHistoryCharts(filteredSegmentDetailData, routeHistoryState.selectedSegment);
+}
+
+function initializeRouteHistoryFilter() {
+  if (!routeHistoryFilterElements.form || isRouteHistoryFilterInitialized) {
+    return;
+  }
+
+  routeHistoryFilterElements.form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    renderFilteredRouteHistory();
+  });
+
+  isRouteHistoryFilterInitialized = true;
+}
+
 function renderRouteLineChart(segmentDetailData) {
   const chartData = Array.isArray(segmentDetailData.hourly_delay) ? segmentDetailData.hourly_delay : [];
   const actualPoints = getLineChartPoints(chartData, "actual");
@@ -996,6 +1106,10 @@ function renderRouteDetail(segmentDetailsData, vulnerabilitySegmentsData) {
   }
 
   const selectedSegmentDetail = getSelectedSegmentDetail(selectedSegment, segmentDetailsData);
+  routeHistoryState = {
+    segmentDetailData: selectedSegmentDetail,
+    selectedSegment,
+  };
 
   renderRoutePageMeta(selectedSegmentDetail, selectedSegment);
   renderRouteSummary(selectedSegmentDetail, vulnerabilitySegmentsData, selectedSegment);
@@ -1003,6 +1117,7 @@ function renderRouteDetail(segmentDetailsData, vulnerabilitySegmentsData) {
   renderRouteAlertTables(selectedSegmentDetail);
   renderRouteHistoryTable(selectedSegmentDetail);
   renderRouteCharts(selectedSegmentDetail, selectedSegment);
+  initializeRouteHistoryFilter();
 }
 
 async function fetchJson(url) {

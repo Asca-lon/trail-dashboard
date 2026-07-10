@@ -556,18 +556,20 @@
 
       <div class="route-content-grid route-content-grid--history" id="route-panel-history" role="tabpanel" aria-labelledby="route-tab-history" data-route-panel="history" hidden>
         <div class="route-analysis-area">
-          <form class="route-history-filter" action="#" method="get" aria-label="과거 사례 필터">
+          <form class="route-history-filter" action="#" method="get" aria-label="과거 사례 필터" data-route-history-filter-form>
             <div class="route-history-filter__group">
               <label for="history-alert-type">특보 종류</label>
-              <select id="history-alert-type" name="alertType">
-                <option value="rain" selected>호우</option>
-                <option value="snow">대설</option>
-                <option value="wind">강풍</option>
+              <select id="history-alert-type" name="alertType" data-route-history-alert-type-select>
+                <option value="" selected>전체</option>
+                <option value="호우">호우</option>
+                <option value="대설">대설</option>
+                <option value="강풍">강풍</option>
+                <option value="폭염">폭염</option>
               </select>
             </div>
             <div class="route-history-filter__group">
               <label for="history-alert-level">특보 등급</label>
-              <select id="history-alert-level" name="alertLevel">
+              <select id="history-alert-level" name="alertLevel" data-route-history-alert-level-select>
                 <option value="all" selected>전체</option>
                 <option value="warning">주의보</option>
                 <option value="high">경보</option>
@@ -575,7 +577,7 @@
             </div>
             <div class="route-history-filter__group">
               <label for="history-period">기간</label>
-              <select id="history-period" name="period">
+              <select id="history-period" name="period" data-route-history-period-select>
                 <option value="1y" selected>최근 1년</option>
                 <option value="6m">최근 6개월</option>
                 <option value="3m">최근 3개월</option>
