@@ -83,11 +83,7 @@
             <span class="station-line-badge" data-station-detail-line>경부선</span>
           </div>
         </div>
-        <button class="station-info-card__change" type="button" aria-label="조회할 역 변경" data-station-select-toggle>역 변경</button>
-        <label class="station-info-card__selector" data-station-selector hidden>
-          <span class="sr-only">조회할 역 선택</span>
-          <select class="station-info-card__select" aria-label="조회할 역 선택" data-station-select></select>
-        </label>
+        <button class="station-info-card__change" type="button" aria-label="조회할 역 변경" aria-haspopup="dialog" aria-controls="station-change-dialog" aria-expanded="false" data-station-select-toggle>역 변경</button>
       </div>
 
       <aside class="station-risk-status" aria-labelledby="station-risk-title" data-station-detail-risk-card>
@@ -295,6 +291,32 @@
       지표 설명: 평균 지연 증가량은 평상시 평균 지연 시간 대비 특보 발생 시 평균 지연 시간의 증가 수치입니다.
     </p>
   </main>
+
+  <div class="route-change-modal" role="presentation" data-station-change-modal hidden>
+    <section class="route-change-modal__dialog" id="station-change-dialog" role="dialog" aria-modal="true" aria-labelledby="station-change-title" aria-describedby="station-change-description">
+      <header class="route-change-modal__header">
+        <div>
+          <h2 id="station-change-title">역 변경</h2>
+          <p id="station-change-description">조회할 철도역을 선택한 뒤 적용하면 해당 역 상세 화면으로 이동합니다.</p>
+        </div>
+        <button class="route-change-modal__close" type="button" aria-label="역 변경 창 닫기" data-station-change-close>×</button>
+      </header>
+
+      <form class="route-change-form" action="#" method="get" data-station-change-form>
+        <div class="route-change-form__group">
+          <label for="station-change-select">변경할 역</label>
+          <select id="station-change-select" name="station_id" data-station-select></select>
+        </div>
+
+        <p class="route-change-form__hint">경부선 고속 정차역 목록을 사용합니다.</p>
+
+        <div class="route-change-form__actions">
+          <button class="route-change-form__button route-change-form__button--secondary" type="button" data-station-change-close>취소</button>
+          <button class="route-change-form__button route-change-form__button--primary" type="submit">적용하기</button>
+        </div>
+      </form>
+    </section>
+  </div>
 
   <script src="./sidebar.js" defer></script>
   <script src="./station-detail.js" defer></script>

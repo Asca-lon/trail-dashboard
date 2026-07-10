@@ -65,8 +65,10 @@ const chartElements = {
 
 const stationSelectionElements = {
   toggleButton: document.querySelector("[data-station-select-toggle]"),
-  selector: document.querySelector("[data-station-selector]"),
+  modal: document.querySelector("[data-station-change-modal]"),
+  form: document.querySelector("[data-station-change-form]"),
   select: document.querySelector("[data-station-select]"),
+  closeButtons: Array.from(document.querySelectorAll("[data-station-change-close]")),
 };
 
 function getRiskLevelByDelayRate(delayRate) {
@@ -562,37 +564,69 @@ function buildStationSelectOptions(vulnerabilityStationsData, selectedStationNam
     getStationIdByName(selectedStationName, vulnerabilityStationsData) || selectedStationName;
 }
 
-function initializeStationSelection(stationDetailData, vulnerabilityStationsData, selectedStationName) {
-  const queryParams = new URLSearchParams(window.location.search);
-  const hasStationQuery = queryParams.has(STATION_ID_QUERY_PARAM) || queryParams.has(STATION_QUERY_PARAM);
+function openStationChangeModal() {
+  if (!stationSelectionElements.modal) {
+    return;
+  }
 
+  stationSelectionElements.modal.hidden = false;
+  stationSelectionElements.toggleButton?.setAttribute("aria-expanded", "true");
+  stationSelectionElements.select?.focus();
+}
+
+function closeStationChangeModal() {
+  if (!stationSelectionElements.modal) {
+    return;
+  }
+
+  stationSelectionElements.modal.hidden = true;
+  stationSelectionElements.toggleButton?.setAttribute("aria-expanded", "false");
+  stationSelectionElements.toggleButton?.focus();
+}
+
+function initializeStationSelection(stationDetailData, vulnerabilityStationsData, selectedStationName) {
   buildStationSelectOptions(vulnerabilityStationsData, selectedStationName);
 
-  if (stationSelectionElements.toggleButton && stationSelectionElements.selector) {
-    stationSelectionElements.selector.hidden = !hasStationQuery;
-    stationSelectionElements.toggleButton.setAttribute("aria-expanded", String(hasStationQuery));
-
+  if (stationSelectionElements.toggleButton && stationSelectionElements.modal) {
+    stationSelectionElements.toggleButton.setAttribute("aria-haspopup", "dialog");
+    stationSelectionElements.toggleButton.setAttribute("aria-expanded", "false");
     stationSelectionElements.toggleButton.addEventListener("click", () => {
-      const shouldShowSelector = stationSelectionElements.selector.hidden;
+      const currentStationName = getInitialSelectedStationName(stationDetailData, vulnerabilityStationsData);
 
-      stationSelectionElements.selector.hidden = !shouldShowSelector;
-      stationSelectionElements.toggleButton.setAttribute("aria-expanded", String(shouldShowSelector));
-
-      if (shouldShowSelector) {
-        stationSelectionElements.select?.focus();
-      }
+      stationSelectionElements.select.value =
+        getStationIdByName(currentStationName, vulnerabilityStationsData) || currentStationName;
+      openStationChangeModal();
     });
   }
 
-  if (stationSelectionElements.select) {
-    stationSelectionElements.select.addEventListener("change", (event) => {
+  stationSelectionElements.closeButtons.forEach((button) => {
+    button.addEventListener("click", closeStationChangeModal);
+  });
+
+  stationSelectionElements.modal?.addEventListener("click", (event) => {
+    if (event.target === stationSelectionElements.modal) {
+      closeStationChangeModal();
+    }
+  });
+
+  if (stationSelectionElements.form && stationSelectionElements.select) {
+    stationSelectionElements.form.addEventListener("submit", (event) => {
+      event.preventDefault();
       const selectedStationName =
-        getStationNameById(event.target.value, vulnerabilityStationsData) || event.target.value;
+        getStationNameById(stationSelectionElements.select.value, vulnerabilityStationsData)
+        || stationSelectionElements.select.value;
 
       updateStationQueryString(selectedStationName, vulnerabilityStationsData);
       renderStationDetail(stationDetailData, vulnerabilityStationsData, selectedStationName);
+      closeStationChangeModal();
     });
   }
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && stationSelectionElements.modal && !stationSelectionElements.modal.hidden) {
+      closeStationChangeModal();
+    }
+  });
 
   window.addEventListener("popstate", () => {
     const selectedStationNameFromUrl = getInitialSelectedStationName(stationDetailData, vulnerabilityStationsData);
