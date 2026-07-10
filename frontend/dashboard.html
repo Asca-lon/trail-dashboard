@@ -72,12 +72,14 @@
 
       <div class="alert-banner__content">
         <h2 class="alert-banner__title" id="active-alert-title">현재 발효 중인 기상특보</h2>
-        <span class="alert-banner__badge" data-dashboard-alert-badge>호우 경보</span>
-        <p class="alert-banner__text" data-dashboard-alert-text>
-          대전광역시 외 3개 지역
-          <span class="alert-banner__muted" data-dashboard-alert-standard-time>14:00 기준 영향 가능 철도 구간</span>
-          <strong class="alert-banner__count" data-dashboard-alert-count>7개</strong>
-        </p>
+        <div class="alert-banner__list" data-dashboard-alert-list>
+          <div class="alert-banner__item">
+            <span class="alert-banner__badge">호우 경보</span>
+            <p class="alert-banner__text">대전광역시</p>
+            <span class="alert-banner__muted">14:00 기준 영향 가능 철도 구간</span>
+            <strong class="alert-banner__count">7개</strong>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -96,28 +98,21 @@
           <div class="filter-group">
             <label class="filter-group__label" for="alert-type-select">특보 종류</label>
             <select class="filter-group__select" id="alert-type-select" name="alertType" data-dashboard-alert-type-select>
-              <option value="" selected>전체</option>
-              <option value="호우">호우</option>
-              <option value="폭염">폭염</option>
+              <option value="all" selected>전체</option>
             </select>
           </div>
 
           <div class="filter-group">
             <label class="filter-group__label" for="alert-level-select">특보 등급</label>
             <select class="filter-group__select" id="alert-level-select" name="alertLevel" data-dashboard-alert-level-select>
-              <option value="전체" selected>전체</option>
-              <option value="주의보">주의보</option>
-              <option value="경보">경보</option>
+              <option value="all" selected>전체</option>
             </select>
           </div>
 
           <div class="filter-group">
             <label class="filter-group__label" for="train-type-select">열차 종류</label>
-            <select class="filter-group__select" id="train-type-select" name="trainType" data-dashboard-train-type-select>
-              <option value="전체" selected>전체</option>
-              <option value="KTX">KTX</option>
-              <option value="무궁화">무궁화</option>
-              <option value="새마을">새마을</option>
+            <select class="filter-group__select" id="train-type-select" name="trainType" data-dashboard-train-type-select disabled title="열차 종류 데이터가 제공되지 않습니다.">
+              <option value="all" selected>전체</option>
             </select>
           </div>
         </div>
@@ -153,7 +148,7 @@
       <article class="summary-card" aria-label="평균 지연 시간 예상 18.4분, 전일 대비 7.2분 증가" data-dashboard-summary-card="average-delay">
         <div class="summary-card__icon summary-card__icon--delay" aria-hidden="true"><img class="summary-card__icon-image" src="./assets/icons/clock-4.svg" alt=""></div>
         <div class="summary-card__content">
-          <h3 class="summary-card__title">평균 지연 시간(예상)</h3>
+          <h3 class="summary-card__title">평균 신규 지연(예상)</h3>
           <p class="summary-card__value"><strong data-dashboard-summary-value>18.4</strong><span data-dashboard-summary-unit>분</span></p>
           <p class="summary-card__comparison" data-dashboard-summary-comparison>전일 대비 <strong>+7.2분 ↑</strong></p>
         </div>
@@ -176,8 +171,7 @@
       <article class="map-card" aria-labelledby="map-card-title">
         <header class="map-card__header">
           <div class="map-card__title-group">
-            <h3 class="map-card__title" id="map-card-title" data-dashboard-heatmap-title>경부선 기상 취약도 현황</h3>
-            <span class="map-card__info" aria-label="취약도 지도 안내">i</span>
+            <h3 class="map-card__title" id="map-card-title" data-dashboard-heatmap-title>경부선 고속철도 기상 취약도 현황</h3>
           </div>
         </header>
 
@@ -192,7 +186,7 @@
             </ul>
           </aside>
 
-          <div class="route-map" aria-label="경부선 역별 취약도" data-dashboard-route-map>
+          <div class="route-map" aria-label="경부선 고속철도 역별 취약도" data-dashboard-route-map>
             <ol class="route-map__list" data-dashboard-route-list>
               <li class="route-map__item route-map__item--interest"><span class="route-map__station">서울</span><span class="route-map__marker"></span><span class="route-map__dash"></span><span class="route-map__status">관심</span><span class="route-map__chevron">›</span></li>
               <li class="route-map__item route-map__item--interest"><span class="route-map__station">광명</span><span class="route-map__marker"></span><span class="route-map__dash"></span><span class="route-map__status">관심</span><span class="route-map__chevron">›</span></li>
@@ -298,7 +292,7 @@
                   <th scope="col">역명</th>
                   <th scope="col">노선</th>
                   <th scope="col">취약도</th>
-                  <th scope="col">지연 건수</th>
+                  <th scope="col">지연 건수(추정)</th>
                 </tr>
               </thead>
               <tbody data-dashboard-station-ranking-body>

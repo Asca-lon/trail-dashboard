@@ -5,22 +5,40 @@ const VULNERABILITY_SEGMENTS_MOCK_URL = "../mock/vulnerability_segments.json";
 const VULNERABILITY_STATIONS_MOCK_URL = "../mock/vulnerability_stations.json";
 const HEATMAP_MOCK_URL = "../mock/heatmap.json";
 
-const HIGH_DELAY_THRESHOLD_MINUTES = 12;
-const HIGH_VULNERABILITY_THRESHOLD = 0.7;
-const WARNING_VULNERABILITY_THRESHOLD = 0.5;
+const ALL_FILTER_VALUE = "all";
+const DEFAULT_DASHBOARD_FILTERS = Object.freeze({
+  line: "경부선",
+  alertType: ALL_FILTER_VALUE,
+  alertLevel: ALL_FILTER_VALUE,
+  trainType: ALL_FILTER_VALUE,
+});
+const FILTER_QUERY_PARAM_NAMES = Object.freeze({
+  line: "line",
+  alertType: "alert_type",
+  alertLevel: "alert_level",
+  trainType: "train_type",
+});
+const ALERT_LEVEL_ORDER = Object.freeze(["주의보", "경보"]);
+const TRAIN_TYPE_ORDER = Object.freeze(["KTX", "새마을", "무궁화"]);
 
-const GYEONGBU_HIGH_SPEED_STATIONS = [
-  "서울",
-  "광명",
-  "천안아산",
-  "오송",
-  "대전",
-  "김천(구미)",
-  "동대구",
-  "경주",
-  "울산",
-  "부산",
-];
+const RISK_THRESHOLDS = Object.freeze({
+  vulnerabilityScore: Object.freeze({ high: 0.7, warning: 0.5 }),
+  delayIncreaseMinutes: Object.freeze({ high: 12, warning: 7 }),
+  stationDelayRate: Object.freeze({ high: 0.4, warning: 0.25 }),
+});
+
+const GYEONGBU_HIGH_SPEED_STATIONS = Object.freeze([
+  { stationId: "seoul", station: "서울" },
+  { stationId: "gwangmyeong", station: "광명" },
+  { stationId: "cheonan_asan", station: "천안아산" },
+  { stationId: "osong", station: "오송" },
+  { stationId: "daejeon", station: "대전" },
+  { stationId: "gimcheon_gumi", station: "김천(구미)" },
+  { stationId: "dongdaegu", station: "동대구" },
+  { stationId: "gyeongju", station: "경주" },
+  { stationId: "ulsan", station: "울산" },
+  { stationId: "busan", station: "부산" },
+]);
 
 const RISK_LEVELS = {
   high: { label: "높음", color: "#EF4444" },
@@ -38,10 +56,7 @@ const SEGMENT_ID_QUERY_PARAM = "segment_id";
 const alertElements = {
   updatedTime: document.querySelector("[data-dashboard-updated-time]"),
   banner: document.querySelector("[data-dashboard-alert-banner]"),
-  badge: document.querySelector("[data-dashboard-alert-badge]"),
-  text: document.querySelector("[data-dashboard-alert-text]"),
-  standardTime: document.querySelector("[data-dashboard-alert-standard-time]"),
-  count: document.querySelector("[data-dashboard-alert-count]"),
+  list: document.querySelector("[data-dashboard-alert-list]"),
 };
 
 const filterElements = {
@@ -150,20 +165,6 @@ function formatCompactDateTime(isoDateString) {
   return `${parts.year}.${parts.month}.${parts.day} ${parts.hour}:${parts.minute}`;
 }
 
-function getRegionSummary(activeAlerts) {
-  const regions = [...new Set(activeAlerts.map((alert) => alert.region_name).filter(Boolean))];
-
-  if (regions.length === 0) {
-    return "영향 지역 정보 없음";
-  }
-
-  if (regions.length === 1) {
-    return regions[0];
-  }
-
-  return regions.join(", ");
-}
-
 function getAffectedSegmentCount(activeAlerts) {
   return activeAlerts.reduce((total, alert) => {
     const affected = Array.isArray(alert.affected) ? alert.affected : [];
@@ -173,56 +174,162 @@ function getAffectedSegmentCount(activeAlerts) {
   }, 0);
 }
 
+function groupActiveAlerts(activeAlerts) {
+  const groups = new Map();
+
+  activeAlerts.forEach((alert) => {
+    const alertType = alert.alert_type || "특보";
+    const alertLevel = alert.alert_level || "";
+    const key = `${alertType}:${alertLevel}`;
+    const group = groups.get(key) || {
+      label: `${alertType} ${alertLevel}`.trim(),
+      regions: [],
+      affectedSegmentCount: 0,
+    };
+
+    if (alert.region_name && !group.regions.includes(alert.region_name)) {
+      group.regions.push(alert.region_name);
+    }
+
+    group.affectedSegmentCount += getAffectedSegmentCount([alert]);
+    groups.set(key, group);
+  });
+
+  return [...groups.values()];
+}
+
+function createHiddenRegionList(regions, alertLabel) {
+  const container = document.createElement("span");
+  const button = document.createElement("button");
+  const tooltip = document.createElement("span");
+
+  container.className = "alert-banner__region-overflow";
+  button.className = "alert-banner__region-button";
+  button.type = "button";
+  button.textContent = `외 ${regions.length}개 지역`;
+  button.setAttribute("aria-expanded", "false");
+  button.setAttribute("aria-label", `${alertLabel} 나머지 지역 ${regions.length}개 보기`);
+
+  tooltip.className = "alert-banner__region-tooltip";
+  tooltip.setAttribute("role", "tooltip");
+  tooltip.textContent = regions.join("\n");
+
+  container.addEventListener("mouseleave", () => {
+    container.dataset.open = "false";
+    button.setAttribute("aria-expanded", "false");
+
+    if (button.matches(":focus")) {
+      button.blur();
+    }
+  });
+
+  container.append(button, tooltip);
+  return container;
+}
+
+function createAlertGroupItem(group, updatedAt) {
+  const item = document.createElement("div");
+  const badge = document.createElement("span");
+  const regionText = document.createElement("p");
+  const standardTime = document.createElement("span");
+  const count = document.createElement("strong");
+  const [primaryRegion = "영향 지역 정보 없음", ...hiddenRegions] = group.regions;
+
+  item.className = "alert-banner__item";
+  badge.className = "alert-banner__badge";
+  badge.textContent = group.label;
+  regionText.className = "alert-banner__text";
+  regionText.append(document.createTextNode(primaryRegion));
+
+  if (hiddenRegions.length > 0) {
+    regionText.append(document.createTextNode(" "), createHiddenRegionList(hiddenRegions, group.label));
+  }
+
+  standardTime.className = "alert-banner__muted";
+  standardTime.textContent = formatStandardTime(updatedAt);
+  count.className = "alert-banner__count";
+  count.textContent = `${group.affectedSegmentCount}개`;
+  item.append(badge, regionText, standardTime, count);
+
+  return item;
+}
+
 function getChecklistItems(checklistData) {
   return Array.isArray(checklistData.items) ? checklistData.items : [];
 }
 
-function getAverageDelayIncrease(checklistData) {
-  const delayValues = getChecklistItems(checklistData)
-    .map((item) => item.avg_delay_incr)
-    .filter((value) => Number.isFinite(value));
+function getSegmentKey(fromStation, toStation) {
+  return [fromStation, toStation].sort((left, right) => left.localeCompare(right, "ko")).join(":");
+}
 
-  if (delayValues.length === 0) {
+function isHighSpeedSegment(fromStation, toStation) {
+  const fromIndex = GYEONGBU_HIGH_SPEED_STATIONS.findIndex(
+    (station) => station.station === fromStation,
+  );
+  const toIndex = GYEONGBU_HIGH_SPEED_STATIONS.findIndex(
+    (station) => station.station === toStation,
+  );
+
+  return fromIndex >= 0 && toIndex >= 0 && Math.abs(fromIndex - toIndex) === 1;
+}
+
+function getUniqueAffectedHighSpeedSegmentCount(activeAlerts) {
+  const segmentKeys = new Set();
+
+  activeAlerts.forEach((alert) => {
+    const affected = Array.isArray(alert.affected) ? alert.affected : [];
+
+    affected.forEach((item) => {
+      if (item.type === "segment" && isHighSpeedSegment(item.from, item.to)) {
+        segmentKeys.add(getSegmentKey(item.from, item.to));
+      }
+    });
+  });
+
+  return segmentKeys.size;
+}
+
+function getWeightedAverageHighSpeedDelay(segmentsData) {
+  const segments = Array.isArray(segmentsData.segments) ? segmentsData.segments : [];
+  const validSegments = segments.filter((segment) =>
+    isHighSpeedSegment(segment.from, segment.to)
+    && Number.isFinite(segment.avg_delay_incr)
+    && Number.isFinite(segment.sample_n)
+    && segment.sample_n > 0,
+  );
+
+  if (validSegments.length === 0) {
     return null;
   }
 
-  const total = delayValues.reduce((sum, value) => sum + value, 0);
+  const totalSampleCount = validSegments.reduce((sum, segment) => sum + segment.sample_n, 0);
+  const weightedDelayTotal = validSegments.reduce(
+    (sum, segment) => sum + (segment.avg_delay_incr * segment.sample_n),
+    0,
+  );
 
-  return total / delayValues.length;
+  return weightedDelayTotal / totalSampleCount;
 }
 
-function getHighRiskSegmentCount(segmentsData) {
-  const segments = Array.isArray(segmentsData.segments) ? segmentsData.segments : [];
+function getHighRiskHighSpeedSegmentCount(heatmapData) {
+  const edges = Array.isArray(heatmapData.edges) ? heatmapData.edges : [];
 
-  return segments.filter((segment) => segment.avg_delay_incr >= HIGH_DELAY_THRESHOLD_MINUTES).length;
+  return edges.filter((edge) =>
+    isHighSpeedSegment(edge.from, edge.to)
+    && getRiskLevel(edge.vuln, RISK_THRESHOLDS.vulnerabilityScore) === "high",
+  ).length;
 }
 
-function getRiskLevelByVulnerability(vulnerability) {
-  if (!Number.isFinite(vulnerability)) {
+function getRiskLevel(value, thresholds) {
+  if (!Number.isFinite(value)) {
     return "none";
   }
 
-  if (vulnerability >= HIGH_VULNERABILITY_THRESHOLD) {
+  if (value >= thresholds.high) {
     return "high";
   }
 
-  if (vulnerability >= WARNING_VULNERABILITY_THRESHOLD) {
-    return "warning";
-  }
-
-  return "interest";
-}
-
-function getRiskLevelByDelayIncrease(delayIncrease) {
-  if (!Number.isFinite(delayIncrease)) {
-    return "none";
-  }
-
-  if (delayIncrease >= HIGH_DELAY_THRESHOLD_MINUTES) {
-    return "high";
-  }
-
-  if (delayIncrease >= 7) {
+  if (value >= thresholds.warning) {
     return "warning";
   }
 
@@ -239,20 +346,12 @@ function updateRecentUpdatedTime(updatedAt) {
 }
 
 function renderEmptyAlertBanner() {
-  if (alertElements.badge) {
-    alertElements.badge.textContent = "특보 없음";
-  }
+  if (alertElements.list) {
+    const message = document.createElement("p");
 
-  if (alertElements.text) {
-    alertElements.text.firstChild.textContent = "현재 발효 중인 기상특보가 없습니다. ";
-  }
-
-  if (alertElements.standardTime) {
-    alertElements.standardTime.textContent = "영향 가능 철도 구간";
-  }
-
-  if (alertElements.count) {
-    alertElements.count.textContent = "0개";
+    message.className = "alert-banner__empty";
+    message.textContent = "현재 발효 중인 기상특보가 없습니다.";
+    alertElements.list.replaceChildren(message);
   }
 
   if (alertElements.banner) {
@@ -270,33 +369,61 @@ function renderAlertBanner(alertsData) {
     return;
   }
 
-  const primaryAlert = activeAlerts[0];
-  const badgeText = `${primaryAlert.alert_type || "특보"} ${primaryAlert.alert_level || ""}`.trim();
-  const regionSummary = getRegionSummary(activeAlerts);
-  const affectedSegmentCount = getAffectedSegmentCount(activeAlerts);
+  const groups = groupActiveAlerts(activeAlerts);
 
-  if (alertElements.badge) {
-    alertElements.badge.textContent = badgeText;
-  }
-
-  if (alertElements.text) {
-    alertElements.text.firstChild.textContent = `${regionSummary} `;
-  }
-
-  if (alertElements.standardTime) {
-    alertElements.standardTime.textContent = formatStandardTime(alertsData.updated_at);
-  }
-
-  if (alertElements.count) {
-    alertElements.count.textContent = `${affectedSegmentCount}개`;
+  if (alertElements.list) {
+    alertElements.list.replaceChildren(
+      ...groups.map((group) => createAlertGroupItem(group, alertsData.updated_at)),
+    );
   }
 
   if (alertElements.banner) {
     alertElements.banner.setAttribute(
       "aria-label",
-      `현재 발효 중인 기상특보 ${badgeText}, ${regionSummary}, 영향 가능 철도 구간 ${affectedSegmentCount}개`,
+      `현재 발효 중인 기상특보 ${groups.map((group) =>
+        `${group.label}, ${group.regions.join(", ") || "영향 지역 정보 없음"}, 영향 가능 철도 구간 ${group.affectedSegmentCount}개`
+      ).join("; ")}`,
     );
   }
+}
+
+function initializeAlertRegionTooltips() {
+  if (!alertElements.list) {
+    return;
+  }
+
+  alertElements.list.addEventListener("click", (event) => {
+    const button = event.target.closest(".alert-banner__region-button");
+
+    if (!button) {
+      return;
+    }
+
+    const container = button.closest(".alert-banner__region-overflow");
+    const isOpen = container.dataset.open === "true";
+
+    alertElements.list.querySelectorAll(".alert-banner__region-overflow[data-open='true']")
+      .forEach((openContainer) => {
+        openContainer.dataset.open = "false";
+        openContainer.querySelector(".alert-banner__region-button")?.setAttribute("aria-expanded", "false");
+      });
+
+    container.dataset.open = String(!isOpen);
+    button.setAttribute("aria-expanded", String(!isOpen));
+  });
+
+  alertElements.list.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") {
+      return;
+    }
+
+    const container = event.target.closest(".alert-banner__region-overflow");
+
+    if (container) {
+      container.dataset.open = "false";
+      container.querySelector(".alert-banner__region-button")?.setAttribute("aria-expanded", "false");
+    }
+  });
 }
 
 function createOption(value, label, isSelected = false) {
@@ -337,6 +464,106 @@ function renderLineSelect(linesData) {
   filterElements.lineSelect.replaceChildren(...options);
 }
 
+function getUniqueFilterValues(values) {
+  return [...new Set(values.filter((value) => typeof value === "string" && value.trim()))];
+}
+
+function sortFilterValues(values, preferredOrder = []) {
+  const orderIndexes = new Map(preferredOrder.map((value, index) => [value, index]));
+
+  return values.slice().sort((left, right) => {
+    const leftIndex = orderIndexes.get(left) ?? Number.MAX_SAFE_INTEGER;
+    const rightIndex = orderIndexes.get(right) ?? Number.MAX_SAFE_INTEGER;
+
+    if (leftIndex !== rightIndex) {
+      return leftIndex - rightIndex;
+    }
+
+    return left.localeCompare(right, "ko");
+  });
+}
+
+function renderDynamicFilterSelect(select, values, preferredOrder, emptyMessage) {
+  if (!select) {
+    return;
+  }
+
+  const uniqueValues = sortFilterValues(getUniqueFilterValues(values), preferredOrder);
+  const options = [
+    createOption(ALL_FILTER_VALUE, "전체", true),
+    ...uniqueValues.map((value) => createOption(value, value)),
+  ];
+
+  select.replaceChildren(...options);
+  select.disabled = uniqueValues.length === 0;
+  select.title = uniqueValues.length === 0 ? emptyMessage : "";
+}
+
+function collectNestedFilterValues(source, singularKey, pluralKey, values = []) {
+  if (Array.isArray(source)) {
+    source.forEach((item) => collectNestedFilterValues(item, singularKey, pluralKey, values));
+    return values;
+  }
+
+  if (!source || typeof source !== "object") {
+    return values;
+  }
+
+  if (typeof source[singularKey] === "string") {
+    values.push(source[singularKey]);
+  }
+
+  if (Array.isArray(source[pluralKey])) {
+    values.push(...source[pluralKey]);
+  }
+
+  Object.values(source).forEach((value) => {
+    if (value && typeof value === "object") {
+      collectNestedFilterValues(value, singularKey, pluralKey, values);
+    }
+  });
+
+  return values;
+}
+
+function renderDashboardFilterOptions(data) {
+  const filterSources = [
+    data.alertsData,
+    data.checklistData,
+    data.vulnerabilitySegmentsData,
+    data.vulnerabilityStationsData,
+    data.heatmapData,
+  ];
+  const alertTypes = collectNestedFilterValues(filterSources, "alert_type", "alert_types");
+  const alertLevels = collectNestedFilterValues(filterSources, "alert_level", "alert_levels");
+  const trainTypes = collectNestedFilterValues(filterSources, "train_type", "train_types");
+
+  renderDynamicFilterSelect(
+    filterElements.alertTypeSelect,
+    alertTypes,
+    [],
+    "특보 종류 데이터가 제공되지 않습니다.",
+  );
+  renderDynamicFilterSelect(
+    filterElements.alertLevelSelect,
+    alertLevels,
+    ALERT_LEVEL_ORDER,
+    "특보 등급 데이터가 제공되지 않습니다.",
+  );
+  renderDynamicFilterSelect(
+    filterElements.trainTypeSelect,
+    trainTypes,
+    TRAIN_TYPE_ORDER,
+    "열차 종류 데이터가 제공되지 않습니다.",
+  );
+}
+
+function renderEmptyDashboardFilterOptions() {
+  renderDynamicFilterSelect(filterElements.alertTypeSelect, [], [], "특보 종류 데이터가 없습니다.");
+  renderDynamicFilterSelect(filterElements.alertLevelSelect, [], [], "특보 등급 데이터가 없습니다.");
+  renderDynamicFilterSelect(filterElements.trainTypeSelect, [], [], "열차 종류 데이터가 없습니다.");
+}
+
 function setSummaryCard(card, value, unit, comparisonText, ariaLabel) {
   if (!card) {
     return;
@@ -366,75 +593,178 @@ function renderEmptySummaryCards() {
     summaryCardElements.affectedSegments,
     "0",
     "개",
-    "mock 데이터 없음",
+    "전일 비교 데이터 없음",
     "영향 가능 구간 데이터 없음",
   );
   setSummaryCard(
     summaryCardElements.delayedTrains,
     "-",
     "편",
-    "mock 데이터 없음",
+    "집계 데이터 없음",
     "운행 지연 예상 열차 데이터 없음",
   );
   setSummaryCard(
     summaryCardElements.averageDelay,
     "-",
     "분",
-    "mock 데이터 없음",
-    "평균 지연 시간 데이터 없음",
+    "전일 비교 데이터 없음",
+    "평균 신규 지연 데이터 없음",
   );
   setSummaryCard(
     summaryCardElements.highRiskSegments,
     "0",
     "개",
-    "mock 데이터 없음",
+    "전일 비교 데이터 없음",
     "취약도 높음 구간 데이터 없음",
   );
 }
 
-function renderSummaryCards(alertsData, checklistData, vulnerabilitySegmentsData) {
+function getSummaryContainers(dataSources) {
+  return dataSources.flatMap((source) => [source?.dashboard_summary, source?.summary, source])
+    .filter((source) => source && typeof source === "object");
+}
+
+function findFiniteSummaryValue(dataSources, fieldName) {
+  const container = getSummaryContainers(dataSources).find(
+    (source) => Number.isFinite(source[fieldName]),
+  );
+
+  return container ? container[fieldName] : null;
+}
+
+function getMetricPreviousValue(dataSources, metricName) {
+  for (const container of getSummaryContainers(dataSources)) {
+    const nestedPreviousValue = container[metricName]?.previous;
+    const comparisonPreviousValue = container.comparisons?.[metricName]?.previous;
+    const flatPreviousValue = container[`${metricName}_previous`];
+    const previousValue = [nestedPreviousValue, comparisonPreviousValue, flatPreviousValue]
+      .find((value) => Number.isFinite(value));
+
+    if (Number.isFinite(previousValue)) {
+      return previousValue;
+    }
+  }
+
+  return null;
+}
+
+function formatMetricNumber(value) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function formatDayOverDayComparison(currentValue, previousValue) {
+  if (!Number.isFinite(currentValue) || !Number.isFinite(previousValue)) {
+    return "전일 비교 데이터 없음";
+  }
+
+  const difference = currentValue - previousValue;
+
+  if (difference === 0) {
+    return "전일과 동일";
+  }
+
+  const sign = difference > 0 ? "+" : "";
+  const arrow = difference > 0 ? "↑" : "↓";
+
+  return `전일 대비 ${sign}${formatMetricNumber(difference)} ${arrow}`;
+}
+
+function getExpectedDelayedTrainCount(dataSources) {
+  const directCount = findFiniteSummaryValue(dataSources, "expected_delayed_train_count");
+
+  if (directCount !== null) {
+    return directCount;
+  }
+
+  for (const container of getSummaryContainers(dataSources)) {
+    if (!Array.isArray(container.expected_delayed_trains)) {
+      continue;
+    }
+
+    const trainKeys = new Set(
+      container.expected_delayed_trains
+        .filter((train) => train?.run_date && train?.train_no)
+        .map((train) => `${train.run_date}:${train.train_no}`),
+    );
+
+    return trainKeys.size;
+  }
+
+  return null;
+}
+
+function renderSummaryCards(
+  alertsData,
+  checklistData,
+  vulnerabilitySegmentsData,
+  heatmapData,
+) {
+  const dataSources = [alertsData, checklistData, vulnerabilitySegmentsData, heatmapData];
   const activeAlerts = Array.isArray(alertsData.active) ? alertsData.active : [];
-  const affectedSegmentCount = getAffectedSegmentCount(activeAlerts);
-  const averageDelayIncrease = getAverageDelayIncrease(checklistData);
-  const highRiskSegmentCount = getHighRiskSegmentCount(vulnerabilitySegmentsData);
+  const affectedSegmentCount = getUniqueAffectedHighSpeedSegmentCount(activeAlerts);
+  const expectedDelayedTrainCount = getExpectedDelayedTrainCount(dataSources);
+  const averageDelayIncrease = getWeightedAverageHighSpeedDelay(vulnerabilitySegmentsData);
+  const highRiskSegmentCount = getHighRiskHighSpeedSegmentCount(heatmapData);
+  const affectedSegmentsComparison = formatDayOverDayComparison(
+    affectedSegmentCount,
+    getMetricPreviousValue(dataSources, "affected_segments"),
+  );
+  const delayedTrainsComparison = formatDayOverDayComparison(
+    expectedDelayedTrainCount,
+    getMetricPreviousValue(dataSources, "expected_delayed_trains"),
+  );
+  const averageDelayComparison = formatDayOverDayComparison(
+    averageDelayIncrease,
+    getMetricPreviousValue(dataSources, "average_delay_increase"),
+  );
+  const highRiskSegmentsComparison = formatDayOverDayComparison(
+    highRiskSegmentCount,
+    getMetricPreviousValue(dataSources, "high_risk_segments"),
+  );
   const averageDelayText =
     averageDelayIncrease === null ? "-" : averageDelayIncrease.toFixed(1);
+  const expectedDelayedTrainText = expectedDelayedTrainCount === null
+    ? "-"
+    : String(expectedDelayedTrainCount);
 
   setSummaryCard(
     summaryCardElements.affectedSegments,
     String(affectedSegmentCount),
     "개",
-    "발효 특보 기준",
-    `영향 가능 구간 ${affectedSegmentCount}개, 발효 특보 기준`,
+    affectedSegmentsComparison,
+    `영향 가능 고속철도 구간 ${affectedSegmentCount}개, 현재 발효 특보 기준, ${affectedSegmentsComparison}`,
   );
   setSummaryCard(
     summaryCardElements.delayedTrains,
-    "-",
+    expectedDelayedTrainText,
     "편",
-    "mock 데이터 없음",
-    "운행 지연 예상 열차 데이터 없음",
+    expectedDelayedTrainCount === null ? "집계 데이터 없음" : delayedTrainsComparison,
+    expectedDelayedTrainCount === null
+      ? "운행 지연 예상 열차 데이터 없음"
+      : `운행 지연 예상 열차 ${expectedDelayedTrainText}편, ${delayedTrainsComparison}`,
   );
   setSummaryCard(
     summaryCardElements.averageDelay,
     averageDelayText,
     "분",
-    "우선 점검 대상 평균",
-    `평균 지연 시간 예상 ${averageDelayText}분, 우선 점검 대상 평균`,
+    averageDelayComparison,
+    `평균 신규 지연 예상 ${averageDelayText}분, 고속철도 구간 표본 가중평균, ${averageDelayComparison}`,
   );
   setSummaryCard(
     summaryCardElements.highRiskSegments,
     String(highRiskSegmentCount),
     "개",
-    `${HIGH_DELAY_THRESHOLD_MINUTES}분 이상 기준`,
-    `취약도 높음 구간 ${highRiskSegmentCount}개, ${HIGH_DELAY_THRESHOLD_MINUTES}분 이상 기준`,
+    highRiskSegmentsComparison,
+    `취약도 높음 고속철도 구간 ${highRiskSegmentCount}개, 취약도 점수 기준, ${highRiskSegmentsComparison}`,
   );
 }
 
 function createRouteMapItem(node, segment, stations = []) {
-  const riskLevel = getRiskLevelByVulnerability(node.vuln);
+  const riskLevel = getRiskLevel(node.vuln, RISK_THRESHOLDS.vulnerabilityScore);
   const risk = RISK_LEVELS[riskLevel];
-  const segmentRiskLevel = getRiskLevelByVulnerability(segment?.vuln);
+  const segmentRiskLevel = getRiskLevel(segment?.vuln, RISK_THRESHOLDS.vulnerabilityScore);
   const stationInfo = getStationByName(node.station, stations);
+  const stationId = stationInfo?.station_id || node.stationId;
   const item = document.createElement("li");
   const station = document.createElement("span");
   const marker = document.createElement("span");
@@ -458,7 +788,7 @@ function createRouteMapItem(node, segment, stations = []) {
   status.textContent = risk.label;
 
   chevron.className = "route-map__chevron";
-  chevron.href = createStationDetailUrl(node.station, stationInfo?.station_id);
+  chevron.href = createStationDetailUrl(node.station, stationId);
   chevron.textContent = "›";
   chevron.setAttribute(
     "aria-label",
@@ -478,7 +808,7 @@ function createRouteMapItem(node, segment, stations = []) {
 function countHeatmapEdgesByRiskLevel(edges) {
   return edges.reduce(
     (counts, edge) => {
-      const riskLevel = getRiskLevelByVulnerability(edge.vuln);
+      const riskLevel = getRiskLevel(edge.vuln, RISK_THRESHOLDS.vulnerabilityScore);
       counts[riskLevel] += 1;
 
       return counts;
@@ -499,15 +829,21 @@ function findHeatmapEdge(fromStation, toStation, edges) {
 }
 
 function buildHighSpeedRoute(nodes, edges) {
-  return GYEONGBU_HIGH_SPEED_STATIONS.map((stationName, index) => {
-    const nextStationName = GYEONGBU_HIGH_SPEED_STATIONS[index + 1];
+  return GYEONGBU_HIGH_SPEED_STATIONS.map((stationReference, index) => {
+    const nextStationReference = GYEONGBU_HIGH_SPEED_STATIONS[index + 1];
+    const stationName = stationReference.station;
+    const nextStationName = nextStationReference?.station;
     const node = findHeatmapNode(stationName, nodes);
     const segment = nextStationName
       ? findHeatmapEdge(stationName, nextStationName, edges)
       : null;
 
     return {
-      node: { station: stationName, vuln: node?.vuln ?? null },
+      node: {
+        stationId: stationReference.stationId,
+        station: stationName,
+        vuln: node?.vuln ?? null,
+      },
       segment: nextStationName
         ? { from: stationName, to: nextStationName, vuln: segment?.vuln ?? null }
         : null,
@@ -517,11 +853,11 @@ function buildHighSpeedRoute(nodes, edges) {
 
 function renderEmptyHeatmap() {
   if (heatmapElements.title) {
-    heatmapElements.title.textContent = "기상 취약도 현황";
+    heatmapElements.title.textContent = "경부선 고속철도 기상 취약도 현황";
   }
 
   if (heatmapElements.routeMap) {
-    heatmapElements.routeMap.setAttribute("aria-label", "역별 취약도 데이터 없음");
+    heatmapElements.routeMap.setAttribute("aria-label", "경부선 고속철도 역별 취약도 데이터 없음");
   }
 
   if (heatmapElements.routeList) {
@@ -553,11 +889,11 @@ function renderHeatmap(heatmapData, updatedAt, vulnerabilityStationsData = {}) {
   const edgeCounts = countHeatmapEdgesByRiskLevel(routeSegments);
 
   if (heatmapElements.title) {
-    heatmapElements.title.textContent = `${lineName} 기상 취약도 현황`;
+    heatmapElements.title.textContent = `${lineName} 고속철도 기상 취약도 현황`;
   }
 
   if (heatmapElements.routeMap) {
-    heatmapElements.routeMap.setAttribute("aria-label", `${lineName} 역별 취약도`);
+    heatmapElements.routeMap.setAttribute("aria-label", `${lineName} 고속철도 역별 취약도`);
   }
 
   if (heatmapElements.routeList) {
@@ -748,7 +1084,10 @@ function renderEmptyRankings() {
 
 function createSegmentRankingRow(segment, index, lineName) {
   const row = document.createElement("tr");
-  const riskLevel = getRiskLevelByDelayIncrease(segment.avg_delay_incr);
+  const riskLevel = getRiskLevel(
+    segment.avg_delay_incr,
+    RISK_THRESHOLDS.delayIncreaseMinutes,
+  );
   const riskCell = document.createElement("td");
 
   if (segment.segment_id) {
@@ -769,8 +1108,17 @@ function createSegmentRankingRow(segment, index, lineName) {
 
 function createStationRankingRow(station, index, lineName) {
   const row = document.createElement("tr");
-  const riskLevel = getRiskLevelByVulnerability(station.delay_rate);
+  const riskLevel = getRiskLevel(station.delay_rate, RISK_THRESHOLDS.stationDelayRate);
   const riskCell = document.createElement("td");
+  const hasExactDelayCount = Number.isFinite(station.delay_count);
+  const estimatedDelayCount = Number.isFinite(station.sample_n) && Number.isFinite(station.delay_rate)
+    ? Math.round(station.sample_n * station.delay_rate)
+    : null;
+  const delayCountText = hasExactDelayCount
+    ? `${station.delay_count}건`
+    : Number.isFinite(estimatedDelayCount)
+      ? `약 ${estimatedDelayCount}건`
+      : "-";
 
   riskCell.append(createRiskBadge(riskLevel));
   row.append(
@@ -778,7 +1126,7 @@ function createStationRankingRow(station, index, lineName) {
     createStationLinkCell(station.station, station.station_id),
     createRankingCell(lineName),
     riskCell,
-    createRankingCell(String(station.sample_n ?? "-"), "ranking-table__number"),
+    createRankingCell(delayCountText, "ranking-table__number"),
   );
 
   return row;
@@ -844,7 +1192,10 @@ function renderInspectionDetail(item, stations = []) {
     return;
   }
 
-  const riskLevel = getRiskLevelByDelayIncrease(item.avg_delay_incr);
+  const riskLevel = getRiskLevel(
+    item.avg_delay_incr,
+    RISK_THRESHOLDS.delayIncreaseMinutes,
+  );
   const stationName = getStationNameFromInspectionItem(item, stations);
   const stationId = getStationByName(stationName, stations)?.station_id;
   const segmentId = item.target_type === "segment" ? item.segment_id : null;
@@ -922,7 +1273,10 @@ function createInspectionTargetCell(item, stations) {
 
 function createInspectionRow(item, stations) {
   const row = document.createElement("tr");
-  const riskLevel = getRiskLevelByDelayIncrease(item.avg_delay_incr);
+  const riskLevel = getRiskLevel(
+    item.avg_delay_incr,
+    RISK_THRESHOLDS.delayIncreaseMinutes,
+  );
   const riskCell = document.createElement("td");
   const detailCell = document.createElement("td");
   const detailButton = document.createElement("button");
@@ -1000,31 +1354,62 @@ function renderInspectionTable(checklistData, vulnerabilityStationsData) {
 }
 
 function getSelectedFilterValues() {
-  const isAlertLevelAll =
-    !filterElements.alertLevelSelect || filterElements.alertLevelSelect.selectedIndex <= 0;
+  return normalizeDashboardFilters({
+    line: filterElements.lineSelect?.value,
+    alertType: filterElements.alertTypeSelect?.value,
+    alertLevel: filterElements.alertLevelSelect?.value,
+    trainType: filterElements.trainTypeSelect?.value,
+  });
+}
 
+function normalizeFilterValue(value, fallback) {
+  const normalizedValue = String(value || "").trim();
+
+  if (!normalizedValue || normalizedValue === "전체") {
+    return fallback;
+  }
+
+  return normalizedValue;
+}
+
+function normalizeDashboardFilters(filters = {}) {
   return {
-    line: filterElements.lineSelect?.value || "",
-    alertType: filterElements.alertTypeSelect?.value || "",
-    alertLevel: isAlertLevelAll ? "" : filterElements.alertLevelSelect.value,
-    trainType: filterElements.trainTypeSelect?.value || "",
+    line: normalizeFilterValue(filters.line, DEFAULT_DASHBOARD_FILTERS.line),
+    alertType: normalizeFilterValue(filters.alertType, DEFAULT_DASHBOARD_FILTERS.alertType),
+    alertLevel: normalizeFilterValue(filters.alertLevel, DEFAULT_DASHBOARD_FILTERS.alertLevel),
+    trainType: normalizeFilterValue(filters.trainType, DEFAULT_DASHBOARD_FILTERS.trainType),
   };
 }
 
+function createDashboardFilterQuery(filters) {
+  const normalizedFilters = normalizeDashboardFilters(filters);
+  const params = new URLSearchParams();
+
+  Object.entries(FILTER_QUERY_PARAM_NAMES).forEach(([filterName, queryParamName]) => {
+    params.set(queryParamName, normalizedFilters[filterName]);
+  });
+
+  return params.toString();
+}
+
+function isAllFilterValue(value) {
+  return !value || value === ALL_FILTER_VALUE || value === "전체";
+}
+
 function isMatchingLine(dataLine, selectedLine) {
-  return !selectedLine || dataLine === selectedLine;
+  return isAllFilterValue(selectedLine) || dataLine === selectedLine;
 }
 
 function isMatchingAlertType(alertType, selectedAlertType) {
-  return !selectedAlertType || alertType === selectedAlertType;
+  return isAllFilterValue(selectedAlertType) || alertType === selectedAlertType;
 }
 
 function isMatchingAlertLevel(alertLevel, selectedAlertLevel) {
-  return !selectedAlertLevel || alertLevel === selectedAlertLevel;
+  return isAllFilterValue(selectedAlertLevel) || alertLevel === selectedAlertLevel;
 }
 
 function includesFilterText(sourceText, filterText) {
-  return !filterText || String(sourceText || "").includes(filterText);
+  return isAllFilterValue(filterText) || String(sourceText || "").includes(filterText);
 }
 
 function filterAlertsData(alertsData, filters) {
@@ -1119,7 +1504,12 @@ function getFilteredDashboardData(state, filters) {
 
 function renderDashboardData(data) {
   renderAlertBanner(data.alertsData);
-  renderSummaryCards(data.alertsData, data.checklistData, data.vulnerabilitySegmentsData);
+  renderSummaryCards(
+    data.alertsData,
+    data.checklistData,
+    data.vulnerabilitySegmentsData,
+    data.heatmapData,
+  );
   renderHeatmap(data.heatmapData, data.alertsData.updated_at, data.vulnerabilityStationsData);
   renderRankings(data.vulnerabilitySegmentsData, data.vulnerabilityStationsData);
   renderInspectionTable(data.checklistData, data.vulnerabilityStationsData);
@@ -1130,7 +1520,11 @@ function renderFilteredDashboard() {
     return;
   }
 
-  renderDashboardData(getFilteredDashboardData(dashboardState, getSelectedFilterValues()));
+  const filters = getSelectedFilterValues();
+
+  dashboardState.activeFilters = filters;
+  dashboardState.filterQuery = createDashboardFilterQuery(filters);
+  renderDashboardData(getFilteredDashboardData(dashboardState, filters));
 }
 
 function renderUnfilteredDashboard() {
@@ -1138,6 +1532,8 @@ function renderUnfilteredDashboard() {
     return;
   }
 
+  dashboardState.activeFilters = { ...DEFAULT_DASHBOARD_FILTERS };
+  dashboardState.filterQuery = createDashboardFilterQuery(DEFAULT_DASHBOARD_FILTERS);
   renderDashboardData(dashboardState);
 }
 
@@ -1194,6 +1590,8 @@ async function initializeDashboard() {
     };
 
     renderLineSelect(linesData);
+    renderDashboardFilterOptions(dashboardState);
+    initializeAlertRegionTooltips();
     initializeDashboardFilters();
     renderUnfilteredDashboard();
   } catch (error) {
@@ -1201,6 +1599,7 @@ async function initializeDashboard() {
     updateRecentUpdatedTime(null);
     renderEmptyAlertBanner();
     renderEmptyLineSelect();
+    renderEmptyDashboardFilterOptions();
     renderEmptySummaryCards();
     renderEmptyHeatmap();
     renderEmptyRankings();
