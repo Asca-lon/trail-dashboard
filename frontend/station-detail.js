@@ -3,6 +3,19 @@ const VULNERABILITY_STATIONS_MOCK_URL = "../mock/vulnerability_stations.json";
 const STATION_QUERY_PARAM = "station";
 const STATION_ID_QUERY_PARAM = "station_id";
 
+const GYEONGBU_HIGH_SPEED_STATIONS = [
+  { station_id: "seoul", station: "서울" },
+  { station_id: "gwangmyeong", station: "광명" },
+  { station_id: "cheonan_asan", station: "천안아산" },
+  { station_id: "osong", station: "오송" },
+  { station_id: "daejeon", station: "대전" },
+  { station_id: "gimcheon_gumi", station: "김천(구미)" },
+  { station_id: "dongdaegu", station: "동대구" },
+  { station_id: "gyeongju", station: "경주" },
+  { station_id: "ulsan", station: "울산" },
+  { station_id: "busan", station: "부산" },
+];
+
 const HIGH_DELAY_RATE_THRESHOLD = 0.4;
 const WARNING_DELAY_RATE_THRESHOLD = 0.25;
 const LINE_CHART_MAX_VALUE = 40;
@@ -21,14 +34,9 @@ const RISK_LABELS = {
   none: "정보 없음",
 };
 
-const STATION_ADDRESS_BY_NAME = {
-  대전: "대전광역시 동구 중앙로 215",
-};
-
 const stationInfoElements = {
   name: document.querySelector("[data-station-detail-name]"),
   line: document.querySelector("[data-station-detail-line]"),
-  address: document.querySelector("[data-station-detail-address]"),
   riskCard: document.querySelector("[data-station-detail-risk-card]"),
   riskTitle: document.querySelector("[data-station-detail-risk-title]"),
   riskText: document.querySelector("[data-station-detail-risk-text]"),
@@ -43,10 +51,6 @@ const metricElements = {
 
 const alertTableElements = {
   body: document.querySelector("[data-station-detail-alert-table-body]"),
-};
-
-const historyElements = {
-  list: document.querySelector("[data-station-detail-history-list]"),
 };
 
 const chartElements = {
@@ -87,10 +91,6 @@ function formatStationName(stationName) {
   }
 
   return stationName.endsWith("역") ? stationName : `${stationName}역`;
-}
-
-function formatStationAddress(stationName) {
-  return STATION_ADDRESS_BY_NAME[stationName] || "주소 정보 없음(mock 미제공)";
 }
 
 function formatPercent(rate) {
@@ -219,7 +219,9 @@ function getStationByName(stationName, vulnerabilityStationsData) {
 }
 
 function getStationById(stationId, vulnerabilityStationsData) {
-  return getStations(vulnerabilityStationsData).find((station) => station.station_id === stationId) || null;
+  return GYEONGBU_HIGH_SPEED_STATIONS.find((station) => station.station_id === stationId)
+    || getStations(vulnerabilityStationsData).find((station) => station.station_id === stationId)
+    || null;
 }
 
 function getStationNameById(stationId, vulnerabilityStationsData) {
@@ -227,11 +229,12 @@ function getStationNameById(stationId, vulnerabilityStationsData) {
 }
 
 function getStationIdByName(stationName, vulnerabilityStationsData) {
-  return getStationByName(stationName, vulnerabilityStationsData)?.station_id || null;
+  return GYEONGBU_HIGH_SPEED_STATIONS.find((station) => station.station === stationName)?.station_id
+    || getStationByName(stationName, vulnerabilityStationsData)?.station_id
+    || null;
 }
 
 function getInitialSelectedStationName(stationDetailData, vulnerabilityStationsData) {
-  const stations = getStations(vulnerabilityStationsData);
   const params = new URLSearchParams(window.location.search);
   const stationIdFromUrl = params.get(STATION_ID_QUERY_PARAM);
   const stationNameFromUrl = params.get(STATION_QUERY_PARAM);
@@ -245,9 +248,9 @@ function getInitialSelectedStationName(stationDetailData, vulnerabilityStationsD
     return stationNameFromUrl;
   }
 
-  return getStationByName(stationDetailData.station, vulnerabilityStationsData)
+  return GYEONGBU_HIGH_SPEED_STATIONS.some((station) => station.station === stationDetailData.station)
     ? stationDetailData.station
-    : stations[0]?.station;
+    : GYEONGBU_HIGH_SPEED_STATIONS[0].station;
 }
 
 function updateStationQueryString(stationName, vulnerabilityStationsData) {
@@ -292,10 +295,6 @@ function renderStationInfo(stationDetailData, vulnerabilityStationsData, station
 
   if (stationInfoElements.line) {
     stationInfoElements.line.textContent = lineName;
-  }
-
-  if (stationInfoElements.address) {
-    stationInfoElements.address.textContent = formatStationAddress(stationDetailData.station);
   }
 
   if (stationInfoElements.riskTitle) {
@@ -431,97 +430,6 @@ function renderAlertStatsTable(stationDetailData) {
   );
 }
 
-function formatCaseDate(dateString) {
-  const date = new Date(dateString);
-
-  if (Number.isNaN(date.getTime())) {
-    return "날짜 정보 없음";
-  }
-
-  const formatter = new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  const parts = Object.fromEntries(
-    formatter.formatToParts(date).map((part) => [part.type, part.value]),
-  );
-
-  return `${parts.year}.${parts.month}.${parts.day}`;
-}
-
-function getHistoryRiskLevel(caseItem) {
-  if (!caseItem.alert_type) {
-    return "interest";
-  }
-
-  if (caseItem.delay_min >= 20) {
-    return "high";
-  }
-
-  return "warning";
-}
-
-function createHistoryItem(caseItem) {
-  const item = document.createElement("li");
-  const label = document.createElement("span");
-  const content = document.createElement("div");
-  const title = document.createElement("strong");
-  const alertDescription = document.createElement("p");
-  const delayDescription = document.createElement("p");
-  const alertLabel = caseItem.alert_type || "평상시";
-  const riskLevel = getHistoryRiskLevel(caseItem);
-  const formattedDate = formatCaseDate(caseItem.date);
-
-  item.className = "station-history-item";
-  label.className = `station-history-item__label station-history-item__label--${riskLevel}`;
-  label.textContent = alertLabel;
-
-  content.className = "station-history-item__content";
-  title.textContent = `${formattedDate} ${alertLabel}`;
-  alertDescription.textContent = caseItem.alert_type
-    ? `${caseItem.alert_type} 영향 기록`
-    : "특보 미발효 기준 기록";
-  delayDescription.textContent = Number.isFinite(caseItem.delay_min)
-    ? `기록된 지연 ${caseItem.delay_min}분`
-    : "지연 정보 없음";
-  content.append(title, alertDescription, delayDescription);
-
-  item.append(label, content);
-
-  return item;
-}
-
-function renderEmptyHistoryList() {
-  if (!historyElements.list) {
-    return;
-  }
-
-  const item = document.createElement("li");
-
-  item.className = "station-history-item";
-  item.textContent = "과거 주요 사례 데이터가 없습니다.";
-  historyElements.list.replaceChildren(item);
-}
-
-function renderHistoryList(stationDetailData) {
-  if (!historyElements.list) {
-    return;
-  }
-
-  const rows = Array.isArray(stationDetailData.cases)
-    ? stationDetailData.cases.map(createHistoryItem)
-    : [];
-
-  if (rows.length === 0) {
-    renderEmptyHistoryList();
-    return;
-  }
-
-  historyElements.list.replaceChildren(...rows);
-}
-
 function renderStationLineChart(stationDetailData) {
   const hourlyDelayData = Array.isArray(stationDetailData.hourly_delay) ? stationDetailData.hourly_delay : [];
   const weekdayPoints = getLineChartPoints(hourlyDelayData, "weekday_delay");
@@ -632,7 +540,6 @@ function renderStationDetail(stationDetailData, vulnerabilityStationsData, selec
   renderStationInfo(selectedStationDetail, vulnerabilityStationsData, stationMetrics);
   renderStationMetrics(stationMetrics);
   renderAlertStatsTable(selectedStationDetail);
-  renderHistoryList(selectedStationDetail);
   renderStationCharts(selectedStationDetail);
 }
 
@@ -641,8 +548,7 @@ function buildStationSelectOptions(vulnerabilityStationsData, selectedStationNam
     return;
   }
 
-  const stations = getStations(vulnerabilityStationsData);
-  const options = stations.map((station) => {
+  const options = GYEONGBU_HIGH_SPEED_STATIONS.map((station) => {
     const option = document.createElement("option");
 
     option.value = station.station_id || station.station;
