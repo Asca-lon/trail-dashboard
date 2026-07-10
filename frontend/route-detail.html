@@ -44,18 +44,6 @@
             <span>구간 상세</span>
           </a>
         </li>
-        <li class="sidebar__navigation-item">
-          <a class="sidebar__navigation-link" href="#">
-            <span class="sidebar__navigation-icon sidebar__navigation-icon--rag" aria-hidden="true"></span>
-            <span>RAG 심층 설명</span>
-          </a>
-        </li>
-        <li class="sidebar__navigation-item">
-          <a class="sidebar__navigation-link" href="#">
-            <span class="sidebar__navigation-icon sidebar__navigation-icon--analytics" aria-hidden="true"></span>
-            <span>데이터 분석·통계</span>
-          </a>
-        </li>
       </ul>
 
       <div class="sidebar__bottom">
@@ -95,6 +83,8 @@
             <strong data-route-detail-to-station>김천(구미)역</strong>
           </div>
         </div>
+
+        <button class="route-info-card__change-button" type="button" aria-label="조회할 구간 변경" aria-haspopup="dialog" data-route-change-open>구간 변경</button>
 
         <div class="route-info-card__meta" aria-label="구간 기본 정보">
           <div class="route-info-card__meta-item">
@@ -139,10 +129,6 @@
           <button class="route-tabs__button" type="button" role="tab" aria-selected="false" aria-controls="route-panel-alerts" id="route-tab-alerts" data-route-tab="alerts">특보별 분석</button>
           <button class="route-tabs__button" type="button" role="tab" aria-selected="false" aria-controls="route-panel-history" id="route-tab-history" data-route-tab="history">과거 사례</button>
         </div>
-        <a class="route-rag-button" href="#" aria-label="RAG 심층 분석 보기">
-          RAG 심층 분석 보기
-          <img src="./assets/icons/chevron-right.svg" alt="" aria-hidden="true">
-        </a>
       </header>
 
       <div class="route-content-grid" id="route-panel-summary" role="tabpanel" aria-labelledby="route-tab-summary" data-route-panel="summary">
@@ -739,9 +725,38 @@
       <p class="route-metric-description" data-route-panel="history" hidden>
         <img src="./assets/icons/circle-info.svg" alt="" aria-hidden="true">
         분석 기간: 최근 1년 (2025.07.07 ~ 2026.07.07) <span>특보 기준: 기상청 발표 기준</span> <span>유사도 기준: 누적 강수량, 지연 시간, 운행 중단률 가중 평균</span>
-      </p>    </section>
+      </p>
+    </section>
   </main>
 
+
+  <div class="route-change-modal" role="presentation" data-route-change-modal hidden>
+    <section class="route-change-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="route-change-title" aria-describedby="route-change-description">
+      <header class="route-change-modal__header">
+        <div>
+          <h2 id="route-change-title">구간 변경</h2>
+          <p id="route-change-description">조회할 철도 구간을 선택한 뒤 적용하면 해당 구간 상세 화면으로 이동합니다.</p>
+        </div>
+        <button class="route-change-modal__close" type="button" aria-label="구간 변경 창 닫기" data-route-change-close>×</button>
+      </header>
+
+      <form class="route-change-form" action="#" method="get" data-route-change-form>
+        <div class="route-change-form__group">
+          <label for="route-change-segment">변경할 구간</label>
+          <select id="route-change-segment" name="segment_id" data-route-change-select>
+            <option value="daejeon-gimcheon_gumi">대전역 - 김천(구미)역</option>
+          </select>
+        </div>
+
+        <p class="route-change-form__hint">현재는 mock 데이터 기준 구간 목록을 사용합니다.</p>
+
+        <div class="route-change-form__actions">
+          <button class="route-change-form__button route-change-form__button--secondary" type="button" data-route-change-close>취소</button>
+          <button class="route-change-form__button route-change-form__button--primary" type="submit">적용하기</button>
+        </div>
+      </form>
+    </section>
+  </div>
   <script src="./sidebar.js" defer></script>
   <script src="./route-detail.js" defer></script>
 </body>

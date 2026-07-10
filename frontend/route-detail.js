@@ -1024,3 +1024,113 @@ routeTabs.forEach((tab) => {
 });
 
 initializeRouteDetail();
+
+const ROUTE_CHANGE_SEGMENT_LABELS = {
+  "daejeon-gimcheon_gumi": "대전역 - 김천(구미)역",
+  "cheonan-daejeon": "천안역 - 대전역",
+  "yeongdeungpo-suwon": "영등포역 - 수원역",
+  "dongdaegu-miryang": "동대구역 - 밀양역",
+  "gimcheon_gumi-dongdaegu": "김천(구미)역 - 동대구역",
+  "miryang-busan": "밀양역 - 부산역",
+};
+
+const routeChangeElements = {
+  openButton: document.querySelector("[data-route-change-open]"),
+  modal: document.querySelector("[data-route-change-modal]"),
+  form: document.querySelector("[data-route-change-form]"),
+  select: document.querySelector("[data-route-change-select]"),
+  closeButtons: Array.from(document.querySelectorAll("[data-route-change-close]")),
+};
+
+function getRouteChangeLabel(segment) {
+  return ROUTE_CHANGE_SEGMENT_LABELS[segment.segment_id]
+    || `${segment.from || "출발역"} - ${segment.to || "도착역"}`;
+}
+
+function getCurrentRouteSegmentId() {
+  return new URLSearchParams(window.location.search).get(SEGMENT_ID_QUERY_PARAM) || "daejeon-gimcheon_gumi";
+}
+
+function openRouteChangeModal() {
+  if (!routeChangeElements.modal) {
+    return;
+  }
+
+  routeChangeElements.modal.hidden = false;
+  routeChangeElements.select?.focus();
+}
+
+function closeRouteChangeModal() {
+  if (!routeChangeElements.modal) {
+    return;
+  }
+
+  routeChangeElements.modal.hidden = true;
+  routeChangeElements.openButton?.focus();
+}
+
+function moveToSelectedRoute(segmentId) {
+  if (!segmentId) {
+    return;
+  }
+
+  const nextUrl = new URL(window.location.href);
+
+  nextUrl.searchParams.set(SEGMENT_ID_QUERY_PARAM, segmentId);
+  window.location.href = nextUrl.toString();
+}
+
+function renderRouteChangeOptions(segments) {
+  if (!routeChangeElements.select) {
+    return;
+  }
+
+  const currentSegmentId = getCurrentRouteSegmentId();
+  const options = segments.map((segment) => {
+    const option = document.createElement("option");
+
+    option.value = segment.segment_id;
+    option.textContent = getRouteChangeLabel(segment);
+    option.selected = segment.segment_id === currentSegmentId;
+
+    return option;
+  });
+
+  if (options.length > 0) {
+    routeChangeElements.select.replaceChildren(...options);
+  }
+}
+
+async function initializeRouteChangeModal() {
+  if (!routeChangeElements.openButton || !routeChangeElements.modal || !routeChangeElements.form) {
+    return;
+  }
+
+  try {
+    const vulnerabilitySegmentsData = await fetchJson(VULNERABILITY_SEGMENTS_MOCK_URL);
+    renderRouteChangeOptions(getSegments(vulnerabilitySegmentsData));
+  } catch (error) {
+    console.error(error);
+  }
+
+  routeChangeElements.openButton.addEventListener("click", openRouteChangeModal);
+  routeChangeElements.closeButtons.forEach((button) => {
+    button.addEventListener("click", closeRouteChangeModal);
+  });
+  routeChangeElements.modal.addEventListener("click", (event) => {
+    if (event.target === routeChangeElements.modal) {
+      closeRouteChangeModal();
+    }
+  });
+  routeChangeElements.form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    moveToSelectedRoute(routeChangeElements.select?.value);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !routeChangeElements.modal.hidden) {
+      closeRouteChangeModal();
+    }
+  });
+}
+
+initializeRouteChangeModal();

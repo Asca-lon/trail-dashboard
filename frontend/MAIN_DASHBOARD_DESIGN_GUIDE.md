@@ -516,11 +516,6 @@ Hover:
 3. `구간 상세`
    - Icon: `GitBranch` or `Route`
 
-4. `RAG 심층 설명`
-   - Icon: `CircleHelp` or `Sparkles`
-
-5. `데이터 분석·통계`
-   - Icon: `BarChart3`
 
 ### Bottom Area
 
