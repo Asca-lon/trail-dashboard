@@ -18,11 +18,22 @@ from collector.db_writer import get_writer_conn
 PUBLIC_API_KEY = os.getenv("PUBLIC_DATA_API_KEY")
 KORAIL_RUN_API_URL = os.getenv("KORail_RUN_API_URL", "https://apis.data.go.kr/B551457/run/v2").rstrip('/')
 
-def parse_iso_time(ymd, time_str):
-    if not time_str or len(time_str) < 4:
+def parse_iso_time(ymd, time_val):
+    if not time_val:
         return None
-    s = time_str.strip()
-    return f"{ymd[:4]}-{ymd[4:6]}-{ymd[6:8]} {s[:2]}:{s[2:4]}:00+09:00"
+    
+    s = str(time_val).strip()
+    if not s or s in ['None', 'null', '']:
+        return None
+
+    if '.' in s:
+        s = s.split('.')[0]
+
+    if ':' in s:
+        time_part = s.split(' ')[-1] if ' ' in s else s
+        return f"{ymd[:4]}-{ymd[4:6]}-{ymd[6:8]} {time_part}+09:00"
+
+    return None
 
 def classify_train_type(train_no):
     if not train_no:
@@ -88,25 +99,26 @@ def collect_rail_by_date(target_date=None):
                     stations_to_insert = set()
 
                     for item in items:
-                        trn_no = item.get('trnNo') or item.get('trn_no')
-                        stn_cd = item.get('stnCd') or item.get('stn_cd')
-                        stn_nm = item.get('stnNm') or item.get('stn_nm') or f"역_{stn_cd}"
+                        trn_no = item.get('trn_no') or item.get('trnNo')
+                        stn_cd = item.get('stn_cd') or item.get('stnCd')
+                        stn_nm = item.get('stn_nm') or item.get('stnNm') or f"역_{stn_cd}"
+                        line_nm = item.get('mrnt_nm') or "경부선"
 
                         if not trn_no or not stn_cd:
                             continue
 
                         stn_cd_str = str(stn_cd)
-                        stations_to_insert.add((stn_cd_str, str(stn_nm), "경부선"))
+                        stations_to_insert.add((stn_cd_str, str(stn_nm), str(line_nm)))
 
-                        seq_val = int(item.get('trnRunSn') or 0)
-                        planned_arr = parse_iso_time(run_ymd_param, item.get('arvlTm') or item.get('plan_arvl_tm'))
-                        actual_arr = parse_iso_time(run_ymd_param, item.get('trnArvlDt') or item.get('actual_arvl_tm'))
-                        planned_dpt = parse_iso_time(run_ymd_param, item.get('dptreTm') or item.get('plan_dpt_tm'))
-                        actual_dpt = parse_iso_time(run_ymd_param, item.get('trnDptreDt') or item.get('actual_dpt_tm'))
+                        seq_val = int(item.get('trn_run_sn') or item.get('trnRunSn') or 0)
 
-                        event_time = planned_arr or actual_arr or planned_dpt or actual_dpt
-                        if not event_time:
-                            event_time = f"{target_date} 00:00:00+09:00"
+                        actual_arr = parse_iso_time(run_ymd_param, item.get('trn_arvl_dt'))
+                        actual_dpt = parse_iso_time(run_ymd_param, item.get('trn_dptre_dt'))
+                        
+                        planned_arr = actual_arr
+                        planned_dpt = actual_dpt
+
+                        event_time = actual_arr or actual_dpt or f"{target_date} 00:00:00+09:00"
 
                         train_type = classify_train_type(trn_no)
 
@@ -115,7 +127,7 @@ def collect_rail_by_date(target_date=None):
                             str(trn_no).lstrip('0'),
                             seq_val,
                             stn_cd_str,
-                            "경부선",
+                            str(line_nm),
                             train_type,
                             planned_arr,
                             actual_arr,
