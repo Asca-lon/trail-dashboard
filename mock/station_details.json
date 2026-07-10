@@ -1,5 +1,20 @@
 {
   "station": "대전",
+  "hourly_delay": [
+    { "time": "00:00", "weekday_delay": 6.8,  "holiday_delay": 5.4 },
+    { "time": "04:00", "weekday_delay": 7.6,  "holiday_delay": 6.1 },
+    { "time": "08:00", "weekday_delay": 13.2, "holiday_delay": 9.8 },
+    { "time": "12:00", "weekday_delay": 11.7, "holiday_delay": 8.6 },
+    { "time": "16:00", "weekday_delay": 12.7, "holiday_delay": 10.4 },
+    { "time": "20:00", "weekday_delay": 9.4,  "holiday_delay": 7.8 },
+    { "time": "24:00", "weekday_delay": 5.9,  "holiday_delay": 4.7 }
+  ],
+  "alert_delay_comparison": [
+    { "alert_type": "호우", "normal_avg_delay": 8.2, "alert_avg_delay": 15.2 },
+    { "alert_type": "폭염", "normal_avg_delay": 7.1, "alert_avg_delay": 12.7 },
+    { "alert_type": "강풍", "normal_avg_delay": 6.8, "alert_avg_delay": 10.4 },
+    { "alert_type": "대설", "normal_avg_delay": 7.4, "alert_avg_delay": 11.2 }
+  ],
   "by_alert": [
     { "alert_type": "호우", "alert_level": "경보",   "avg_delay": 15.2, "sample_n": 34 },
     { "alert_type": "폭염", "alert_level": "경보",   "avg_delay": 12.7, "sample_n": 61 },

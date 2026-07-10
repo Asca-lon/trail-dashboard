@@ -5,6 +5,14 @@ const STATION_ID_QUERY_PARAM = "station_id";
 
 const HIGH_DELAY_RATE_THRESHOLD = 0.4;
 const WARNING_DELAY_RATE_THRESHOLD = 0.25;
+const LINE_CHART_MAX_VALUE = 40;
+const LINE_CHART_MIN_X = 42;
+const LINE_CHART_MAX_X = 590;
+const LINE_CHART_MIN_Y = 24;
+const LINE_CHART_MAX_Y = 192;
+const BAR_CHART_MAX_VALUE = 30;
+const BAR_CHART_MAX_HEIGHT = 180;
+const BAR_CHART_MIN_HEIGHT = 8;
 
 const RISK_LABELS = {
   high: "높음",
@@ -39,6 +47,16 @@ const alertTableElements = {
 
 const historyElements = {
   list: document.querySelector("[data-station-detail-history-list]"),
+};
+
+const chartElements = {
+  lineChart: document.querySelector("[data-station-detail-line-chart]"),
+  lineWeekday: document.querySelector("[data-station-detail-line-weekday]"),
+  lineHoliday: document.querySelector("[data-station-detail-line-holiday]"),
+  linePoint: document.querySelector("[data-station-detail-line-point]"),
+  lineTooltipBox: document.querySelector("[data-station-detail-line-tooltip-box]"),
+  lineTooltip: document.querySelector("[data-station-detail-line-tooltip]"),
+  alertComparisonChart: document.querySelector("[data-station-detail-alert-comparison-chart]"),
 };
 
 const stationSelectionElements = {
@@ -89,6 +107,39 @@ function formatSignedNumber(value) {
   }
 
   return `+${value.toFixed(1)}`;
+}
+
+function getLineChartPoint(item, index, itemCount, valueKey) {
+  const safeCount = Math.max(itemCount - 1, 1);
+  const value = Number.isFinite(item[valueKey]) ? item[valueKey] : 0;
+  const x = LINE_CHART_MIN_X + ((LINE_CHART_MAX_X - LINE_CHART_MIN_X) / safeCount) * index;
+  const clampedValue = Math.max(0, Math.min(value, LINE_CHART_MAX_VALUE));
+  const y = LINE_CHART_MAX_Y - (clampedValue / LINE_CHART_MAX_VALUE) * (LINE_CHART_MAX_Y - LINE_CHART_MIN_Y);
+
+  return {
+    x: Number(x.toFixed(1)),
+    y: Number(y.toFixed(1)),
+    value,
+  };
+}
+
+function getLineChartPoints(hourlyDelayData, valueKey) {
+  return hourlyDelayData.map((item, index) => getLineChartPoint(item, index, hourlyDelayData.length, valueKey));
+}
+
+function toPolylinePoints(points) {
+  return points.map((point) => `${point.x},${point.y}`).join(" ");
+}
+
+function getBarHeight(value) {
+  if (!Number.isFinite(value)) {
+    return BAR_CHART_MIN_HEIGHT;
+  }
+
+  return Math.max(
+    BAR_CHART_MIN_HEIGHT,
+    Math.min((value / BAR_CHART_MAX_VALUE) * BAR_CHART_MAX_HEIGHT, BAR_CHART_MAX_HEIGHT),
+  );
 }
 
 function setMetricCard(card, value, unit, comparisonLabel, comparisonValue, ariaLabel) {
@@ -146,6 +197,7 @@ function renderEmptyStationDetail() {
   setMetricCard(metricElements.stopRate, "-", "%", "mock 데이터", "없음", "운행 중단률 데이터 없음");
   renderEmptyAlertStatsTable();
   renderEmptyHistoryList();
+  renderStationCharts({});
 }
 
 function getSelectedStationMetrics(stationName, vulnerabilityStationsData) {
@@ -221,6 +273,8 @@ function createSelectedStationDetail(stationDetailData, selectedStationName) {
     station: selectedStationName,
     by_alert: hasStationSpecificDetail ? stationDetailData.by_alert : [],
     cases: hasStationSpecificDetail ? stationDetailData.cases : [],
+    hourly_delay: hasStationSpecificDetail ? stationDetailData.hourly_delay : [],
+    alert_delay_comparison: hasStationSpecificDetail ? stationDetailData.alert_delay_comparison : [],
   };
 }
 
@@ -474,6 +528,104 @@ function renderHistoryList(stationDetailData) {
   historyElements.list.replaceChildren(...rows);
 }
 
+function renderStationLineChart(stationDetailData) {
+  const hourlyDelayData = Array.isArray(stationDetailData.hourly_delay) ? stationDetailData.hourly_delay : [];
+  const weekdayPoints = getLineChartPoints(hourlyDelayData, "weekday_delay");
+  const holidayPoints = getLineChartPoints(hourlyDelayData, "holiday_delay");
+  const highlightPoint = weekdayPoints[weekdayPoints.length - 1] || null;
+
+  if (chartElements.lineChart) {
+    chartElements.lineChart.setAttribute(
+      "aria-label",
+      hourlyDelayData.length > 0
+        ? `${formatStationName(stationDetailData.station)} 시간대별 평균 지연 시간 차트`
+        : "시간대별 평균 지연 시간 데이터 없음",
+    );
+  }
+
+  if (chartElements.lineWeekday) {
+    chartElements.lineWeekday.setAttribute("points", toPolylinePoints(weekdayPoints));
+  }
+
+  if (chartElements.lineHoliday) {
+    chartElements.lineHoliday.setAttribute("points", toPolylinePoints(holidayPoints));
+  }
+
+  if (chartElements.linePoint) {
+    chartElements.linePoint.toggleAttribute("hidden", !highlightPoint);
+
+    if (highlightPoint) {
+      chartElements.linePoint.setAttribute("cx", String(highlightPoint.x));
+      chartElements.linePoint.setAttribute("cy", String(highlightPoint.y));
+    }
+  }
+
+  if (chartElements.lineTooltip) {
+    chartElements.lineTooltip.textContent = highlightPoint ? `${highlightPoint.value.toFixed(1)}분` : "-";
+
+    if (highlightPoint) {
+      chartElements.lineTooltip.setAttribute("x", String(highlightPoint.x));
+      chartElements.lineTooltip.setAttribute("y", String(Math.max(highlightPoint.y - 12, 18)));
+    }
+  }
+
+  if (chartElements.lineTooltipBox) {
+    chartElements.lineTooltipBox.toggleAttribute("hidden", !highlightPoint);
+
+    if (highlightPoint) {
+      chartElements.lineTooltipBox.setAttribute("x", String(highlightPoint.x - 29));
+      chartElements.lineTooltipBox.setAttribute("y", String(Math.max(highlightPoint.y - 42, 0)));
+    }
+  }
+}
+
+function createAlertComparisonGroup(comparisonItem) {
+  const group = document.createElement("div");
+  const normalBar = document.createElement("div");
+  const alertBar = document.createElement("div");
+  const normalValue = document.createElement("span");
+  const alertValue = document.createElement("span");
+  const label = document.createElement("strong");
+
+  group.className = "station-bar-chart__group";
+  normalBar.className = "station-bar-chart__bar station-bar-chart__bar--normal";
+  alertBar.className = "station-bar-chart__bar station-bar-chart__bar--alert";
+  normalBar.style.height = `${getBarHeight(comparisonItem.normal_avg_delay).toFixed(0)}px`;
+  alertBar.style.height = `${getBarHeight(comparisonItem.alert_avg_delay).toFixed(0)}px`;
+  normalValue.textContent = Number.isFinite(comparisonItem.normal_avg_delay)
+    ? comparisonItem.normal_avg_delay.toFixed(1)
+    : "-";
+  alertValue.textContent = Number.isFinite(comparisonItem.alert_avg_delay)
+    ? comparisonItem.alert_avg_delay.toFixed(1)
+    : "-";
+  label.textContent = comparisonItem.alert_type || "특보";
+
+  normalBar.append(normalValue);
+  alertBar.append(alertValue);
+  group.append(normalBar, alertBar, label);
+
+  return group;
+}
+
+function renderStationAlertComparisonChart(stationDetailData) {
+  if (!chartElements.alertComparisonChart) {
+    return;
+  }
+
+  const axisItems = Array.from(chartElements.alertComparisonChart.querySelectorAll(".station-bar-chart__y"));
+  const comparisonData = Array.isArray(stationDetailData.alert_delay_comparison)
+    ? stationDetailData.alert_delay_comparison
+    : [];
+  const groups = comparisonData.map(createAlertComparisonGroup);
+
+  chartElements.alertComparisonChart.replaceChildren(...axisItems, ...groups);
+}
+
+function renderStationCharts(stationDetailData) {
+  renderStationLineChart(stationDetailData);
+  renderStationAlertComparisonChart(stationDetailData);
+}
+
 function renderStationDetail(stationDetailData, vulnerabilityStationsData, selectedStationName = stationDetailData.station) {
   const selectedStationDetail = createSelectedStationDetail(stationDetailData, selectedStationName);
   const stationMetrics = getSelectedStationMetrics(selectedStationName, vulnerabilityStationsData);
@@ -487,6 +639,7 @@ function renderStationDetail(stationDetailData, vulnerabilityStationsData, selec
   renderStationMetrics(stationMetrics);
   renderAlertStatsTable(selectedStationDetail);
   renderHistoryList(selectedStationDetail);
+  renderStationCharts(selectedStationDetail);
 }
 
 function buildStationSelectOptions(vulnerabilityStationsData, selectedStationName) {

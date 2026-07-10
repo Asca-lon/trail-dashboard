@@ -160,7 +160,7 @@
           <h3 class="station-chart-card__title" id="hourly-delay-title">시간대별 평균 지연 시간</h3>
           <span class="station-chart-card__unit">(단위: 분)</span>
         </header>
-        <div class="station-line-chart" role="img" aria-label="평일 평균 지연 시간이 14시에 18.4분으로 표시되는 시간대별 평균 지연 시간 차트">
+        <div class="station-line-chart" role="img" aria-label="평일 평균 지연 시간이 14시에 18.4분으로 표시되는 시간대별 평균 지연 시간 차트" data-station-detail-line-chart>
           <div class="station-line-chart__legend">
             <span><i class="station-line-chart__legend-line station-line-chart__legend-line--weekday"></i>평일</span>
             <span><i class="station-line-chart__legend-line station-line-chart__legend-line--holiday"></i>주말/공휴일</span>
@@ -186,12 +186,12 @@
               <text x="532" y="216">20시</text>
               <text x="574" y="216">24시</text>
             </g>
-            <polyline class="station-line-chart__holiday-line" points="42,158 72,150 102,154 132,145 162,142 192,126 222,116 252,136 282,144 312,142 342,118 372,112 402,132 432,146 462,120 492,116 522,124 552,82 590,70"></polyline>
-            <polyline class="station-line-chart__weekday-line" points="42,146 72,136 102,138 132,128 162,112 192,86 222,80 252,104 282,108 312,104 342,86 372,66"></polyline>
-            <circle class="station-line-chart__point" cx="372" cy="66" r="5"></circle>
+            <polyline class="station-line-chart__holiday-line" points="42,158 72,150 102,154 132,145 162,142 192,126 222,116 252,136 282,144 312,142 342,118 372,112 402,132 432,146 462,120 492,116 522,124 552,82 590,70" data-station-detail-line-holiday></polyline>
+            <polyline class="station-line-chart__weekday-line" points="42,146 72,136 102,138 132,128 162,112 192,86 222,80 252,104 282,108 312,104 342,86 372,66" data-station-detail-line-weekday></polyline>
+            <circle class="station-line-chart__point" cx="372" cy="66" r="5" data-station-detail-line-point></circle>
             <g class="station-line-chart__tooltip">
-              <rect x="344" y="34" width="58" height="30" rx="6"></rect>
-              <text x="373" y="54" text-anchor="middle">18.4분</text>
+              <rect x="344" y="34" width="58" height="30" rx="6" data-station-detail-line-tooltip-box></rect>
+              <text x="373" y="54" text-anchor="middle" data-station-detail-line-tooltip>18.4분</text>
             </g>
           </svg>
         </div>
@@ -207,7 +207,7 @@
             <span><i class="station-bar-chart__legend-dot station-bar-chart__legend-dot--normal"></i>평상시 평균</span>
             <span><i class="station-bar-chart__legend-dot station-bar-chart__legend-dot--alert"></i>특보 발생 시 평균</span>
           </div>
-          <div class="station-bar-chart__plot">
+          <div class="station-bar-chart__plot" data-station-detail-alert-comparison-chart>
             <span class="station-bar-chart__y station-bar-chart__y--30">30</span>
             <span class="station-bar-chart__y station-bar-chart__y--20">20</span>
             <span class="station-bar-chart__y station-bar-chart__y--10">10</span>

@@ -6954,6 +6954,470 @@ miryang-busan | 밀양→부산 | 5.4분 | 0.0% | 7 hourly | 7 trend | 3 alerts 
 
 ---
 
+# 역 상세 차트 Mock 연결 작업 요약
+
+# 개요
+
+역 상세 페이지의 정적 그래프 2개를 mock 데이터와 연결했습니다.
+
+연결한 차트:
+
+- 시간대별 평균 지연 시간
+- 특보 발생 시 / 평상시 평균 지연 비교
+
+# 구현 목적
+
+기존 역 상세 그래프는 HTML에 고정된 `polyline`, tooltip, 막대 값으로 표시되고 있었습니다.
+
+따라서 mock 데이터를 불러와도 그래프 값은 변하지 않았습니다.
+
+이번 작업은 `station_details.json`에 차트용 mock 데이터를 추가하고, `station-detail.js`에서 해당 데이터를 DOM에 렌더링하도록 연결하기 위한 작업입니다.
+
+# 구현 내용
+
+- `mock/station_details.json`
+  - `hourly_delay[]` 추가
+  - `alert_delay_comparison[]` 추가
+
+- `frontend/station-detail.html`
+  - 선 그래프 polyline, point, tooltip에 렌더링용 `data-*` 속성 추가
+  - 막대 그래프 plot 영역에 렌더링용 `data-*` 속성 추가
+
+- `frontend/station-detail.js`
+  - 선 그래프 좌표 계산 함수 추가
+  - 평일/주말 polyline 렌더링 추가
+  - tooltip과 강조 point 동적 갱신 추가
+  - 특보별 평상시/특보 발생 시 평균 지연 막대 그래프 렌더링 추가
+  - 선택한 역에 상세 차트 mock이 없을 때 빈 상태로 처리
+
+# 코드 설명
+
+## 왜 필요한가
+
+역 상세 페이지의 요약 카드와 표는 mock 데이터와 연결되어 있었지만, 그래프는 정적 HTML 값으로 남아 있었습니다.
+
+이 상태에서는 역을 변경하거나 mock 값을 수정해도 그래프가 바뀌지 않습니다.
+
+## 어떤 원리인가
+
+1. `station_details.json`에서 `hourly_delay[]`와 `alert_delay_comparison[]`를 읽습니다.
+2. `hourly_delay[]`의 평일/주말 값을 SVG 좌표로 변환합니다.
+3. 변환한 좌표를 `polyline points`에 반영합니다.
+4. 마지막 평일 지점을 기준으로 tooltip과 point 위치를 갱신합니다.
+5. `alert_delay_comparison[]`을 기준으로 평상시/특보 발생 시 막대 높이를 계산합니다.
+6. 역 상세 화면 렌더링 시 차트도 함께 다시 렌더링합니다.
+
+# API
+
+API 변경 사항은 없습니다.
+
+사용한 mock 데이터:
+
+- `GET ../mock/station_details.json`
+
+추가된 mock 필드:
+
+```json
+{
+  "hourly_delay": [
+    {
+      "time": "00:00",
+      "weekday_delay": 6.8,
+      "holiday_delay": 5.4
+    }
+  ],
+  "alert_delay_comparison": [
+    {
+      "alert_type": "호우",
+      "normal_avg_delay": 8.2,
+      "alert_avg_delay": 15.2
+    }
+  ]
+}
+```
+
+# Database
+
+DB 변경 사항은 없습니다.
+
+# 테스트 방법
+
+1. JavaScript 문법 검사
+
+```bash
+node --check frontend/station-detail.js
+```
+
+예상 결과:
+
+- 오류 없이 종료됩니다.
+
+2. 차트 mock 데이터 구조 검사
+
+검증 결과:
+
+```text
+station: 대전
+hourly points: 7
+comparison groups: 4
+bad chart data: 0
+```
+
+3. 대표 값 확인
+
+검증 결과:
+
+```text
+last weekday: 5.9
+rain compare: 8.2 15.2
+```
+
+4. HTTP 경로 검사
+
+검증 결과:
+
+```text
+/frontend/station-detail.html?station_id=daejeon=200
+/frontend/station-detail.js=200
+/mock/station_details.json=200
+/mock/vulnerability_stations.json=200
+```
+
+# 주의사항
+
+현재 `station_details.json`은 대전역 상세 mock만 제공합니다.
+
+다른 역을 선택했을 때 대전역 차트가 그대로 남지 않도록, 상세 차트 mock이 없는 역은 빈 데이터로 처리했습니다.
+
+# 변경 이력
+
+2026-07-10
+
+- 역 상세 시간대별 평균 지연 시간 그래프 mock 연결
+- 역 상세 특보 발생 시 / 평상시 평균 지연 비교 그래프 mock 연결
+- 대전역 차트용 mock 데이터 추가
+
+# 작업 요약
+
+## 완료한 내용
+
+- 역 상세 차트 mock 데이터 추가
+- 시간대별 평균 지연 시간 선 그래프 연결
+- 특보 발생 시 / 평상시 평균 지연 비교 막대 그래프 연결
+- 선택 역에 상세 mock이 없을 때 빈 차트 처리
+- 문법 및 mock 구조 검증
+- HTTP 경로 검증
+
+## 수정한 파일
+
+- `frontend/station-detail.html`
+- `frontend/station-detail.js`
+- `mock/station_details.json`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+그래프 값이 변하지 않는 원인은 mock 데이터 부족과 매핑 로직 부재였습니다.
+
+이번 작업으로 역 상세 그래프가 `station_details.json`의 데이터를 기준으로 렌더링됩니다.
+
+## 변경 사항
+
+- 정적 SVG polyline을 mock 기반 렌더링 대상으로 변경
+- 정적 막대 그래프를 mock 배열 기반 DOM 렌더링으로 변경
+- 상세 mock이 없는 역의 차트 fallback 처리 추가
+
+## 새롭게 배운 개념
+
+- SVG Polyline Mapping
+- Bar Chart DOM Rendering
+- Station Detail Chart Fallback
+
+## 실무에서는
+
+실무에서는 역별 상세 차트 데이터를 API에서 `station_id` 기준으로 조회하는 구조가 적절합니다.
+
+목록용 요약 데이터와 상세 차트 데이터를 분리하면 초기 로딩은 가볍게 유지하고, 상세 화면에서는 필요한 데이터만 가져올 수 있습니다.
+
+## 개선 가능한 부분
+
+- 다른 역의 상세 차트 mock 데이터 추가
+- `station_details.json`을 역별 `stations[]` 구조로 확장
+- Playwright 기반 실제 렌더링 검증 자동화
+
+## 다음 작업
+
+- 역 상세 mock을 여러 역 상세 데이터 구조로 확장
+
+## 복습 문제
+
+1. 그래프 값이 변하지 않을 때 mock 데이터 문제와 매핑 문제를 어떻게 구분할 수 있나요?
+2. SVG `polyline points`는 어떤 방식으로 동적으로 계산하나요?
+3. 상세 mock이 없는 역을 선택했을 때 fallback 처리가 필요한 이유는 무엇인가요?
+
+## 오늘 배운 내용
+
+- SVG Polyline
+- Data-driven Chart Rendering
+- Fallback Rendering
+
+## Change Log
+
+2026-07-10
+
+- 역 상세 차트 mock 연결
+- 문서 업데이트
+
+## Timestamp
+
+2026-07-10 10:20:53 (KST)
+
+---
+
+# 전체 Mock 데이터 매핑 검수 작업 요약
+
+# 개요
+
+현재 존재하는 mock 데이터를 추가하지 않고, 대시보드/역 상세/구간 상세 화면에서 mock 데이터 매핑이 정상적으로 연결되어 있는지 검수했습니다.
+
+검수 범위:
+
+- `frontend/dashboard.js`
+- `frontend/station-detail.js`
+- `frontend/route-detail.js`
+- `mock/` 폴더의 전체 JSON 파일
+- 대시보드에서 상세 화면으로 이동하는 `station_id`, `segment_id` 참조
+
+# 구현 목적
+
+현재 화면에 표시되는 데이터가 mock 파일과 올바르게 연결되어 있는지 확인하기 위함입니다.
+
+이번 작업에서는 mock 데이터를 새로 추가하지 않고, 기존 데이터와 렌더링 로직의 연결 상태만 점검했습니다.
+
+# 구현 내용
+
+기능 코드 변경은 없습니다.
+
+검수한 항목:
+
+- 모든 mock JSON 파싱 가능 여부
+- 주요 JS 파일 문법 오류 여부
+- checklist의 `station_id`, `segment_id` 참조 무결성
+- 구간 상세 요약 mock과 상세 mock의 `segment_id` 일치 여부
+- 역 상세 mock과 역 요약 mock의 연결 여부
+- HTTP 서버 기준 실제 fetch 경로 응답 여부
+
+# 코드 설명
+
+## 왜 필요한가
+
+mock 데이터와 화면 매핑은 여러 파일을 거쳐 동작합니다.
+
+대시보드는 여러 mock 파일을 동시에 사용하고, 상세 화면은 URL 파라미터로 전달된 id를 기준으로 mock 데이터를 찾습니다.
+
+따라서 JSON 형식이 맞더라도 id 참조가 깨지면 화면에는 일부 데이터가 비거나 잘못된 상세 화면으로 이동할 수 있습니다.
+
+## 어떤 원리인가
+
+1. `node --check`로 주요 JS 파일 문법을 검사합니다.
+2. `mock/` 폴더의 JSON 파일을 모두 파싱합니다.
+3. checklist의 대상 id가 실제 station/segment 목록에 존재하는지 확인합니다.
+4. 구간 상세의 `segments_details.json`과 `vulnerability_segments.json`이 같은 `segment_id`를 공유하는지 확인합니다.
+5. 역 상세의 `station_details.json`이 `vulnerability_stations.json`의 역과 연결되는지 확인합니다.
+6. 로컬 HTTP 서버에서 실제 fetch 경로가 200으로 응답하는지 확인합니다.
+
+# API
+
+API 변경 사항은 없습니다.
+
+검수한 mock 데이터:
+
+- `GET ../mock/alerts_active.json`
+- `GET ../mock/lines.json`
+- `GET ../mock/checklist.json`
+- `GET ../mock/heatmap.json`
+- `GET ../mock/vulnerability_stations.json`
+- `GET ../mock/vulnerability_segments.json`
+- `GET ../mock/station_details.json`
+- `GET ../mock/segments_details.json`
+
+# Database
+
+DB 변경 사항은 없습니다.
+
+# 테스트 방법
+
+1. JavaScript 문법 검사
+
+```bash
+node --check frontend/dashboard.js
+node --check frontend/station-detail.js
+node --check frontend/route-detail.js
+```
+
+예상 결과:
+
+- 오류 없이 종료됩니다.
+
+2. 전체 mock JSON 파싱 검사
+
+검증 결과:
+
+```text
+alerts_active.json: ok
+lines.json: ok
+heatmap.json: ok
+checklist.json: ok
+vulnerability_segments.json: ok
+vulnerability_stations.json: ok
+segments_details.json: ok
+station_details.json: ok
+```
+
+3. checklist 참조 무결성 검사
+
+검증 결과:
+
+```text
+checklist items: 4
+bad checklist refs: 0
+```
+
+4. 구간 상세 참조 무결성 검사
+
+검증 결과:
+
+```text
+segment summaries: 6
+segment details: 6
+missing details: 0
+missing summaries: 0
+bad segment detail structures: 0
+```
+
+5. 역 상세 연결 검사
+
+검증 결과:
+
+```text
+station summaries: 5
+station detail station: 대전
+station detail summary exists: true
+station detail structure bad: 0
+station detail coverage: daejeon:true, dongdaegu:false, gimcheon_gumi:false, suwon:false, miryang:false
+```
+
+6. HTTP 경로 검사
+
+검증 결과:
+
+```text
+/frontend/dashboard.html=200
+/frontend/dashboard.js=200
+/frontend/station-detail.html?station_id=daejeon=200
+/frontend/station-detail.js=200
+/frontend/route-detail.html?segment_id=daejeon-gimcheon_gumi=200
+/frontend/route-detail.js=200
+/mock/alerts_active.json=200
+/mock/lines.json=200
+/mock/checklist.json=200
+/mock/heatmap.json=200
+/mock/vulnerability_stations.json=200
+/mock/vulnerability_segments.json=200
+/mock/station_details.json=200
+/mock/segments_details.json=200
+```
+
+# 주의사항
+
+전체적으로 mock 매핑은 정상입니다.
+
+다만 역 상세 mock은 현재 `대전` 역 상세 데이터만 제공합니다.
+
+따라서 `vulnerability_stations.json`에 있는 다른 역들은 요약 카드에는 표시되지만, 상세 차트/특보 통계/과거 사례 영역은 의도적으로 빈 상태 fallback으로 처리됩니다.
+
+# 변경 이력
+
+2026-07-10
+
+- 전체 mock 데이터 매핑 검수
+- JSON 파싱, JS 문법, 참조 무결성, HTTP 경로 확인
+- 역 상세 상세 mock coverage 확인
+
+# 작업 요약
+
+## 완료한 내용
+
+- 전체 mock JSON 파싱 검증
+- 주요 JS 파일 문법 검증
+- checklist id 참조 검증
+- 구간 상세 `segment_id` 참조 검증
+- 역 상세 `station_id`/역명 연결 검증
+- 실제 HTTP fetch 경로 검증
+
+## 수정한 파일
+
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+이번 요청은 새 mock 데이터를 추가하지 않고 현재 매핑 상태를 확인하는 작업이었습니다.
+
+검수 결과를 문서화해 이후 포트폴리오와 유지보수 기록으로 남기기 위해 문서를 업데이트했습니다.
+
+## 변경 사항
+
+- 기능 코드 변경 없음
+- mock 데이터 변경 없음
+- 검수 결과 문서 추가
+
+## 새롭게 배운 개념
+
+- Mock Mapping Audit
+- Reference Integrity Check
+- Coverage Check
+
+## 실무에서는
+
+실무에서는 mock 데이터도 API contract처럼 관리합니다.
+
+특히 목록 화면과 상세 화면이 id로 연결되는 경우, mock 단계에서도 id 참조 검사를 자동화하면 화면 전환 오류를 빠르게 잡을 수 있습니다.
+
+## 개선 가능한 부분
+
+- 역 상세 mock을 여러 역 상세 데이터 구조로 확장
+- mock schema 검증 스크립트 파일 분리
+- Playwright 기반 실제 화면 텍스트 검증 추가
+
+## 다음 작업
+
+- 역 상세 mock coverage 확장 여부 결정
+
+## 복습 문제
+
+1. mock JSON 파싱 검사는 어떤 종류의 오류를 잡을 수 있나요?
+2. `station_id`, `segment_id` 참조 무결성이 중요한 이유는 무엇인가요?
+3. mock coverage와 데이터 매핑 정상 여부는 어떻게 구분할 수 있나요?
+
+## 오늘 배운 내용
+
+- Mock Mapping Audit
+- Reference Integrity
+- Mock Coverage
+
+## Change Log
+
+2026-07-10
+
+- 전체 mock 데이터 매핑 검수
+- 문서 업데이트
+
+## Timestamp
+
+2026-07-10 10:27:41 (KST)
+
+---
+
 # 구간 상세 구간 변경 버튼 작업 요약
 
 ## 완료한 내용
@@ -7489,3 +7953,95 @@ CSS Grid의 열 합계를 콘텐츠 토큰과 동일하게 맞추고, 내부 fle
 ## Timestamp
 
 2026-07-10 10:10:16 (KST)
+---
+
+# 대시보드 전체 보기 링크 연결 작업 요약
+
+## 완료한 내용
+
+- 대시보드의 `취약 구간 TOP 5` 카드에 있는 `전체 보기` 링크를 구간 상세 화면으로 연결했습니다.
+- 대시보드의 `취약 역 TOP 5` 카드에 있는 `전체 보기` 링크를 역 상세 화면으로 연결했습니다.
+
+## 수정한 파일
+
+- `frontend/dashboard.html`
+- `.docs/Frontend.md`
+
+## 구현 이유
+
+기존 `전체 보기` 링크는 `href="#"`로 되어 있어 클릭해도 실제 페이지 이동이 발생하지 않았습니다. 사용자가 취약 구간과 취약 역 목록에서 자연스럽게 상세 분석 화면으로 이동할 수 있도록 실제 상세 페이지 경로를 연결했습니다.
+
+## 변경 사항
+
+- 취약 구간 전체 보기: `./route-detail.html?segment_id=daejeon-gimcheon_gumi`
+- 취약 역 전체 보기: `./station-detail.html`
+
+## 새롭게 배운 개념
+
+- `href="#"`는 임시 링크로 사용할 수 있지만, 실제 기능이 없으면 사용자 경험과 접근성 측면에서 혼란을 줄 수 있습니다.
+- 구간 상세 화면은 `segment_id` query parameter를 기준으로 상세 데이터를 선택합니다.
+
+## 실무에서는
+
+실무에서는 `전체 보기`가 단일 상세 페이지가 아니라 목록 페이지로 이동하는 경우가 많습니다. 현재 프로젝트에는 별도 전체 목록 페이지가 없으므로, 기존에 구현된 상세 화면 중 대표 구간과 역 상세 화면으로 연결하는 방식이 가장 작은 변경입니다.
+
+## 개선 가능한 부분
+
+- 취약 구간 전체 목록 페이지 추가
+- 취약 역 전체 목록 페이지 추가
+- 현재 TOP 5 데이터의 1순위 항목을 기준으로 동적 링크 생성
+
+## 다음 작업
+
+- 대시보드 필터 `적용하기` 기능 연결
+- 지도 카드 `전체 보기` 기능 설계
+- 전체 목록 페이지가 필요한지 결정
+
+## 프로젝트 진행률
+
+■■■■■■■■□□ 80%
+
+완료
+
+- 취약 구간 전체 보기 링크 연결
+- 취약 역 전체 보기 링크 연결
+
+진행 중
+
+- 디자인만 있는 버튼/링크 기능 연결
+
+예정
+
+- 대시보드 필터 동작 구현
+- 구간/역 전체 목록 화면 설계
+
+## 복습 문제
+
+1. `href="#"`를 실제 서비스 화면에 그대로 두면 어떤 문제가 생길 수 있을까요?
+2. query parameter를 사용해 상세 화면의 데이터를 선택하는 방식의 장점은 무엇일까요?
+3. `전체 보기`가 상세 화면이 아니라 목록 화면으로 가야 하는 경우에는 어떤 라우팅 구조가 더 적절할까요?
+
+## 오늘 배운 내용
+
+- 임시 링크 제거
+- HTML 앵커 이동 경로
+- Query Parameter 기반 상세 화면 이동
+
+## README 반영 여부
+
+이번 작업은 기존 화면 간 이동 링크를 연결한 작은 변경이므로 README에 별도 기능 설명을 추가하지 않았습니다.
+
+## 추천 Commit Message
+
+`fix: 대시보드 전체 보기 링크 연결`
+
+## Change Log
+
+2026-07-10
+
+- 대시보드 취약 구간 전체 보기 링크를 구간 상세 화면으로 연결
+- 대시보드 취약 역 전체 보기 링크를 역 상세 화면으로 연결
+
+## Timestamp
+
+2026-07-10 10:35:56 (KST)
