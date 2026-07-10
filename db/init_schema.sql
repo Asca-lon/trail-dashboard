@@ -1,10 +1,5 @@
-DROP TABLE IF EXISTS segment_vulnerability CASCADE;
-DROP TABLE IF EXISTS station_vulnerability CASCADE;
-DROP TABLE IF EXISTS weather_alerts CASCADE;
-DROP TABLE IF EXISTS train_stops CASCADE;
-DROP TABLE IF EXISTS stations CASCADE;
-
-CREATE TABLE stations (
+-- 1. 역 정보 테이블
+CREATE TABLE IF NOT EXISTS stations (
     station_code TEXT PRIMARY KEY,
     station_name TEXT NOT NULL,
     line TEXT NOT NULL,
@@ -15,7 +10,8 @@ CREATE TABLE stations (
     lon DOUBLE PRECISION
 );
 
-CREATE TABLE train_stops (
+-- 2. 열차 정차/운행 정보 테이블
+CREATE TABLE IF NOT EXISTS train_stops (
     run_date DATE NOT NULL,
     train_no TEXT NOT NULL,
     seq INTEGER,
@@ -29,27 +25,29 @@ CREATE TABLE train_stops (
     delay_min INTEGER,
     status TEXT NOT NULL DEFAULT '정상' CHECK (status IN ('정상','지연','운행중단')),
     event_time TIMESTAMPTZ NOT NULL,
-    ingested_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    ingested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT uq_train_stops UNIQUE (run_date, train_no, station_code, event_time)
 );
 
-CREATE INDEX idx_ts_line ON train_stops (line, event_time DESC);
-CREATE INDEX idx_ts_train ON train_stops (run_date, train_no, seq);
-CREATE UNIQUE INDEX uq_ts ON train_stops (run_date, train_no, station_code, event_time);
+CREATE INDEX IF NOT EXISTS idx_ts_line ON train_stops (line, event_time DESC);
+CREATE INDEX IF NOT EXISTS idx_ts_train ON train_stops (run_date, train_no, seq);
 
-CREATE TABLE weather_alerts (
+-- 3. 기상 특보 정보 테이블
+CREATE TABLE IF NOT EXISTS weather_alerts (
     alert_id BIGSERIAL PRIMARY KEY,
     region_code TEXT NOT NULL,
     alert_type TEXT NOT NULL,
     alert_level TEXT NOT NULL,
     start_time TIMESTAMPTZ NOT NULL,
     end_time TIMESTAMPTZ,
-    UNIQUE (region_code, alert_type, alert_level, start_time)
+    CONSTRAINT uq_weather_alerts UNIQUE (region_code, alert_type, alert_level, start_time)
 );
 
-CREATE INDEX idx_alert_region ON weather_alerts (region_code, start_time DESC);
+CREATE INDEX IF NOT EXISTS idx_alert_region ON weather_alerts (region_code, start_time DESC);
 
-CREATE TABLE station_vulnerability (
-    station_code TEXT,
+-- 4. 역 단위 지연 취약도 테이블
+CREATE TABLE IF NOT EXISTS station_vulnerability (
+    station_code TEXT REFERENCES stations(station_code),
     alert_type TEXT,
     alert_level TEXT,
     avg_delay REAL,
@@ -62,9 +60,10 @@ CREATE TABLE station_vulnerability (
     PRIMARY KEY (station_code, alert_type, alert_level)
 );
 
-CREATE TABLE segment_vulnerability (
-    from_station TEXT,
-    to_station TEXT,
+-- 5. 구간 단위 지연 취약도 테이블
+CREATE TABLE IF NOT EXISTS segment_vulnerability (
+    from_station TEXT REFERENCES stations(station_code),
+    to_station TEXT REFERENCES stations(station_code),
     line TEXT,
     alert_type TEXT,
     alert_level TEXT,
