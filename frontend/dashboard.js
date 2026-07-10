@@ -9,6 +9,19 @@ const HIGH_DELAY_THRESHOLD_MINUTES = 12;
 const HIGH_VULNERABILITY_THRESHOLD = 0.7;
 const WARNING_VULNERABILITY_THRESHOLD = 0.5;
 
+const GYEONGBU_HIGH_SPEED_STATIONS = [
+  "서울",
+  "광명",
+  "천안아산",
+  "오송",
+  "대전",
+  "김천(구미)",
+  "동대구",
+  "경주",
+  "울산",
+  "부산",
+];
+
 const RISK_LEVELS = {
   high: { label: "높음", color: "#EF4444" },
   warning: { label: "주의", color: "#F59E0B" },
@@ -148,7 +161,7 @@ function getRegionSummary(activeAlerts) {
     return regions[0];
   }
 
-  return `${regions[0]} 외 ${regions.length - 1}개 지역`;
+  return regions.join(", ");
 }
 
 function getAffectedSegmentCount(activeAlerts) {
@@ -417,13 +430,15 @@ function renderSummaryCards(alertsData, checklistData, vulnerabilitySegmentsData
   );
 }
 
-function createRouteMapItem(node, stations = []) {
+function createRouteMapItem(node, segment, stations = []) {
   const riskLevel = getRiskLevelByVulnerability(node.vuln);
   const risk = RISK_LEVELS[riskLevel];
+  const segmentRiskLevel = getRiskLevelByVulnerability(segment?.vuln);
   const stationInfo = getStationByName(node.station, stations);
   const item = document.createElement("li");
   const station = document.createElement("span");
   const marker = document.createElement("span");
+  const segmentLine = document.createElement("span");
   const dash = document.createElement("span");
   const status = document.createElement("span");
   const chevron = document.createElement("a");
@@ -435,6 +450,8 @@ function createRouteMapItem(node, stations = []) {
   station.textContent = node.station;
 
   marker.className = "route-map__marker";
+  segmentLine.className = `route-map__segment route-map__segment--${segmentRiskLevel}`;
+  segmentLine.setAttribute("aria-hidden", "true");
   dash.className = "route-map__dash";
 
   status.className = "route-map__status";
@@ -453,7 +470,7 @@ function createRouteMapItem(node, stations = []) {
     ? `${node.station}역 상세 화면으로 이동`
     : `${node.station}역 상세 화면으로 이동합니다. 현재 mock 상세 데이터는 없습니다.`;
 
-  item.append(station, marker, dash, status, chevron);
+  item.append(station, marker, segmentLine, dash, status, chevron);
 
   return item;
 }
@@ -470,22 +487,32 @@ function countHeatmapEdgesByRiskLevel(edges) {
   );
 }
 
-function buildRouteRiskGradient(nodes) {
-  if (nodes.length === 0) {
-    return RISK_LEVELS.none.color;
-  }
+function findHeatmapNode(stationName, nodes) {
+  return nodes.find((node) => node.station === stationName) || null;
+}
 
-  const step = 100 / nodes.length;
-  const stops = nodes.flatMap((node, index) => {
-    const riskLevel = getRiskLevelByVulnerability(node.vuln);
-    const color = RISK_LEVELS[riskLevel].color;
-    const start = (step * index).toFixed(2);
-    const end = (step * (index + 1)).toFixed(2);
+function findHeatmapEdge(fromStation, toStation, edges) {
+  return edges.find((edge) =>
+    (edge.from === fromStation && edge.to === toStation)
+    || (edge.from === toStation && edge.to === fromStation),
+  ) || null;
+}
 
-    return [`${color} ${start}%`, `${color} ${end}%`];
+function buildHighSpeedRoute(nodes, edges) {
+  return GYEONGBU_HIGH_SPEED_STATIONS.map((stationName, index) => {
+    const nextStationName = GYEONGBU_HIGH_SPEED_STATIONS[index + 1];
+    const node = findHeatmapNode(stationName, nodes);
+    const segment = nextStationName
+      ? findHeatmapEdge(stationName, nextStationName, edges)
+      : null;
+
+    return {
+      node: { station: stationName, vuln: node?.vuln ?? null },
+      segment: nextStationName
+        ? { from: stationName, to: nextStationName, vuln: segment?.vuln ?? null }
+        : null,
+    };
   });
-
-  return `linear-gradient(180deg, ${stops.join(", ")})`;
 }
 
 function renderEmptyHeatmap() {
@@ -499,7 +526,6 @@ function renderEmptyHeatmap() {
 
   if (heatmapElements.routeList) {
     heatmapElements.routeList.replaceChildren();
-    heatmapElements.routeList.style.setProperty("--route-risk-gradient", RISK_LEVELS.none.color);
   }
 
   Object.values(heatmapElements.summary).forEach((element) => {
@@ -522,12 +548,9 @@ function renderHeatmap(heatmapData, updatedAt, vulnerabilityStationsData = {}) {
   const edges = Array.isArray(heatmapData.edges) ? heatmapData.edges : [];
   const stations = getStationsFromData(vulnerabilityStationsData);
   const lineName = heatmapData.line || "노선";
-  const edgeCounts = countHeatmapEdgesByRiskLevel(edges);
-
-  if (nodes.length === 0) {
-    renderEmptyHeatmap();
-    return;
-  }
+  const highSpeedRoute = buildHighSpeedRoute(nodes, edges);
+  const routeSegments = highSpeedRoute.map((item) => item.segment).filter(Boolean);
+  const edgeCounts = countHeatmapEdgesByRiskLevel(routeSegments);
 
   if (heatmapElements.title) {
     heatmapElements.title.textContent = `${lineName} 기상 취약도 현황`;
@@ -538,8 +561,9 @@ function renderHeatmap(heatmapData, updatedAt, vulnerabilityStationsData = {}) {
   }
 
   if (heatmapElements.routeList) {
-    heatmapElements.routeList.replaceChildren(...nodes.map((node) => createRouteMapItem(node, stations)));
-    heatmapElements.routeList.style.setProperty("--route-risk-gradient", buildRouteRiskGradient(nodes));
+    heatmapElements.routeList.replaceChildren(
+      ...highSpeedRoute.map(({ node, segment }) => createRouteMapItem(node, segment, stations)),
+    );
   }
 
   Object.entries(edgeCounts).forEach(([riskLevel, count]) => {
