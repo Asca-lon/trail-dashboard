@@ -615,7 +615,7 @@ function renderEmptySummaryCards() {
     "0",
     "개",
     "전일 비교 데이터 없음",
-    "취약도 높음 구간 데이터 없음",
+    "위험도 높음 구간 데이터 없음",
   );
 }
 
@@ -755,7 +755,7 @@ function renderSummaryCards(
     String(highRiskSegmentCount),
     "개",
     highRiskSegmentsComparison,
-    `취약도 높음 고속철도 구간 ${highRiskSegmentCount}개, 취약도 점수 기준, ${highRiskSegmentsComparison}`,
+    `위험도 높음 고속철도 구간 ${highRiskSegmentCount}개, 위험도 점수 기준, ${highRiskSegmentsComparison}`,
   );
 }
 
@@ -774,7 +774,7 @@ function createRouteMapItem(node, segment, stations = []) {
   const chevron = document.createElement("a");
 
   item.className = `route-map__item route-map__item--${riskLevel}`;
-  item.setAttribute("aria-label", `${node.station} 취약도 ${risk.label}`);
+  item.setAttribute("aria-label", `${node.station} 위험도 ${risk.label}`);
 
   station.className = "route-map__station";
   station.textContent = node.station;
@@ -853,11 +853,11 @@ function buildHighSpeedRoute(nodes, edges) {
 
 function renderEmptyHeatmap() {
   if (heatmapElements.title) {
-    heatmapElements.title.textContent = "경부선 고속철도 기상 취약도 현황";
+    heatmapElements.title.textContent = "경부선 고속철도 기상 위험도 현황";
   }
 
   if (heatmapElements.routeMap) {
-    heatmapElements.routeMap.setAttribute("aria-label", "경부선 고속철도 역별 취약도 데이터 없음");
+    heatmapElements.routeMap.setAttribute("aria-label", "경부선 고속철도 역별 위험도 데이터 없음");
   }
 
   if (heatmapElements.routeList) {
@@ -889,11 +889,11 @@ function renderHeatmap(heatmapData, updatedAt, vulnerabilityStationsData = {}) {
   const edgeCounts = countHeatmapEdgesByRiskLevel(routeSegments);
 
   if (heatmapElements.title) {
-    heatmapElements.title.textContent = `${lineName} 고속철도 기상 취약도 현황`;
+    heatmapElements.title.textContent = `${lineName} 고속철도 기상 위험도 현황`;
   }
 
   if (heatmapElements.routeMap) {
-    heatmapElements.routeMap.setAttribute("aria-label", `${lineName} 고속철도 역별 취약도`);
+    heatmapElements.routeMap.setAttribute("aria-label", `${lineName} 고속철도 역별 위험도`);
   }
 
   if (heatmapElements.routeList) {
@@ -1074,11 +1074,11 @@ function createTableMessageRow(message, columnCount) {
 
 function renderEmptyRankings() {
   if (rankingElements.segmentBody) {
-    rankingElements.segmentBody.replaceChildren(createEmptyRankingRow("취약 구간 데이터가 없습니다.", 5));
+    rankingElements.segmentBody.replaceChildren(createEmptyRankingRow("위험 구간 데이터가 없습니다.", 5));
   }
 
   if (rankingElements.stationBody) {
-    rankingElements.stationBody.replaceChildren(createEmptyRankingRow("취약 역 데이터가 없습니다.", 5));
+    rankingElements.stationBody.replaceChildren(createEmptyRankingRow("위험 역 데이터가 없습니다.", 5));
   }
 }
 
@@ -1154,13 +1154,13 @@ function renderRankings(vulnerabilitySegmentsData, vulnerabilityStationsData) {
 
   if (rankingElements.segmentBody) {
     rankingElements.segmentBody.replaceChildren(
-      ...(segmentRows.length > 0 ? segmentRows : [createEmptyRankingRow("취약 구간 데이터가 없습니다.", 5)]),
+      ...(segmentRows.length > 0 ? segmentRows : [createEmptyRankingRow("위험 구간 데이터가 없습니다.", 5)]),
     );
   }
 
   if (rankingElements.stationBody) {
     rankingElements.stationBody.replaceChildren(
-      ...(stationRows.length > 0 ? stationRows : [createEmptyRankingRow("취약 역 데이터가 없습니다.", 5)]),
+      ...(stationRows.length > 0 ? stationRows : [createEmptyRankingRow("위험 역 데이터가 없습니다.", 5)]),
     );
   }
 }
@@ -1173,18 +1173,6 @@ function getAlertLabelFromReason(reason) {
   const match = reason.match(/^(.*?)\s시/);
 
   return match ? match[1].replace(/\s/g, "") : "-";
-}
-
-function getInspectionRecommendation(riskLevel) {
-  if (riskLevel === "high") {
-    return "즉시 현장 점검 및 운행 관리 강화";
-  }
-
-  if (riskLevel === "warning") {
-    return "시설 및 선로 사전 점검";
-  }
-
-  return "상황 모니터링";
 }
 
 function renderInspectionDetail(item, stations = []) {
@@ -1208,7 +1196,6 @@ function renderInspectionDetail(item, stations = []) {
     ["주요 위험", item.reason || "-"],
     ["평균 지연 증가", Number.isFinite(item.avg_delay_incr) ? `+${item.avg_delay_incr.toFixed(1)}분` : "-"],
     ["분석 표본", Number.isFinite(item.sample_n) ? `${item.sample_n}건` : "-"],
-    ["대응 권고", getInspectionRecommendation(riskLevel)],
   ];
 
   title.className = "inspection-detail-panel__title";
@@ -1306,7 +1293,6 @@ function createInspectionRow(item, stations) {
     createInspectionTargetCell(item, stations),
     createRankingCell(getAlertLabelFromReason(item.reason)),
     createRankingCell(item.reason || "-"),
-    createRankingCell(getInspectionRecommendation(riskLevel)),
     detailCell,
   );
 
@@ -1318,7 +1304,7 @@ function renderEmptyInspectionTable() {
     return;
   }
 
-  inspectionElements.body.replaceChildren(createTableMessageRow("우선 점검 대상 데이터가 없습니다.", 6));
+  inspectionElements.body.replaceChildren(createTableMessageRow("우선 점검 대상 데이터가 없습니다.", 5));
 
   if (inspectionElements.detail) {
     const title = document.createElement("h3");
@@ -1344,7 +1330,7 @@ function renderInspectionTable(checklistData, vulnerabilityStationsData) {
   const rows = items.map((item) => createInspectionRow(item, stations));
 
   inspectionElements.body.replaceChildren(
-    ...(rows.length > 0 ? rows : [createTableMessageRow("우선 점검 대상 데이터가 없습니다.", 6)]),
+    ...(rows.length > 0 ? rows : [createTableMessageRow("우선 점검 대상 데이터가 없습니다.", 5)]),
   );
 
   if (items.length > 0) {

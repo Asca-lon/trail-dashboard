@@ -228,7 +228,7 @@ Increase value:
    - Comparison: 전일 대비 +7.2분 ↑
    - Icon background: `#FBBF24`
 
-4. 취약도 높은 구간
+4. 위험도 높은 구간
    - Value: 5 개
    - Comparison: 전일 대비 +1 ↑
    - Icon background: `#4CC76A`
@@ -262,7 +262,7 @@ Header:
 - Layout: horizontal / space-between / center
 
 Title:
-- Text: `경부선 기상 취약도 현황`
+- Text: `경부선 기상 위험도 현황`
 - Style: 16px / 700 / `#111827`
 
 Info icon:
@@ -317,7 +317,7 @@ Legend:
 Header:
 - Size: 448 × 48px
 - Padding: 0 20px
-- Title: `취약 구간 TOP 5`
+- Title: `위험 구간 TOP 5`
 - Title style: 16px / 700 / `#111827`
 - More text: `더보기 >`
 - More style: 12px / 500 / `#6B7280`
@@ -337,7 +337,7 @@ Column widths:
 - 순위: 48px
 - 구간: 112px
 - 노선: 72px
-- 취약도: 88px
+- 위험도: 88px
 - 예상 지연(분): 128px
 
 Badge:
@@ -355,13 +355,13 @@ Badge colors:
 Same component as Vulnerable Segment TOP 5.
 
 - Size: 448 × 252px
-- Header title: `취약 역 TOP 5`
+- Header title: `위험 역 TOP 5`
 
 Column widths:
 - 순위: 48px
 - 역명: 112px
 - 노선: 72px
-- 취약도: 88px
+- 위험도: 88px
 - 분석 지표: 128px
 
 Use the same typography, border, badge, and row styles as the segment card.

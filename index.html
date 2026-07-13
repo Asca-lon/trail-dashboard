@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>경부선 기상 취약구간 · API / Mock 콘솔</title>
+<title>경부선 기상 위험구간 · API / Mock 콘솔</title>
 <style>
   :root{
     --paper:#f4f2ec; --ink:#14181f; --rail:#2b3440; --line-on:#d9d4c7;
     --muted:#8a9099; --hair:#dcd7cb;
     --lamp-ref:#3fa66a;   /* 참조·목록 (정적) */
-    --lamp-agg:#e0a43b;   /* 취약도 집계 */
+    --lamp-agg:#e0a43b;   /* 위험도 집계 */
     --lamp-live:#d1495b;  /* 실시간 특보 */
     --chip:#eae5d9;
     --mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;
@@ -87,7 +87,7 @@
 <div class="wrap">
   <header>
     <p class="eyebrow">CONTRACT_V5 · source of truth</p>
-    <h1>경부선 기상 취약구간
+    <h1>경부선 기상 위험구간
       <small>사전 점검 대시보드 — API / Mock 콘솔</small>
     </h1>
     <div class="range">데이터 기준 · <b>철도 실적 최근 3개월</b> · 실적은 1일 지연(실시간 아님)</div>
@@ -110,7 +110,7 @@
 
   <div class="legend">
     <span><span class="lamp l-ref"></span><b>참조·목록</b> 정적 기준</span>
-    <span><span class="lamp l-agg"></span><b>취약도 집계</b> 3개월 산출</span>
+    <span><span class="lamp l-agg"></span><b>위험도 집계</b> 3개월 산출</span>
     <span><span class="lamp l-live"></span><b>실시간 특보</b> 현재 발효</span>
   </div>
 
@@ -133,9 +133,9 @@
     { kind:'ref',  path:'/lines', mock:'lines.json',
       desc:'노선·정차역 목록. 필터 선택지의 기준.' },
     { kind:'agg',  path:'/vulnerability/segments', q:'?line=경부선&alert_type=호우&alert_level=경보&train_type=all', mock:'vulnerability_segments.json',
-      desc:'역간 구간 취약도(신규 지연). avg_delay_incr 내림차순 정렬.' },
+      desc:'역간 구간 위험도(신규 지연). avg_delay_incr 내림차순 정렬.' },
     { kind:'agg',  path:'/vulnerability/stations', q:'?line=경부선&alert_type=폭염&alert_level=경보', mock:'vulnerability_stations.json',
-      desc:'역 단위 취약도. baseline 대비 delta_delay 포함.' },
+      desc:'역 단위 위험도. baseline 대비 delta_delay 포함.' },
     { kind:'agg',  path:'/heatmap', q:'?line=경부선&alert_type=호우', mock:'heatmap.json',
       desc:'지도용 노드/엣지 vuln(0~1).' },
     { kind:'agg',  path:'/checklist', q:'?line=경부선', mock:'checklist.json',
