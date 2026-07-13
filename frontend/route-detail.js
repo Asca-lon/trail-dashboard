@@ -694,35 +694,6 @@ function createHistoryAlertCell(caseItem) {
   return cell;
 }
 
-function getSimilarityStars(delayMinutes) {
-  if (!Number.isFinite(delayMinutes)) {
-    return "★★★☆☆";
-  }
-
-  if (delayMinutes >= 18) {
-    return "★★★★★";
-  }
-
-  if (delayMinutes >= 10) {
-    return "★★★★☆";
-  }
-
-  return "★★★☆☆";
-}
-
-function createSimilarityCell(delayMinutes) {
-  const cell = document.createElement("td");
-  const stars = document.createElement("span");
-  const starText = getSimilarityStars(delayMinutes);
-
-  stars.className = "route-history-stars";
-  stars.textContent = starText;
-  stars.setAttribute("aria-label", `유사도 ${starText}`);
-  cell.append(stars);
-
-  return cell;
-}
-
 function createHistoryRow(caseItem) {
   const row = document.createElement("tr");
   const delayText = Number.isFinite(caseItem.delay_min) ? caseItem.delay_min.toFixed(1) : "-";
@@ -737,7 +708,6 @@ function createHistoryRow(caseItem) {
     increaseCell,
     createTableCell(Number.isFinite(caseItem.stop_rate) ? formatPercent(caseItem.stop_rate) : "-"),
     createTableCell(Number.isFinite(caseItem.affected_trains) ? String(caseItem.affected_trains) : "-"),
-    createSimilarityCell(caseItem.delay_min),
     createTableCell(""),
   );
 

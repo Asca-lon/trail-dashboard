@@ -3588,16 +3588,6 @@ select {
   font-weight: 600;
 }
 
-.route-history-stars {
-  color: #111827;
-  letter-spacing: 2px;
-}
-
-.route-history-table__chevron {
-  width: 16px;
-  height: 16px;
-}
-
 .route-history-pagination {
   display: flex;
   align-items: center;
