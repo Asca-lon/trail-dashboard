@@ -1,6 +1,17 @@
+/*
 const STATION_DETAIL_MOCK_URL = "../mock/station_details.json";
 const VULNERABILITY_STATIONS_MOCK_URL = "../mock/vulnerability_stations.json";
 const ACTIVE_ALERTS_MOCK_URL = "../mock/alerts_active.json";
+*/
+
+const STATION_DETAIL_MOCK_URL = (() => {
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get("station_id") || params.get("station") || "대전";
+  return "/station/" + encodeURIComponent(id);
+})();
+const VULNERABILITY_STATIONS_MOCK_URL = "/vulnerability/stations";
+const ACTIVE_ALERTS_MOCK_URL = "/alerts/active";
+
 const STATION_QUERY_PARAM = "station";
 const STATION_ID_QUERY_PARAM = "station_id";
 

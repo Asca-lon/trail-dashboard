@@ -1,6 +1,13 @@
+/*
 const SEGMENT_DETAIL_MOCK_URL = "../mock/segments_details.json";
 const VULNERABILITY_SEGMENTS_MOCK_URL = "../mock/vulnerability_segments.json";
 const ACTIVE_ALERTS_MOCK_URL = "../mock/alerts_active.json";
+*/
+
+const SEGMENT_DETAIL_MOCK_URL = "/segments/details";
+const VULNERABILITY_SEGMENTS_MOCK_URL = "/vulnerability/segments";
+const ACTIVE_ALERTS_MOCK_URL = "/alerts/active";
+
 const SEGMENT_ID_QUERY_PARAM = "segment_id";
 
 const HIGH_EXPECTED_DELAY_THRESHOLD = 15;

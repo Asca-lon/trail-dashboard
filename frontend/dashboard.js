@@ -1,9 +1,22 @@
+/* 기존 mock를 가져오던 부분
 const ALERTS_MOCK_URL = "../mock/alerts_active.json";
 const LINES_MOCK_URL = "../mock/lines.json";
 const CHECKLIST_MOCK_URL = "../mock/checklist.json";
 const VULNERABILITY_SEGMENTS_MOCK_URL = "../mock/vulnerability_segments.json";
 const VULNERABILITY_STATIONS_MOCK_URL = "../mock/vulnerability_stations.json";
 const HEATMAP_MOCK_URL = "../mock/heatmap.json";
+*/
+
+const ALERTS_MOCK_URL = "/alerts/active";
+const LINES_MOCK_URL = "/lines";
+const CHECKLIST_MOCK_URL = "/checklist";
+const VULNERABILITY_SEGMENTS_MOCK_URL = "/vulnerability/segments";
+const VULNERABILITY_STATIONS_MOCK_URL = "/vulnerability/stations";
+const HEATMAP_MOCK_URL = "/heatmap";
+
+const HIGH_DELAY_THRESHOLD_MINUTES = 12;
+const HIGH_VULNERABILITY_THRESHOLD = 0.7;
+const WARNING_VULNERABILITY_THRESHOLD = 0.5;
 
 const ALL_FILTER_VALUE = "all";
 const DEFAULT_DASHBOARD_FILTERS = Object.freeze({
