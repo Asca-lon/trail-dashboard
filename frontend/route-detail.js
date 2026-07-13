@@ -67,8 +67,8 @@ const routeSummaryElements = {
 const routeMetricElements = {
   avgDelay: document.querySelector('[data-route-detail-metric="avg-delay"]'),
   delayIncrease: document.querySelector('[data-route-detail-metric="delay-increase"]'),
+  delayRate: document.querySelector('[data-route-detail-metric="delay-rate"]'),
   stopRate: document.querySelector('[data-route-detail-metric="stop-rate"]'),
-  sampleCount: document.querySelector('[data-route-detail-metric="sample-count"]'),
 };
 
 const routeTableElements = {
@@ -1162,10 +1162,10 @@ function renderEmptyRouteDetail() {
     routeSummaryElements.riskTime.textContent = "기준 시간 정보 없음";
   }
 
-  setMetricCard(routeMetricElements.avgDelay, "-", "분", "mock 데이터", "없음", "평균 예상 지연 시간 데이터 없음");
-  setMetricCard(routeMetricElements.delayIncrease, "-", "분", "mock 데이터", "없음", "지연 증가량 데이터 없음");
-  setMetricCard(routeMetricElements.stopRate, "-", "%", "mock 데이터", "없음", "운행 중단률 데이터 없음");
-  setMetricCard(routeMetricElements.sampleCount, "-", "건", "mock 데이터", "없음", "분석 표본 수 데이터 없음");
+  setMetricCard(routeMetricElements.avgDelay, "-", "분", "연결 데이터", "없음", "평균 지연 시간 데이터 없음");
+  setMetricCard(routeMetricElements.delayIncrease, "-", "분", "연결 데이터", "없음", "평균 지연 증가량 데이터 없음");
+  setMetricCard(routeMetricElements.delayRate, "-", "%", "데이터 미제공", "", "운행 지연률 데이터 없음");
+  setMetricCard(routeMetricElements.stopRate, "-", "%", "연결 데이터", "없음", "운행 중단률 데이터 없음");
   renderActiveAlerts({}, null);
   renderRouteAlertTables({});
   renderRouteHistoryTable({});
@@ -1240,21 +1240,31 @@ function renderRouteSummary(segmentDetailData, vulnerabilitySegmentsData, select
   }
 }
 
-function renderRouteMetrics(selectedSegment) {
-  const avgDelay = Number.isFinite(selectedSegment?.avg_delay_incr)
-    ? selectedSegment.avg_delay_incr.toFixed(1)
+function getSelectedAlertStat(segmentDetailData, vulnerabilitySegmentsData) {
+  const alertStats = Array.isArray(segmentDetailData?.by_alert) ? segmentDetailData.by_alert : [];
+
+  return alertStats.find((alertStat) => (
+    alertStat.alert_type === vulnerabilitySegmentsData.alert_type
+    && alertStat.alert_level === vulnerabilitySegmentsData.alert_level
+  )) || alertStats[0] || null;
+}
+
+function renderRouteMetrics(selectedSegment, segmentDetailData, vulnerabilitySegmentsData) {
+  const selectedAlertStat = getSelectedAlertStat(segmentDetailData, vulnerabilitySegmentsData);
+  const avgDelay = Number.isFinite(selectedAlertStat?.avg_delay)
+    ? selectedAlertStat.avg_delay.toFixed(1)
     : "-";
-  const delayIncrease = formatSignedNumber(selectedSegment?.avg_delay_incr);
-  const stopRate = formatPercent(selectedSegment?.stop_rate);
-  const sampleCount = Number.isFinite(selectedSegment?.sample_n) ? String(selectedSegment.sample_n) : "-";
+  const delayIncrease = formatSignedNumber(selectedAlertStat?.delay_increase);
+  const delayRate = formatPercent(selectedAlertStat?.delay_rate);
+  const stopRate = formatPercent(selectedAlertStat?.stop_rate ?? selectedSegment?.stop_rate);
 
   setMetricCard(
     routeMetricElements.avgDelay,
     avgDelay,
     "분",
     "특보 기준",
-    "평균 지연",
-    `평균 예상 지연 시간 ${avgDelay}분`,
+    "현재 특보",
+    `평균 지연 시간 ${avgDelay}분`,
   );
   setMetricCard(
     routeMetricElements.delayIncrease,
@@ -1262,23 +1272,23 @@ function renderRouteMetrics(selectedSegment) {
     "분",
     "평상시 대비",
     "증가량",
-    `지연 증가량 ${delayIncrease}분`,
+    `평균 지연 증가량 ${delayIncrease}분`,
+  );
+  setMetricCard(
+    routeMetricElements.delayRate,
+    delayRate,
+    "%",
+    Number.isFinite(selectedAlertStat?.delay_rate) ? "현재 특보" : "데이터 미제공",
+    "",
+    `운행 지연률 ${delayRate}퍼센트`,
   );
   setMetricCard(
     routeMetricElements.stopRate,
     stopRate,
     "%",
-    "mock 기준",
+    "현재 특보",
     "운행 중단률",
     `운행 중단률 ${stopRate}퍼센트`,
-  );
-  setMetricCard(
-    routeMetricElements.sampleCount,
-    sampleCount,
-    "건",
-    "mock 기준",
-    "분석 표본",
-    `분석 표본 수 ${sampleCount}건`,
   );
 }
 
@@ -1299,7 +1309,7 @@ function renderRouteDetail(segmentDetailsData, vulnerabilitySegmentsData, alerts
   renderRoutePageMeta(selectedSegmentDetail, selectedSegment);
   renderRouteSummary(selectedSegmentDetail, vulnerabilitySegmentsData, selectedSegment, alertsData);
   renderActiveAlerts(alertsData, selectedSegment);
-  renderRouteMetrics(selectedSegment);
+  renderRouteMetrics(selectedSegment, selectedSegmentDetail, vulnerabilitySegmentsData);
   renderRouteAlertTables(selectedSegmentDetail);
   renderRouteHistoryTable(selectedSegmentDetail);
   renderRouteCharts(selectedSegmentDetail, selectedSegment);

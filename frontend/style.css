@@ -1672,14 +1672,6 @@ select {
   background: #F3E8FF;
 }
 
-.station-metric-card__icon--sample {
-  background: #FFF7ED;
-}
-
-.station-metric-card__icon--sample img {
-  filter: invert(67%) sepia(67%) saturate(1597%) hue-rotate(358deg) brightness(96%) contrast(99%);
-}
-
 .station-metric-card__icon--suspend {
   background: #FEF2F2;
 }

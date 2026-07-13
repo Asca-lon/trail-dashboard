@@ -132,23 +132,34 @@
           <section class="station-metric-grid" aria-labelledby="route-metric-title">
             <h2 class="sr-only" id="route-metric-title">구간 주요 지표</h2>
 
-            <article class="station-metric-card" aria-label="평균 예상 지연 시간 불러오는 중" data-route-detail-metric="avg-delay">
+            <article class="station-metric-card" aria-label="평균 지연 시간 불러오는 중" data-route-detail-metric="avg-delay">
               <div class="station-metric-card__icon station-metric-card__icon--delay" aria-hidden="true">
                 <img src="./assets/icons/clock-4.svg" alt="">
               </div>
               <div class="station-metric-card__body">
-                <h3 class="station-metric-card__title">평균 예상 지연 시간</h3>
+                <h3 class="station-metric-card__title">평균 지연 시간</h3>
                 <p class="station-metric-card__value"><strong data-route-detail-metric-value>-</strong><span data-route-detail-metric-unit></span></p>
                 <p class="station-metric-card__comparison" data-route-detail-metric-comparison>불러오는 중</p>
               </div>
             </article>
 
-            <article class="station-metric-card" aria-label="지연 증가량 불러오는 중" data-route-detail-metric="delay-increase">
+            <article class="station-metric-card" aria-label="평균 지연 증가량 불러오는 중" data-route-detail-metric="delay-increase">
               <div class="station-metric-card__icon station-metric-card__icon--increase" aria-hidden="true">
                 <img src="./assets/icons/trending-up.svg" alt="">
               </div>
               <div class="station-metric-card__body">
-                <h3 class="station-metric-card__title">지연 증가량</h3>
+                <h3 class="station-metric-card__title">평균 지연 증가량</h3>
+                <p class="station-metric-card__value"><strong data-route-detail-metric-value>-</strong><span data-route-detail-metric-unit></span></p>
+                <p class="station-metric-card__comparison" data-route-detail-metric-comparison>불러오는 중</p>
+              </div>
+            </article>
+
+            <article class="station-metric-card" aria-label="운행 지연률 불러오는 중" data-route-detail-metric="delay-rate">
+              <div class="station-metric-card__icon station-metric-card__icon--rate" aria-hidden="true">
+                <img src="./assets/icons/percent.svg" alt="">
+              </div>
+              <div class="station-metric-card__body">
+                <h3 class="station-metric-card__title">운행 지연률</h3>
                 <p class="station-metric-card__value"><strong data-route-detail-metric-value>-</strong><span data-route-detail-metric-unit></span></p>
                 <p class="station-metric-card__comparison" data-route-detail-metric-comparison>불러오는 중</p>
               </div>
@@ -160,17 +171,6 @@
               </div>
               <div class="station-metric-card__body">
                 <h3 class="station-metric-card__title">운행 중단률</h3>
-                <p class="station-metric-card__value"><strong data-route-detail-metric-value>-</strong><span data-route-detail-metric-unit></span></p>
-                <p class="station-metric-card__comparison" data-route-detail-metric-comparison>불러오는 중</p>
-              </div>
-            </article>
-
-            <article class="station-metric-card" aria-label="분석 표본 수 불러오는 중" data-route-detail-metric="sample-count">
-              <div class="station-metric-card__icon station-metric-card__icon--sample" aria-hidden="true">
-                <img src="./assets/icons/train-front.svg" alt="">
-              </div>
-              <div class="station-metric-card__body">
-                <h3 class="station-metric-card__title">분석 표본 수</h3>
                 <p class="station-metric-card__value"><strong data-route-detail-metric-value>-</strong><span data-route-detail-metric-unit></span></p>
                 <p class="station-metric-card__comparison" data-route-detail-metric-comparison>불러오는 중</p>
               </div>
