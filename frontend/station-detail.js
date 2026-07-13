@@ -34,6 +34,9 @@ const RISK_LABELS = {
   interest: "관심",
   none: "정보 없음",
 };
+const STATION_RISK_STATUS_MODIFIER_CLASSES = Object.keys(RISK_LABELS).map(
+  (riskLevel) => `station-risk-status--${riskLevel}`,
+);
 
 const stationInfoElements = {
   updatedTime: document.querySelector("[data-station-detail-updated-time]"),
@@ -203,6 +206,15 @@ function setMetricCard(card, value, unit, comparisonLabel, comparisonValue, aria
   card.setAttribute("aria-label", ariaLabel);
 }
 
+function setStationRiskStatusLevel(riskLevel) {
+  if (!stationInfoElements.riskCard) {
+    return;
+  }
+
+  stationInfoElements.riskCard.classList.remove(...STATION_RISK_STATUS_MODIFIER_CLASSES);
+  stationInfoElements.riskCard.classList.add(`station-risk-status--${riskLevel}`);
+}
+
 function renderEmptyStationDetail() {
   if (stationInfoElements.name) {
     stationInfoElements.name.textContent = "역 정보 없음";
@@ -219,6 +231,8 @@ function renderEmptyStationDetail() {
   if (stationInfoElements.riskText) {
     stationInfoElements.riskText.textContent = "기준 정보 없음";
   }
+
+  setStationRiskStatusLevel("none");
 
   setMetricCard(metricElements.avgDelay, "-", "분", "mock 데이터", "없음", "평균 지연 시간 데이터 없음");
   setMetricCard(metricElements.deltaDelay, "-", "분", "mock 데이터", "없음", "평균 지연 증가량 데이터 없음");
@@ -333,6 +347,8 @@ function renderStationInfo(stationDetailData, vulnerabilityStationsData, station
   if (stationInfoElements.riskText) {
     stationInfoElements.riskText.textContent = `${alertType} ${alertLevel}`.trim() + " 기준";
   }
+
+  setStationRiskStatusLevel(riskLevel);
 
   if (stationInfoElements.riskCard) {
     stationInfoElements.riskCard.setAttribute(

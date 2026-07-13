@@ -1602,18 +1602,23 @@ select {
   height: 72px;
   gap: 16px;
   padding: 16px 20px;
-  background: var(--color-alert-bg);
+  --station-risk-accent: #64748B;
+  --station-risk-background: #F8FAFC;
+  --station-risk-border: #E2E8F0;
+  background: var(--station-risk-background);
+  border: 1px solid var(--station-risk-border);
   border-radius: 10px;
 }
 
 .station-risk-status__icon {
   width: 28px;
   height: 28px;
+  filter: invert(44%) sepia(12%) saturate(694%) hue-rotate(176deg) brightness(95%) contrast(88%);
 }
 
 .station-risk-status__title {
   margin: 0;
-  color: var(--color-danger-red);
+  color: var(--station-risk-accent);
   font-size: 14px;
   font-weight: 700;
   line-height: 20px;
@@ -1625,6 +1630,42 @@ select {
   font-size: 12px;
   font-weight: 400;
   line-height: 18px;
+}
+
+.station-risk-status--high {
+  --station-risk-accent: #DC2626;
+  --station-risk-background: #FEF2F2;
+  --station-risk-border: #FECACA;
+}
+
+.station-risk-status--warning {
+  --station-risk-accent: #D97706;
+  --station-risk-background: #FFFBEB;
+  --station-risk-border: #FDE68A;
+}
+
+.station-risk-status--interest {
+  --station-risk-accent: #16A34A;
+  --station-risk-background: #F0FDF4;
+  --station-risk-border: #BBF7D0;
+}
+
+.station-risk-status--none {
+  --station-risk-accent: #64748B;
+  --station-risk-background: #F8FAFC;
+  --station-risk-border: #E2E8F0;
+}
+
+.station-risk-status--high .station-risk-status__icon {
+  filter: invert(37%) sepia(70%) saturate(1519%) hue-rotate(334deg) brightness(91%) contrast(92%);
+}
+
+.station-risk-status--warning .station-risk-status__icon {
+  filter: invert(61%) sepia(63%) saturate(1533%) hue-rotate(356deg) brightness(91%) contrast(88%);
+}
+
+.station-risk-status--interest .station-risk-status__icon {
+  filter: invert(53%) sepia(61%) saturate(546%) hue-rotate(87deg) brightness(92%) contrast(86%);
 }
 
 .station-metric-grid,
