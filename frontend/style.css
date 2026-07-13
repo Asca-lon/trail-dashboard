@@ -65,7 +65,7 @@ select {
 }
 
 .site-header {
-  height: 72px;
+  height: 64px;
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
 }
@@ -74,7 +74,7 @@ select {
   display: flex;
   align-items: center;
   width: min(var(--content-width), calc(100% - (var(--page-margin) * 2)));
-  height: 72px;
+  height: 64px;
   margin: 0 auto;
 }
 
@@ -93,8 +93,8 @@ select {
 
 .brand__logo {
   flex: 0 0 auto;
-  width: 32px;
-  height: 32px;
+  width: 20px;
+  height: 20px;
   display: block;
 }
 
@@ -712,7 +712,7 @@ select {
 }
 
 
-.map-card { overflow: hidden; width: 840px; min-height: 520px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-card); box-shadow: var(--shadow-card); }
+.map-card { overflow: hidden; width: 840px; height: 568px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-card); box-shadow: var(--shadow-card); }
 .map-card__header { display: flex; align-items: center; justify-content: space-between; height: 64px; padding: 0 24px; border-bottom: 1px solid var(--color-border); }
 .map-card__title-group { display: flex; align-items: center; gap: 8px; }
 .map-card__title { margin: 0; color: var(--color-main-text); font-size: 16px; font-weight: 700; line-height: 24px; }
@@ -762,14 +762,14 @@ select {
   display: flex;
   flex-direction: column;
   width: 448px;
-  min-height: 520px;
+  height: 568px;
   gap: 16px;
 }
 
 .ranking-card {
   overflow: hidden;
   width: 448px;
-  height: 252px;
+  height: 276px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
@@ -1144,19 +1144,26 @@ select {
     --page-margin: 20px;
   }
 
-  .site-header,
+  .site-header {
+    height: auto;
+  }
+
   .site-header__inner {
-    height: 64px;
+    align-items: flex-start;
+    flex-direction: column;
+    height: auto;
+    gap: 12px;
+    padding: 12px 0;
   }
 
   .brand__logo {
-    width: 28px;
-    height: 28px;
+    width: 20px;
+    height: 20px;
   }
 
   .brand {
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
   }
 
   .sidebar,
@@ -1247,6 +1254,7 @@ select {
   }
 
   .map-card {
+    height: auto;
     min-height: 0;
   }
 
@@ -1664,6 +1672,14 @@ select {
   background: #F3E8FF;
 }
 
+.station-metric-card__icon--sample {
+  background: #FFF7ED;
+}
+
+.station-metric-card__icon--sample img {
+  filter: invert(67%) sepia(67%) saturate(1597%) hue-rotate(358deg) brightness(96%) contrast(99%);
+}
+
 .station-metric-card__icon--suspend {
   background: #FEF2F2;
 }
@@ -1712,7 +1728,8 @@ select {
   line-height: 18px;
 }
 
-.station-metric-card__comparison strong {
+.station-metric-card__comparison strong,
+.station-metric-card__comparison b {
   margin-left: 16px;
   color: var(--color-danger-red);
   font-weight: 600;
@@ -2106,6 +2123,7 @@ select {
 }
 
 @media (max-width: 1024px) {
+  .site-header__inner,
   .station-global-header__inner,
   .station-detail-main {
     width: calc(100% - 40px);
@@ -2135,7 +2153,8 @@ select {
     padding: 12px 0;
   }
 
-  .station-page-title {
+  .station-page-title,
+  .route-page-title {
     align-items: flex-start;
     flex-direction: column;
   }
@@ -2252,9 +2271,15 @@ select {
 
 .route-page-title {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
+  align-items: center;
+  justify-content: space-between;
   min-height: 64px;
+  gap: 24px;
+}
+
+.route-page-title__text {
+  display: flex;
+  flex-direction: column;
   gap: 4px;
 }
 
@@ -2275,9 +2300,7 @@ select {
 }
 
 .route-info-card,
-.route-risk-card,
 .route-content-card,
-.route-metric-card,
 .route-chart-card,
 .route-impact-card,
 .route-alert-card,
@@ -2290,7 +2313,7 @@ select {
 
 .route-summary-grid {
   display: grid;
-  grid-template-columns: minmax(0, 944px) 352px;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   width: 100%;
   max-width: var(--content-width);
@@ -2418,13 +2441,18 @@ select {
   min-height: 104px;
   gap: 16px;
   padding: 20px;
-  background: var(--color-alert-bg);
-  border-color: #FECACA;
+  --route-risk-accent: #64748B;
+  --route-risk-background: #F8FAFC;
+  --route-risk-border: #E2E8F0;
+  background: var(--route-risk-background);
+  border: 1px solid var(--route-risk-border);
+  border-radius: 10px;
 }
 
 .route-risk-card__icon {
   width: 40px;
   height: 40px;
+  filter: invert(44%) sepia(12%) saturate(694%) hue-rotate(176deg) brightness(95%) contrast(88%);
 }
 
 .route-risk-card__content {
@@ -2441,7 +2469,7 @@ select {
 
 .route-risk-card__title {
   margin: 0;
-  color: var(--color-danger-red);
+  color: var(--route-risk-accent);
   font-size: 14px;
   font-weight: 700;
   line-height: 20px;
@@ -2454,10 +2482,46 @@ select {
   height: 24px;
   padding: 0 10px;
   color: var(--color-surface);
-  background: var(--color-danger-red);
+  background: var(--route-risk-accent);
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
+}
+
+.route-risk-card--high {
+  --route-risk-accent: #DC2626;
+  --route-risk-background: #FEF2F2;
+  --route-risk-border: #FECACA;
+}
+
+.route-risk-card--warning {
+  --route-risk-accent: #D97706;
+  --route-risk-background: #FFFBEB;
+  --route-risk-border: #FDE68A;
+}
+
+.route-risk-card--interest {
+  --route-risk-accent: #16A34A;
+  --route-risk-background: #F0FDF4;
+  --route-risk-border: #BBF7D0;
+}
+
+.route-risk-card--none {
+  --route-risk-accent: #64748B;
+  --route-risk-background: #F8FAFC;
+  --route-risk-border: #E2E8F0;
+}
+
+.route-risk-card--high .route-risk-card__icon {
+  filter: invert(37%) sepia(70%) saturate(1519%) hue-rotate(334deg) brightness(91%) contrast(92%);
+}
+
+.route-risk-card--warning .route-risk-card__icon {
+  filter: invert(61%) sepia(63%) saturate(1533%) hue-rotate(356deg) brightness(91%) contrast(88%);
+}
+
+.route-risk-card--interest .route-risk-card__icon {
+  filter: invert(53%) sepia(61%) saturate(546%) hue-rotate(87deg) brightness(92%) contrast(86%);
 }
 
 .route-risk-card__alert,
@@ -2548,107 +2612,9 @@ select {
   gap: 16px;
 }
 
-.route-metric-grid,
 .route-chart-grid {
   display: flex;
   gap: 16px;
-}
-
-.route-metric-card {
-  display: flex;
-  align-items: center;
-  flex: 1 1 0;
-  min-height: 120px;
-  gap: 16px;
-  padding: 20px;
-}
-
-.route-metric-card__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-}
-
-.route-metric-card__icon img {
-  width: 24px;
-  height: 24px;
-}
-
-.route-metric-card__icon--delay {
-  background: #F3E8FF;
-}
-
-.route-metric-card__icon--increase {
-  background: #ECFDF5;
-}
-
-.route-metric-card__icon--suspend {
-  background: #FEF2F2;
-}
-
-.route-metric-card__icon--train {
-  background: #FFF7ED;
-}
-
-.route-metric-card__icon--delay img {
-  filter: invert(33%) sepia(95%) saturate(1701%) hue-rotate(250deg) brightness(90%) contrast(93%);
-}
-
-.route-metric-card__icon--increase img {
-  filter: invert(53%) sepia(95%) saturate(433%) hue-rotate(116deg) brightness(89%) contrast(90%);
-}
-
-.route-metric-card__icon--suspend img {
-  filter: invert(38%) sepia(84%) saturate(2071%) hue-rotate(334deg) brightness(100%) contrast(88%);
-}
-
-.route-metric-card__icon--train img {
-  filter: invert(67%) sepia(67%) saturate(1597%) hue-rotate(358deg) brightness(96%) contrast(99%);
-}
-
-.route-metric-card__content h3 {
-  margin: 0;
-  color: var(--color-secondary-text);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 20px;
-}
-
-.route-metric-card__content p {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-  margin: 2px 0 0;
-}
-
-.route-metric-card__content strong {
-  color: var(--color-main-text);
-  font-size: 28px;
-  font-weight: 700;
-  line-height: 36px;
-}
-
-.route-metric-card__content span {
-  color: var(--color-secondary-text);
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.route-metric-card__content small {
-  color: var(--color-description-text);
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 18px;
-}
-
-.route-metric-card__content b {
-  margin-left: 12px;
-  color: var(--color-danger-red);
-  font-weight: 600;
 }
 
 .route-chart-card {
@@ -2950,10 +2916,40 @@ select {
 }
 
 .route-alert-card__box {
+  --route-alert-accent: #64748B;
+  --route-alert-background: #F8FAFC;
+  --route-alert-border: #E2E8F0;
   padding: 16px;
-  background: var(--color-alert-bg);
-  border: 1px solid #FECACA;
+  background: var(--route-alert-background);
+  border: 1px solid var(--route-alert-border);
   border-radius: 10px;
+}
+
+.route-alert-card__box--high {
+  --route-alert-accent: #DC2626;
+  --route-alert-background: #FEF2F2;
+  --route-alert-border: #FECACA;
+  --route-alert-icon-filter: invert(37%) sepia(70%) saturate(1519%) hue-rotate(334deg) brightness(91%) contrast(92%);
+}
+
+.route-alert-card__box--warning {
+  --route-alert-accent: #D97706;
+  --route-alert-background: #FFFBEB;
+  --route-alert-border: #FDE68A;
+  --route-alert-icon-filter: invert(61%) sepia(63%) saturate(1533%) hue-rotate(356deg) brightness(91%) contrast(88%);
+}
+
+.route-alert-card__box--interest {
+  --route-alert-accent: #16A34A;
+  --route-alert-background: #F0FDF4;
+  --route-alert-border: #BBF7D0;
+  --route-alert-icon-filter: invert(53%) sepia(61%) saturate(546%) hue-rotate(87deg) brightness(92%) contrast(86%);
+}
+
+.route-alert-card__box--none {
+  --route-alert-accent: #64748B;
+  --route-alert-background: #F8FAFC;
+  --route-alert-border: #E2E8F0;
 }
 
 .route-alert-card__headline {
@@ -2965,13 +2961,15 @@ select {
 .route-alert-card__headline img {
   width: 28px;
   height: 28px;
+  filter: var(--route-alert-icon-filter, none);
 }
 
 .route-alert-card__headline strong {
-  color: var(--color-main-text);
+  color: var(--route-alert-accent);
   font-size: 16px;
   font-weight: 700;
 }
+
 
 .route-alert-card__details {
   display: grid;
@@ -3145,12 +3143,12 @@ select {
     width: 100%;
   }
 
-  .route-metric-grid {
+  .route-info-card {
     flex-wrap: wrap;
   }
 
-  .route-metric-card {
-    flex: 1 1 calc(50% - 8px);
+  .route-risk-card {
+    flex: 1 1 100%;
   }
 }
 
@@ -3186,10 +3184,6 @@ select {
     overflow-x: auto;
   }
 
-  .route-metric-card {
-    flex: 1 1 100%;
-  }
-
   .route-line-chart,
   .route-bar-chart,
   .route-impact-table-wrap {
@@ -3210,8 +3204,7 @@ select {
 }
 
 .route-alert-analysis-card,
-.route-alert-horizontal-card,
-.route-grade-card {
+.route-alert-horizontal-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
@@ -3223,8 +3216,7 @@ select {
   padding: 20px;
 }
 
-.route-alert-analysis-card h2,
-.route-grade-card h2 {
+.route-alert-analysis-card h2 {
   margin: 0 0 14px;
   color: var(--color-main-text);
   font-size: 16px;
@@ -3422,63 +3414,6 @@ select {
 
 .route-analysis-footnote span {
   margin-left: 16px;
-}
-
-.route-grade-card {
-  padding: 16px;
-}
-
-.route-grade-card__list {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 0;
-  margin: 0;
-  list-style: none;
-}
-
-.route-grade-card__list li {
-  display: grid;
-  grid-template-columns: 10px 44px 1fr;
-  align-items: start;
-  gap: 10px;
-}
-
-.route-grade-card__dot {
-  width: 10px;
-  height: 10px;
-  margin-top: 4px;
-  border-radius: 50%;
-}
-
-.route-grade-card__dot--high {
-  background: var(--color-danger-red);
-}
-
-.route-grade-card__dot--warning {
-  background: #F59E0B;
-}
-
-.route-grade-card__dot--safe {
-  background: #22C55E;
-}
-
-.route-grade-card__dot--info {
-  background: #94A3B8;
-}
-
-.route-grade-card__list strong {
-  color: var(--color-main-text);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 18px;
-}
-
-.route-grade-card__list span {
-  color: var(--color-description-text);
-  font-size: 11px;
-  font-weight: 400;
-  line-height: 16px;
 }
 
 @media (max-width: 1180px) {

@@ -26,6 +26,12 @@ const RISK_LABELS = {
   interest: "관심",
   none: "정보 없음",
 };
+const RISK_CARD_MODIFIER_CLASSES = Object.keys(RISK_LABELS).map(
+  (riskLevel) => `route-risk-card--${riskLevel}`,
+);
+const ALERT_BOX_MODIFIER_CLASSES = Object.keys(RISK_LABELS).map(
+  (riskLevel) => `route-alert-card__box--${riskLevel}`,
+);
 
 const GYEONGBU_HIGH_SPEED_SEGMENTS = [
   { segment_id: "seoul-gwangmyeong", from: "서울", to: "광명" },
@@ -47,6 +53,7 @@ const routeSummaryElements = {
   breadcrumb: document.querySelector("[data-route-detail-breadcrumb]"),
   title: document.querySelector("[data-route-detail-title]"),
   description: document.querySelector("[data-route-detail-description]"),
+  updatedTime: document.querySelector("[data-route-detail-updated-time]"),
   fromStation: document.querySelector("[data-route-detail-from-station]"),
   toStation: document.querySelector("[data-route-detail-to-station]"),
   line: document.querySelector("[data-route-detail-line]"),
@@ -141,6 +148,40 @@ function formatAlertDateTime(value) {
   }).format(date);
 }
 
+function formatUpdatedDateTime(value) {
+  const date = new Date(value);
+
+  if (!value || Number.isNaN(date.getTime())) {
+    return "업데이트 정보 없음";
+  }
+
+  return new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
+function renderRouteUpdatedTime(updatedAt) {
+  if (routeSummaryElements.updatedTime) {
+    routeSummaryElements.updatedTime.textContent = formatUpdatedDateTime(updatedAt);
+    routeSummaryElements.updatedTime.dateTime = updatedAt || "";
+  }
+}
+
+function setRouteRiskCardLevel(riskLevel) {
+  if (!routeSummaryElements.riskCard) {
+    return;
+  }
+
+  routeSummaryElements.riskCard.classList.remove(...RISK_CARD_MODIFIER_CLASSES);
+  routeSummaryElements.riskCard.classList.add(`route-risk-card--${riskLevel}`);
+}
+
 function isAlertMatchingSegment(alert, fromStation, toStation) {
   if (!alert || !fromStation || !toStation) {
     return false;
@@ -199,8 +240,14 @@ function renderActiveAlerts(alertsData, selectedSegment) {
   const matchingAlerts = activeAlerts.filter((alert) => (
     isAlertMatchingSegment(alert, selectedSegment?.from, selectedSegment?.to)
   ));
+  const riskLevel = matchingAlerts.length > 0
+    ? getRiskLevel(selectedSegment?.avg_delay_incr, selectedSegment?.stop_rate)
+    : "none";
 
   activeAlertCardElements.forEach((card) => {
+    card.classList.remove(...ALERT_BOX_MODIFIER_CLASSES);
+    card.classList.add(`route-alert-card__box--${riskLevel}`);
+
     if (matchingAlerts.length === 0) {
       const emptyMessage = document.createElement("p");
       emptyMessage.textContent = "현재 발효 중인 특보가 없습니다.";
@@ -1083,6 +1130,7 @@ function renderEmptyRouteDetail() {
   }
 
   document.title = "구간 상세 | 기상-철도 리스크 의사결정 지원 시스템";
+  renderRouteUpdatedTime(null);
 
   if (routeSummaryElements.fromStation) {
     routeSummaryElements.fromStation.textContent = "출발역 정보 없음";
@@ -1100,8 +1148,18 @@ function renderEmptyRouteDetail() {
     routeSummaryElements.riskBadge.textContent = RISK_LABELS.none;
   }
 
+  setRouteRiskCardLevel("none");
+
   if (routeSummaryElements.alert) {
     routeSummaryElements.alert.textContent = "특보 정보 없음";
+  }
+
+  if (routeSummaryElements.referenceTime) {
+    routeSummaryElements.referenceTime.textContent = "업데이트 정보 없음";
+  }
+
+  if (routeSummaryElements.riskTime) {
+    routeSummaryElements.riskTime.textContent = "기준 시간 정보 없음";
   }
 
   setMetricCard(routeMetricElements.avgDelay, "-", "분", "mock 데이터", "없음", "평균 예상 지연 시간 데이터 없음");
@@ -1134,11 +1192,15 @@ function renderRoutePageMeta(segmentDetailData, selectedSegment) {
   document.title = `${segmentLabel} | 구간 상세`;
 }
 
-function renderRouteSummary(segmentDetailData, vulnerabilitySegmentsData, selectedSegment) {
+function renderRouteSummary(segmentDetailData, vulnerabilitySegmentsData, selectedSegment, alertsData) {
   const fromStation = selectedSegment?.from || segmentDetailData.from;
   const toStation = selectedSegment?.to || segmentDetailData.to;
   const riskLevel = getRiskLevel(selectedSegment?.avg_delay_incr, selectedSegment?.stop_rate);
   const alertText = `${vulnerabilitySegmentsData.alert_type || "특보"} ${vulnerabilitySegmentsData.alert_level || ""}`.trim();
+  const updatedAt = alertsData.updated_at;
+  const formattedUpdatedAt = formatUpdatedDateTime(updatedAt);
+
+  renderRouteUpdatedTime(updatedAt);
 
   if (routeSummaryElements.fromStation) {
     routeSummaryElements.fromStation.textContent = formatStationName(fromStation);
@@ -1153,19 +1215,21 @@ function renderRouteSummary(segmentDetailData, vulnerabilitySegmentsData, select
   }
 
   if (routeSummaryElements.referenceTime) {
-    routeSummaryElements.referenceTime.textContent = "mock 데이터 기준";
+    routeSummaryElements.referenceTime.textContent = formattedUpdatedAt;
   }
 
   if (routeSummaryElements.riskBadge) {
     routeSummaryElements.riskBadge.textContent = RISK_LABELS[riskLevel];
   }
 
+  setRouteRiskCardLevel(riskLevel);
+
   if (routeSummaryElements.alert) {
     routeSummaryElements.alert.textContent = alertText || "특보 정보 없음";
   }
 
   if (routeSummaryElements.riskTime) {
-    routeSummaryElements.riskTime.textContent = "mock 기준";
+    routeSummaryElements.riskTime.textContent = `기준 시간 ${formattedUpdatedAt}`;
   }
 
   if (routeSummaryElements.riskCard) {
@@ -1233,7 +1297,7 @@ function renderRouteDetail(segmentDetailsData, vulnerabilitySegmentsData, alerts
   };
 
   renderRoutePageMeta(selectedSegmentDetail, selectedSegment);
-  renderRouteSummary(selectedSegmentDetail, vulnerabilitySegmentsData, selectedSegment);
+  renderRouteSummary(selectedSegmentDetail, vulnerabilitySegmentsData, selectedSegment, alertsData);
   renderActiveAlerts(alertsData, selectedSegment);
   renderRouteMetrics(selectedSegment);
   renderRouteAlertTables(selectedSegmentDetail);

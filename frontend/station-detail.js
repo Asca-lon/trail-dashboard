@@ -1,5 +1,6 @@
 const STATION_DETAIL_MOCK_URL = "../mock/station_details.json";
 const VULNERABILITY_STATIONS_MOCK_URL = "../mock/vulnerability_stations.json";
+const ACTIVE_ALERTS_MOCK_URL = "../mock/alerts_active.json";
 const STATION_QUERY_PARAM = "station";
 const STATION_ID_QUERY_PARAM = "station_id";
 
@@ -35,6 +36,7 @@ const RISK_LABELS = {
 };
 
 const stationInfoElements = {
+  updatedTime: document.querySelector("[data-station-detail-updated-time]"),
   name: document.querySelector("[data-station-detail-name]"),
   line: document.querySelector("[data-station-detail-line]"),
   riskCard: document.querySelector("[data-station-detail-risk-card]"),
@@ -70,6 +72,31 @@ const stationSelectionElements = {
   select: document.querySelector("[data-station-select]"),
   closeButtons: Array.from(document.querySelectorAll("[data-station-change-close]")),
 };
+
+function formatUpdatedDateTime(value) {
+  const date = new Date(value);
+
+  if (!value || Number.isNaN(date.getTime())) {
+    return "업데이트 정보 없음";
+  }
+
+  return new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
+function renderStationUpdatedTime(updatedAt) {
+  if (stationInfoElements.updatedTime) {
+    stationInfoElements.updatedTime.textContent = formatUpdatedDateTime(updatedAt);
+    stationInfoElements.updatedTime.dateTime = updatedAt || "";
+  }
+}
 
 function getRiskLevelByDelayRate(delayRate) {
   if (!Number.isFinite(delayRate)) {
@@ -647,17 +674,20 @@ async function fetchJson(url) {
 
 async function initializeStationDetail() {
   try {
-    const [stationDetailData, vulnerabilityStationsData] = await Promise.all([
+    const [stationDetailData, vulnerabilityStationsData, alertsData] = await Promise.all([
       fetchJson(STATION_DETAIL_MOCK_URL),
       fetchJson(VULNERABILITY_STATIONS_MOCK_URL),
+      fetchJson(ACTIVE_ALERTS_MOCK_URL),
     ]);
 
     const selectedStationName = getInitialSelectedStationName(stationDetailData, vulnerabilityStationsData);
 
     initializeStationSelection(stationDetailData, vulnerabilityStationsData, selectedStationName);
+    renderStationUpdatedTime(alertsData.updated_at);
     renderStationDetail(stationDetailData, vulnerabilityStationsData, selectedStationName);
   } catch (error) {
     console.error(error);
+    renderStationUpdatedTime(null);
     renderEmptyStationDetail();
   }
 }

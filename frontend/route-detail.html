@@ -62,8 +62,14 @@
     </nav>
 
     <section class="route-page-title" aria-labelledby="route-detail-title">
-      <h1 class="route-page-title__heading" id="route-detail-title" data-route-detail-title>구간 상세</h1>
-      <p class="route-page-title__description" data-route-detail-description>특정 구간의 기상 영향과 철도 운행 현황을 확인할 수 있습니다.</p>
+      <div class="route-page-title__text">
+        <h1 class="route-page-title__heading" id="route-detail-title" data-route-detail-title>구간 상세</h1>
+        <p class="route-page-title__description" data-route-detail-description>특정 구간의 기상 영향과 철도 운행 현황을 확인할 수 있습니다.</p>
+      </div>
+      <div class="page-title__updated" aria-label="최근 업데이트 정보">
+        <span class="page-title__updated-label">최근 업데이트</span>
+        <time class="page-title__updated-time" data-route-detail-updated-time>불러오는 중</time>
+      </div>
     </section>
 
     <section class="route-summary-grid" aria-label="구간 요약 정보">
@@ -98,19 +104,19 @@
             <strong data-route-detail-reference-time>불러오는 중</strong>
           </div>
         </div>
-      </article>
 
-      <aside class="route-risk-card" aria-labelledby="route-risk-title" data-route-detail-risk-card>
-        <img class="route-risk-card__icon" src="./assets/icons/triangle-alert.svg" alt="" aria-hidden="true">
-        <div class="route-risk-card__content">
-          <div class="route-risk-card__title-row">
-            <h2 class="route-risk-card__title" id="route-risk-title">현재 위험도</h2>
-            <span class="route-risk-card__badge" data-route-detail-risk-badge>불러오는 중</span>
+        <aside class="route-risk-card route-risk-card--none" aria-labelledby="route-risk-title" data-route-detail-risk-card>
+          <img class="route-risk-card__icon" src="./assets/icons/triangle-alert.svg" alt="" aria-hidden="true">
+          <div class="route-risk-card__content">
+            <div class="route-risk-card__title-row">
+              <h2 class="route-risk-card__title" id="route-risk-title">현재 위험도</h2>
+              <span class="route-risk-card__badge" data-route-detail-risk-badge>불러오는 중</span>
+            </div>
+            <p class="route-risk-card__alert" data-route-detail-alert>특보 정보 불러오는 중</p>
+            <p class="route-risk-card__time" data-route-detail-risk-time>기준 시간 불러오는 중</p>
           </div>
-          <p class="route-risk-card__alert" data-route-detail-alert>특보 정보 불러오는 중</p>
-          <p class="route-risk-card__time" data-route-detail-risk-time>기준 시간 불러오는 중</p>
-        </div>
-      </aside>
+        </aside>
+      </article>
     </section>
 
     <section class="route-content-card" aria-labelledby="route-tab-summary">
@@ -123,50 +129,50 @@
 
       <div class="route-content-grid" id="route-panel-summary" role="tabpanel" aria-labelledby="route-tab-summary" data-route-panel="summary">
         <div class="route-analysis-area">
-          <section class="route-metric-grid" aria-labelledby="route-metric-title">
+          <section class="station-metric-grid" aria-labelledby="route-metric-title">
             <h2 class="sr-only" id="route-metric-title">구간 주요 지표</h2>
 
-            <article class="route-metric-card" aria-label="평균 예상 지연 시간 불러오는 중" data-route-detail-metric="avg-delay">
-              <div class="route-metric-card__icon route-metric-card__icon--delay" aria-hidden="true">
+            <article class="station-metric-card" aria-label="평균 예상 지연 시간 불러오는 중" data-route-detail-metric="avg-delay">
+              <div class="station-metric-card__icon station-metric-card__icon--delay" aria-hidden="true">
                 <img src="./assets/icons/clock-4.svg" alt="">
               </div>
-              <div class="route-metric-card__content">
-                <h3>평균 예상 지연 시간</h3>
-                <p><strong data-route-detail-metric-value>-</strong><span data-route-detail-metric-unit></span></p>
-                <small data-route-detail-metric-comparison>불러오는 중</small>
+              <div class="station-metric-card__body">
+                <h3 class="station-metric-card__title">평균 예상 지연 시간</h3>
+                <p class="station-metric-card__value"><strong data-route-detail-metric-value>-</strong><span data-route-detail-metric-unit></span></p>
+                <p class="station-metric-card__comparison" data-route-detail-metric-comparison>불러오는 중</p>
               </div>
             </article>
 
-            <article class="route-metric-card" aria-label="지연 증가량 불러오는 중" data-route-detail-metric="delay-increase">
-              <div class="route-metric-card__icon route-metric-card__icon--increase" aria-hidden="true">
+            <article class="station-metric-card" aria-label="지연 증가량 불러오는 중" data-route-detail-metric="delay-increase">
+              <div class="station-metric-card__icon station-metric-card__icon--increase" aria-hidden="true">
                 <img src="./assets/icons/trending-up.svg" alt="">
               </div>
-              <div class="route-metric-card__content">
-                <h3>지연 증가량</h3>
-                <p><strong data-route-detail-metric-value>-</strong><span data-route-detail-metric-unit></span></p>
-                <small data-route-detail-metric-comparison>불러오는 중</small>
+              <div class="station-metric-card__body">
+                <h3 class="station-metric-card__title">지연 증가량</h3>
+                <p class="station-metric-card__value"><strong data-route-detail-metric-value>-</strong><span data-route-detail-metric-unit></span></p>
+                <p class="station-metric-card__comparison" data-route-detail-metric-comparison>불러오는 중</p>
               </div>
             </article>
 
-            <article class="route-metric-card" aria-label="운행 중단률 불러오는 중" data-route-detail-metric="stop-rate">
-              <div class="route-metric-card__icon route-metric-card__icon--suspend" aria-hidden="true">
+            <article class="station-metric-card" aria-label="운행 중단률 불러오는 중" data-route-detail-metric="stop-rate">
+              <div class="station-metric-card__icon station-metric-card__icon--suspend" aria-hidden="true">
                 <img src="./assets/icons/circle-minus.svg" alt="">
               </div>
-              <div class="route-metric-card__content">
-                <h3>운행 중단률</h3>
-                <p><strong data-route-detail-metric-value>-</strong><span data-route-detail-metric-unit></span></p>
-                <small data-route-detail-metric-comparison>불러오는 중</small>
+              <div class="station-metric-card__body">
+                <h3 class="station-metric-card__title">운행 중단률</h3>
+                <p class="station-metric-card__value"><strong data-route-detail-metric-value>-</strong><span data-route-detail-metric-unit></span></p>
+                <p class="station-metric-card__comparison" data-route-detail-metric-comparison>불러오는 중</p>
               </div>
             </article>
 
-            <article class="route-metric-card" aria-label="분석 표본 수 불러오는 중" data-route-detail-metric="sample-count">
-              <div class="route-metric-card__icon route-metric-card__icon--train" aria-hidden="true">
+            <article class="station-metric-card" aria-label="분석 표본 수 불러오는 중" data-route-detail-metric="sample-count">
+              <div class="station-metric-card__icon station-metric-card__icon--sample" aria-hidden="true">
                 <img src="./assets/icons/train-front.svg" alt="">
               </div>
-              <div class="route-metric-card__content">
-                <h3>분석 표본 수</h3>
-                <p><strong data-route-detail-metric-value>-</strong><span data-route-detail-metric-unit></span></p>
-                <small data-route-detail-metric-comparison>불러오는 중</small>
+              <div class="station-metric-card__body">
+                <h3 class="station-metric-card__title">분석 표본 수</h3>
+                <p class="station-metric-card__value"><strong data-route-detail-metric-value>-</strong><span data-route-detail-metric-unit></span></p>
+                <p class="station-metric-card__comparison" data-route-detail-metric-comparison>불러오는 중</p>
               </div>
             </article>
           </section>
@@ -388,15 +394,6 @@
             </ul>
           </section>
 
-          <section class="route-grade-card" aria-labelledby="route-grade-title">
-            <h2 id="route-grade-title">특보 등급 기준</h2>
-            <ul class="route-grade-card__list">
-              <li><i class="route-grade-card__dot route-grade-card__dot--high"></i><strong>경보</strong><span>피해 발생이 예상되어 대응이 필요한 수준</span></li>
-              <li><i class="route-grade-card__dot route-grade-card__dot--warning"></i><strong>주의보</strong><span>피해 발생이 우려되어 주의가 필요한 수준</span></li>
-              <li><i class="route-grade-card__dot route-grade-card__dot--safe"></i><strong>관심</strong><span>주의가 필요한 기상 상황</span></li>
-              <li><i class="route-grade-card__dot route-grade-card__dot--info"></i><strong>정보</strong><span>참고가 필요한 기상 상황</span></li>
-            </ul>
-          </section>
         </aside>
       </div>
 
