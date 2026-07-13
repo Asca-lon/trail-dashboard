@@ -953,3 +953,259 @@ Database 변경은 없습니다.
 ## Timestamp
 
 2026-07-13 10:43:41 (KST)
+
+---
+
+# CSS 통합 리팩터링
+
+# 개요
+
+`css_html_js_refactoring_order_for_codex.md`의 작업 순서에 따라 `frontend/style.css`의 중복 선언과 반응형 규칙을 통합했습니다.
+
+기존 HTML의 BEM 클래스와 JavaScript 상태 제어 클래스는 유지했으며, Mock 데이터·API·백엔드·페이지 경로는 변경하지 않았습니다.
+
+# 구현 목적
+
+- 반복되는 레이아웃과 컴포넌트 스타일을 한 곳에서 관리합니다.
+- 동일 breakpoint 미디어쿼리를 통합해 반응형 규칙 탐색과 수정 비용을 줄입니다.
+- 포커스 및 위험 상태 색상을 CSS 변수로 관리합니다.
+- 기존 디자인과 JavaScript 기능을 유지하면서 CSS 유지보수성을 높입니다.
+
+# 구현 내용
+
+1. 분리되어 있던 `.sidebar__navigation-link` 선언을 하나로 합쳤습니다.
+2. 대시보드·역 상세·구간 상세의 페이지 컨테이너를 공통 선택자로 통합했습니다.
+3. 대시보드와 상세 화면의 전역 헤더 스타일을 통합했습니다.
+4. 역 상세와 구간 상세의 breadcrumb 및 페이지 제목 스타일을 통합했습니다.
+5. 카드 외형, 카드 제목, 테이블, 테이블 wrapper, 아이콘 wrapper 스타일을 공통 선택자로 묶었습니다.
+6. 포커스 outline과 위험 상태 색상을 CSS 사용자 정의 속성으로 변경했습니다.
+7. 1180px, 1024px, 768px, 640px 미디어쿼리를 파일 하단의 반응형 영역으로 통합했습니다.
+8. 연속된 빈 줄과 공통화 후 남은 빈 CSS 규칙을 제거했습니다.
+9. Map 관련 36줄 압축 규칙을 선택자와 속성별 여러 줄 형식으로 정리했습니다.
+10. 역 상세와 구간 상세의 동일한 페이지 padding 선언을 공통 영역으로 이동했습니다.
+11. pagination 현재 페이지 선택자의 우선순위를 높여 `!important`를 제거했습니다.
+12. 남아 있던 차트 높이 관련 한 줄 규칙 27개를 여러 줄 형식으로 정리했습니다.
+
+# 코드 설명
+
+## 왜 필요한가
+
+동일한 시각 규칙이 여러 페이지 선택자에 각각 선언되어 있으면 디자인 변경 시 일부 화면만 누락될 수 있습니다. 공통 규칙을 한 곳에서 관리하면 수정 지점과 회귀 위험을 줄일 수 있습니다.
+
+## 어떤 원리인가
+
+CSS의 쉼표 선택자 목록을 사용해 같은 선언 블록을 여러 기존 BEM 클래스에 적용했습니다. HTML에 `.card` 같은 새 클래스를 추가하지 않았기 때문에 JavaScript의 요소 식별 방식과 기존 DOM 구조는 바뀌지 않습니다.
+
+위험 상태 modifier는 이름을 유지하고 색상값만 `--risk-*` 변수로 연결했습니다. 포커스 스타일도 일반 UI와 사이드바용 변수를 분리해 기존 명암 차이를 유지했습니다.
+
+## 실행 흐름
+
+1. 브라우저가 `:root`의 공통 디자인 토큰을 읽습니다.
+2. 공통 레이아웃과 컴포넌트 규칙을 적용합니다.
+3. Dashboard, Station detail, Route detail의 개별 규칙이 고유 크기와 배치를 추가합니다.
+4. 화면 폭에 따라 파일 하단의 단일 breakpoint 블록이 필요한 속성만 덮어씁니다.
+5. JavaScript는 기존 `data-*` 속성과 상태 modifier를 사용해 UI 상태를 변경합니다.
+
+## 장점
+
+- 공통화 직후 CSS는 4,080줄에서 3,883줄로 감소했으며, 전체 압축 규칙 가독성 포맷팅 후 최신 줄 수는 4,257줄입니다.
+- 각 breakpoint 규칙을 한 위치에서 확인할 수 있습니다.
+- 공통 카드와 테이블 스타일 변경이 쉬워졌습니다.
+- 기존 BEM 및 상태 클래스가 유지되어 JavaScript 회귀 위험이 작습니다.
+- Map 선택자와 속성을 줄 단위로 검색하고 수정할 수 있습니다.
+
+## 단점
+
+- 공통 선택자 목록이 길어질 수 있습니다.
+- 페이지가 크게 늘어나면 정적 CSS 선택자 묶기보다 컴포넌트 단위 스타일 구조가 더 적합할 수 있습니다.
+
+## 다른 구현 방법
+
+HTML에 `.card`, `.card-title`, `.button--md` 같은 공통 클래스를 추가할 수 있습니다. 하지만 현재 구조에서는 세 HTML과 JavaScript의 클래스 처리까지 함께 검토해야 하므로, 변경 범위가 작은 선택자 묶기 방식을 사용했습니다.
+
+## 실무에서는
+
+실무에서는 디자인 토큰과 공통 컴포넌트를 별도 CSS layer 또는 CSS Module로 관리하고, Playwright 같은 E2E 도구로 breakpoint별 시각 회귀 테스트를 자동화합니다. 상태 제어에는 시각 클래스보다 `data-state` 또는 접근성 속성을 함께 사용하는 방식도 널리 사용됩니다.
+
+# API
+
+변경 사항이 없습니다.
+
+# Database
+
+변경 사항이 없습니다. ERD 변경도 필요하지 않습니다.
+
+# 주의사항
+
+- `sidebar--open`, `inspection-table__row--selected`와 위험 상태 modifier 이름을 변경하지 않았습니다.
+- 루트 `index.html`은 별도 API/Mock 콘솔이며 `frontend/style.css`을 사용하지 않아 대상에서 제외했습니다.
+- 세 애플리케이션 HTML과 CSS의 HTTP 200 응답은 확인했습니다.
+- Edge headless 프로세스가 실행 환경에서 비정상 종료되어 자동 스크린샷 비교는 수행하지 못했습니다. 아래 breakpoint 수동 시각 검수가 남아 있습니다.
+
+# 변경 이력
+
+2026-07-13
+
+- 공통 CSS 변수와 컴포넌트 선택자 통합
+- 동일 breakpoint 미디어쿼리 통합
+- 상태 클래스 이름을 유지한 위험 색상 변수화
+- 빈 규칙과 연속 빈 줄 정리
+- Map 관련 압축 CSS를 여러 줄 형식으로 변경
+- 상세 페이지 공통 padding 통합
+- pagination의 `!important` 제거
+- 차트 높이 관련 압축 CSS를 여러 줄 형식으로 변경
+
+# 다음 작업
+
+- 1440px, 1180px, 1024px, 768px, 640px, 375px 브라우저 수동 시각 검수
+- Sidebar, tooltip, filter, table, modal의 키보드 상호작용 확인
+- 필요하면 Playwright 기반 시각 회귀 테스트 도입 검토
+
+# 작업 요약
+
+## 완료한 내용
+
+- CSS 중복 선언 통합
+- 공통 레이아웃·헤더·breadcrumb·페이지 제목 통합
+- 카드·카드 제목·테이블·아이콘 wrapper 통합
+- 포커스 및 위험 상태 CSS 변수 추가
+- 동일 breakpoint 미디어쿼리 통합
+- Map 관련 CSS 선택자 및 속성 줄바꿈
+- 상세 페이지 공통 padding 통합
+- pagination 선택자 우선순위 명시 및 `!important` 제거
+- 차트 높이 관련 한 줄 규칙 27개 줄바꿈
+- CSS·HTML·JavaScript 정적 검사 및 HTTP 응답 검사
+
+## 수정한 파일
+
+- `frontend/style.css`
+- `.docs/Frontend_Common.md`
+
+HTML과 JavaScript 파일은 수정하지 않았습니다.
+
+## 구현 이유
+
+기존 디자인과 동작을 유지하면서 중복된 스타일의 수정 지점을 줄이고, 반응형 및 상태 스타일을 일관되게 관리하기 위해 리팩터링했습니다.
+
+## 변경 사항
+
+- 공통화 직후 CSS 줄 수: 4,080줄 → 3,883줄
+- 전체 가독성 포맷팅 후 최신 CSS 줄 수: 4,257줄
+- 줄 수 증가 이유: 선택자와 속성값 변경 없이 Map 36줄과 차트 높이 규칙 27개를 여러 줄로 확장
+- 1180px 미디어쿼리: 4개 → 1개
+- 1024px 미디어쿼리: 3개 → 1개
+- 768px 미디어쿼리: 3개 → 1개
+- 640px 미디어쿼리: 4개 → 1개
+- 새 HTML 공통 클래스: 없음
+- 제거한 상태 클래스: 없음
+
+## 테스트 방법
+
+```bash
+node --check frontend/dashboard.js
+node --check frontend/station-detail.js
+node --check frontend/route-detail.js
+node --check frontend/sidebar.js
+git diff --check
+```
+
+추가 검증 항목:
+
+- CSS 중괄호: 여는 괄호 622개, 닫는 괄호 622개
+- 빈 CSS 규칙: 0개
+- 한 줄 압축 CSS 규칙: 0개
+- `!important`: 0개
+- HTML 파싱: 3개 애플리케이션 HTML 정상
+- HTTP 응답: Dashboard, Station detail, Route detail, CSS 모두 200
+
+예상 결과:
+
+- JavaScript 문법 오류가 출력되지 않습니다.
+- `git diff --check`에서 공백 오류가 출력되지 않습니다.
+- 각 breakpoint 미디어쿼리가 하나씩만 검색됩니다.
+- 기존 페이지와 상태별 디자인이 유지됩니다.
+
+실패 시 확인 사항:
+
+- 미디어쿼리 순서가 1180px → 1024px → 768px → 640px인지 확인합니다.
+- JavaScript가 사용하는 `--open`, `--active`, `--selected`, 위험 상태 modifier가 유지되는지 확인합니다.
+- 공통 카드 선택자 목록에 대상 페이지 카드가 포함되어 있는지 확인합니다.
+
+## 새롭게 배운 개념
+
+- CSS 선택자 묶기
+- Cascade 순서를 보존하는 미디어쿼리 통합
+- 상태 modifier와 디자인 토큰 분리
+- CSS 회귀 위험을 줄이는 변경 범위 최소화
+
+## 실무에서는
+
+리팩터링 전후에 정적 검사뿐 아니라 실제 브라우저의 computed style과 스크린샷을 비교합니다. 공통 토큰은 색상 이름보다 의미 기반 이름을 사용하고, 상태 클래스는 JavaScript 테스트와 함께 보호합니다.
+
+## 개선 가능한 부분
+
+- Stylelint 또는 formatter를 통한 포맷 규칙 자동 검증
+- CSS layer 또는 파일 분리 도입 검토
+- Playwright 시각 회귀 테스트 추가
+- 키보드 focus 이동과 모달 focus trap 자동 검증
+
+## 다음 작업
+
+- 대표 breakpoint 수동 시각 검수
+- 브라우저 콘솔 오류 확인
+
+## 프로젝트 진행률
+
+■■■■■■■■■□ 90%
+
+완료
+
+- CSS 구조 통합
+- 상태 및 포커스 변수화
+- 정적 검사
+- HTTP smoke test
+- 문서화
+
+진행 중
+
+- 브라우저 수동 시각 검수
+
+예정
+
+- 시각 회귀 테스트 자동화 검토
+
+## 복습 문제
+
+1. JavaScript가 사용하는 상태 modifier의 이름을 CSS 리팩터링 중 유지해야 하는 이유는 무엇인가요?
+2. 동일 breakpoint 미디어쿼리를 합칠 때 기존 cascade 순서를 확인해야 하는 이유는 무엇인가요?
+3. HTML에 공통 클래스를 추가하는 방식과 CSS 선택자를 묶는 방식은 각각 어떤 상황에 적합할까요?
+
+## 오늘 배운 내용
+
+- CSS Design Token
+- Selector Grouping
+- Responsive Cascade
+- State Modifier Protection
+
+## README 반영 여부
+
+실행 방법이나 사용자 기능이 변경되지 않은 내부 CSS 리팩터링이므로 README 수정은 필요하지 않습니다.
+
+## 추천 Commit Message
+
+`refactor: 공통 CSS와 반응형 규칙 통합`
+
+## Change Log
+
+2026-07-13
+
+- CSS 공통 선택자 및 디자인 토큰 통합
+- breakpoint별 미디어쿼리 단일화
+- Map 관련 CSS를 선택자·속성별 여러 줄 형식으로 정리
+- 상세 페이지 padding 통합 및 pagination `!important` 제거
+- 남은 차트 높이 압축 규칙을 여러 줄 형식으로 정리
+- 정적 검사와 HTTP smoke test 결과 문서화
+
+## Timestamp
+
+2026-07-13 17:23:21 (KST)
