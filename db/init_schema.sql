@@ -1,4 +1,3 @@
--- 1. 역 정보 테이블
 CREATE TABLE IF NOT EXISTS stations (
     station_code TEXT PRIMARY KEY,
     station_name TEXT NOT NULL,
@@ -10,7 +9,6 @@ CREATE TABLE IF NOT EXISTS stations (
     lon DOUBLE PRECISION
 );
 
--- 2. 열차 정차/운행 정보 테이블
 CREATE TABLE IF NOT EXISTS train_stops (
     run_date DATE NOT NULL,
     train_no TEXT NOT NULL,
@@ -32,7 +30,6 @@ CREATE TABLE IF NOT EXISTS train_stops (
 CREATE INDEX IF NOT EXISTS idx_ts_line ON train_stops (line, event_time DESC);
 CREATE INDEX IF NOT EXISTS idx_ts_train ON train_stops (run_date, train_no, seq);
 
--- 3. 기상 특보 정보 테이블
 CREATE TABLE IF NOT EXISTS weather_alerts (
     alert_id BIGSERIAL PRIMARY KEY,
     region_code TEXT NOT NULL,
@@ -45,7 +42,6 @@ CREATE TABLE IF NOT EXISTS weather_alerts (
 
 CREATE INDEX IF NOT EXISTS idx_alert_region ON weather_alerts (region_code, start_time DESC);
 
--- 4. 역 단위 지연 취약도 테이블
 CREATE TABLE IF NOT EXISTS station_vulnerability (
     station_code TEXT REFERENCES stations(station_code),
     alert_type TEXT,
@@ -60,7 +56,6 @@ CREATE TABLE IF NOT EXISTS station_vulnerability (
     PRIMARY KEY (station_code, alert_type, alert_level)
 );
 
--- 5. 구간 단위 지연 취약도 테이블
 CREATE TABLE IF NOT EXISTS segment_vulnerability (
     from_station TEXT REFERENCES stations(station_code),
     to_station TEXT REFERENCES stations(station_code),
