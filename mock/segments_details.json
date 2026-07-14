@@ -1,36 +1,102 @@
 {
+  "line": "경부선",
   "segments": [
     {
       "segment_id": "daejeon-gimcheon_gumi",
       "from": "대전",
       "to": "김천(구미)",
       "hourly_delay": [
-        { "time": "00:00", "delay_min": 6.4,  "type": "actual" },
-        { "time": "04:00", "delay_min": 7.1,  "type": "actual" },
-        { "time": "08:00", "delay_min": 11.2, "type": "actual" },
-        { "time": "12:00", "delay_min": 14.6, "type": "actual" },
-        { "time": "16:00", "delay_min": 13.1, "type": "forecast" },
-        { "time": "20:00", "delay_min": 15.8, "type": "forecast" },
-        { "time": "24:00", "delay_min": 12.9, "type": "forecast" }
+        {
+          "time": "00:00",
+          "delay_min": 6.4,
+          "type": "actual"
+        },
+        {
+          "time": "04:00",
+          "delay_min": 7.1,
+          "type": "actual"
+        },
+        {
+          "time": "08:00",
+          "delay_min": 11.2,
+          "type": "actual"
+        },
+        {
+          "time": "12:00",
+          "delay_min": 14.6,
+          "type": "actual"
+        },
+        {
+          "time": "16:00",
+          "delay_min": 13.1,
+          "type": "actual"
+        },
+        {
+          "time": "20:00",
+          "delay_min": 15.8,
+          "type": "actual"
+        },
+        {
+          "time": "24:00",
+          "delay_min": 12.9,
+          "type": "actual"
+        }
       ],
       "delay_increase_trend": [
-        { "date": "2026-07-01", "delay_increase": 5.2 },
-        { "date": "2026-07-02", "delay_increase": 7.4 },
-        { "date": "2026-07-03", "delay_increase": 9.8 },
-        { "date": "2026-07-04", "delay_increase": 8.3 },
-        { "date": "2026-07-05", "delay_increase": 6.1 },
-        { "date": "2026-07-06", "delay_increase": 10.7 },
-        { "date": "2026-07-07", "delay_increase": 14.6 }
+        {
+          "date": "2026-07-01",
+          "delay_increase": 5.2
+        },
+        {
+          "date": "2026-07-02",
+          "delay_increase": 7.4
+        },
+        {
+          "date": "2026-07-03",
+          "delay_increase": 9.8
+        },
+        {
+          "date": "2026-07-04",
+          "delay_increase": 8.3
+        },
+        {
+          "date": "2026-07-05",
+          "delay_increase": 6.1
+        },
+        {
+          "date": "2026-07-06",
+          "delay_increase": 10.7
+        },
+        {
+          "date": "2026-07-07",
+          "delay_increase": 14.6
+        }
       ],
       "by_alert": [
-        { "alert_type": "호우", "alert_level": "경보",   "avg_delay": 14.6, "sample_n": 37 },
-        { "alert_type": "호우", "alert_level": "주의보", "avg_delay": 9.1,  "sample_n": 44 },
-        { "alert_type": "폭염", "alert_level": "경보",   "avg_delay": 7.2,  "sample_n": 25 }
-      ],
-      "cases": [
-        { "date": "2026-06-28", "alert_type": "호우", "delay_min": 19 },
-        { "date": "2026-06-14", "alert_type": "호우", "delay_min": 12 },
-        { "date": "2026-06-03", "alert_type": null,   "delay_min": 6 }
+        {
+          "alert_type": "호우",
+          "alert_level": "경보",
+          "avg_delay": 14.6,
+          "delay_increase": 9.8,
+          "stop_rate": 0.08,
+          "sample_n": 37
+        },
+        {
+          "alert_type": "호우",
+          "alert_level": "주의보",
+          "avg_delay": 9.1,
+          "delay_increase": 5.4,
+          "stop_rate": 0.043,
+          "sample_n": 44
+        },
+        {
+          "alert_type": "폭염",
+          "alert_level": "경보",
+          "avg_delay": 7.2,
+          "delay_increase": 3.6,
+          "stop_rate": 0.025,
+          "sample_n": 25
+        }
       ]
     },
     {
@@ -38,32 +104,89 @@
       "from": "천안",
       "to": "대전",
       "hourly_delay": [
-        { "time": "00:00", "delay_min": 4.8,  "type": "actual" },
-        { "time": "04:00", "delay_min": 5.5,  "type": "actual" },
-        { "time": "08:00", "delay_min": 8.4,  "type": "actual" },
-        { "time": "12:00", "delay_min": 11.3, "type": "actual" },
-        { "time": "16:00", "delay_min": 10.2, "type": "forecast" },
-        { "time": "20:00", "delay_min": 12.4, "type": "forecast" },
-        { "time": "24:00", "delay_min": 9.9,  "type": "forecast" }
+        {
+          "time": "00:00",
+          "delay_min": 4.8,
+          "type": "actual"
+        },
+        {
+          "time": "04:00",
+          "delay_min": 5.5,
+          "type": "actual"
+        },
+        {
+          "time": "08:00",
+          "delay_min": 8.4,
+          "type": "actual"
+        },
+        {
+          "time": "12:00",
+          "delay_min": 11.3,
+          "type": "actual"
+        },
+        {
+          "time": "16:00",
+          "delay_min": 10.2,
+          "type": "actual"
+        },
+        {
+          "time": "20:00",
+          "delay_min": 12.4,
+          "type": "actual"
+        },
+        {
+          "time": "24:00",
+          "delay_min": 9.9,
+          "type": "actual"
+        }
       ],
       "delay_increase_trend": [
-        { "date": "2026-07-01", "delay_increase": 3.8 },
-        { "date": "2026-07-02", "delay_increase": 5.1 },
-        { "date": "2026-07-03", "delay_increase": 6.9 },
-        { "date": "2026-07-04", "delay_increase": 6.0 },
-        { "date": "2026-07-05", "delay_increase": 4.7 },
-        { "date": "2026-07-06", "delay_increase": 8.6 },
-        { "date": "2026-07-07", "delay_increase": 11.3 }
+        {
+          "date": "2026-07-01",
+          "delay_increase": 3.8
+        },
+        {
+          "date": "2026-07-02",
+          "delay_increase": 5.1
+        },
+        {
+          "date": "2026-07-03",
+          "delay_increase": 6.9
+        },
+        {
+          "date": "2026-07-04",
+          "delay_increase": 6.0
+        },
+        {
+          "date": "2026-07-05",
+          "delay_increase": 4.7
+        },
+        {
+          "date": "2026-07-06",
+          "delay_increase": 8.6
+        },
+        {
+          "date": "2026-07-07",
+          "delay_increase": 11.3
+        }
       ],
       "by_alert": [
-        { "alert_type": "호우", "alert_level": "경보",   "avg_delay": 11.3, "sample_n": 42 },
-        { "alert_type": "호우", "alert_level": "주의보", "avg_delay": 7.6,  "sample_n": 31 },
-        { "alert_type": "강풍", "alert_level": "주의보", "avg_delay": 5.8,  "sample_n": 18 }
-      ],
-      "cases": [
-        { "date": "2026-06-26", "alert_type": "호우", "delay_min": 15 },
-        { "date": "2026-06-11", "alert_type": "호우", "delay_min": 10 },
-        { "date": "2026-05-30", "alert_type": null,   "delay_min": 5 }
+        {
+          "alert_type": "호우",
+          "alert_level": "경보",
+          "avg_delay": 11.3,
+          "delay_increase": 7.1,
+          "stop_rate": 0.05,
+          "sample_n": 42
+        },
+        {
+          "alert_type": "호우",
+          "alert_level": "주의보",
+          "avg_delay": 7.6,
+          "delay_increase": 4.0,
+          "stop_rate": 0.031,
+          "sample_n": 31
+        }
       ]
     },
     {
@@ -71,32 +194,97 @@
       "from": "영등포",
       "to": "수원",
       "hourly_delay": [
-        { "time": "00:00", "delay_min": 3.9, "type": "actual" },
-        { "time": "04:00", "delay_min": 4.6, "type": "actual" },
-        { "time": "08:00", "delay_min": 6.8, "type": "actual" },
-        { "time": "12:00", "delay_min": 9.2, "type": "actual" },
-        { "time": "16:00", "delay_min": 8.7, "type": "forecast" },
-        { "time": "20:00", "delay_min": 9.8, "type": "forecast" },
-        { "time": "24:00", "delay_min": 7.6, "type": "forecast" }
+        {
+          "time": "00:00",
+          "delay_min": 3.9,
+          "type": "actual"
+        },
+        {
+          "time": "04:00",
+          "delay_min": 4.6,
+          "type": "actual"
+        },
+        {
+          "time": "08:00",
+          "delay_min": 6.8,
+          "type": "actual"
+        },
+        {
+          "time": "12:00",
+          "delay_min": 9.2,
+          "type": "actual"
+        },
+        {
+          "time": "16:00",
+          "delay_min": 8.7,
+          "type": "actual"
+        },
+        {
+          "time": "20:00",
+          "delay_min": 9.8,
+          "type": "actual"
+        },
+        {
+          "time": "24:00",
+          "delay_min": 7.6,
+          "type": "actual"
+        }
       ],
       "delay_increase_trend": [
-        { "date": "2026-07-01", "delay_increase": 3.1 },
-        { "date": "2026-07-02", "delay_increase": 4.5 },
-        { "date": "2026-07-03", "delay_increase": 5.9 },
-        { "date": "2026-07-04", "delay_increase": 4.8 },
-        { "date": "2026-07-05", "delay_increase": 3.7 },
-        { "date": "2026-07-06", "delay_increase": 6.9 },
-        { "date": "2026-07-07", "delay_increase": 9.2 }
+        {
+          "date": "2026-07-01",
+          "delay_increase": 3.1
+        },
+        {
+          "date": "2026-07-02",
+          "delay_increase": 4.5
+        },
+        {
+          "date": "2026-07-03",
+          "delay_increase": 5.9
+        },
+        {
+          "date": "2026-07-04",
+          "delay_increase": 4.8
+        },
+        {
+          "date": "2026-07-05",
+          "delay_increase": 3.7
+        },
+        {
+          "date": "2026-07-06",
+          "delay_increase": 6.9
+        },
+        {
+          "date": "2026-07-07",
+          "delay_increase": 9.2
+        }
       ],
       "by_alert": [
-        { "alert_type": "호우", "alert_level": "경보",   "avg_delay": 9.2, "sample_n": 51 },
-        { "alert_type": "호우", "alert_level": "주의보", "avg_delay": 6.4, "sample_n": 39 },
-        { "alert_type": "폭염", "alert_level": "주의보", "avg_delay": 4.7, "sample_n": 22 }
-      ],
-      "cases": [
-        { "date": "2026-06-24", "alert_type": "호우", "delay_min": 13 },
-        { "date": "2026-06-10", "alert_type": "폭염", "delay_min": 8 },
-        { "date": "2026-05-27", "alert_type": null,   "delay_min": 4 }
+        {
+          "alert_type": "호우",
+          "alert_level": "경보",
+          "avg_delay": 9.2,
+          "delay_increase": 5.6,
+          "stop_rate": 0.02,
+          "sample_n": 51
+        },
+        {
+          "alert_type": "호우",
+          "alert_level": "주의보",
+          "avg_delay": 6.4,
+          "delay_increase": 3.8,
+          "stop_rate": 0.014,
+          "sample_n": 39
+        },
+        {
+          "alert_type": "폭염",
+          "alert_level": "주의보",
+          "avg_delay": 4.7,
+          "delay_increase": 2.1,
+          "stop_rate": 0.009,
+          "sample_n": 22
+        }
       ]
     },
     {
@@ -104,32 +292,89 @@
       "from": "동대구",
       "to": "밀양",
       "hourly_delay": [
-        { "time": "00:00", "delay_min": 3.2, "type": "actual" },
-        { "time": "04:00", "delay_min": 3.8, "type": "actual" },
-        { "time": "08:00", "delay_min": 5.7, "type": "actual" },
-        { "time": "12:00", "delay_min": 7.8, "type": "actual" },
-        { "time": "16:00", "delay_min": 7.0, "type": "forecast" },
-        { "time": "20:00", "delay_min": 8.5, "type": "forecast" },
-        { "time": "24:00", "delay_min": 6.8, "type": "forecast" }
+        {
+          "time": "00:00",
+          "delay_min": 3.2,
+          "type": "actual"
+        },
+        {
+          "time": "04:00",
+          "delay_min": 3.8,
+          "type": "actual"
+        },
+        {
+          "time": "08:00",
+          "delay_min": 5.7,
+          "type": "actual"
+        },
+        {
+          "time": "12:00",
+          "delay_min": 7.8,
+          "type": "actual"
+        },
+        {
+          "time": "16:00",
+          "delay_min": 7.0,
+          "type": "actual"
+        },
+        {
+          "time": "20:00",
+          "delay_min": 8.5,
+          "type": "actual"
+        },
+        {
+          "time": "24:00",
+          "delay_min": 6.8,
+          "type": "actual"
+        }
       ],
       "delay_increase_trend": [
-        { "date": "2026-07-01", "delay_increase": 2.6 },
-        { "date": "2026-07-02", "delay_increase": 3.7 },
-        { "date": "2026-07-03", "delay_increase": 5.1 },
-        { "date": "2026-07-04", "delay_increase": 4.3 },
-        { "date": "2026-07-05", "delay_increase": 3.2 },
-        { "date": "2026-07-06", "delay_increase": 5.9 },
-        { "date": "2026-07-07", "delay_increase": 7.8 }
+        {
+          "date": "2026-07-01",
+          "delay_increase": 2.6
+        },
+        {
+          "date": "2026-07-02",
+          "delay_increase": 3.7
+        },
+        {
+          "date": "2026-07-03",
+          "delay_increase": 5.1
+        },
+        {
+          "date": "2026-07-04",
+          "delay_increase": 4.3
+        },
+        {
+          "date": "2026-07-05",
+          "delay_increase": 3.2
+        },
+        {
+          "date": "2026-07-06",
+          "delay_increase": 5.9
+        },
+        {
+          "date": "2026-07-07",
+          "delay_increase": 7.8
+        }
       ],
       "by_alert": [
-        { "alert_type": "호우", "alert_level": "경보",   "avg_delay": 7.8, "sample_n": 28 },
-        { "alert_type": "강풍", "alert_level": "주의보", "avg_delay": 5.2, "sample_n": 19 },
-        { "alert_type": "폭염", "alert_level": "주의보", "avg_delay": 4.4, "sample_n": 17 }
-      ],
-      "cases": [
-        { "date": "2026-06-20", "alert_type": "호우", "delay_min": 11 },
-        { "date": "2026-06-08", "alert_type": "강풍", "delay_min": 7 },
-        { "date": "2026-05-25", "alert_type": null,   "delay_min": 3 }
+        {
+          "alert_type": "호우",
+          "alert_level": "경보",
+          "avg_delay": 7.8,
+          "delay_increase": 4.7,
+          "stop_rate": 0.03,
+          "sample_n": 28
+        },
+        {
+          "alert_type": "폭염",
+          "alert_level": "주의보",
+          "avg_delay": 4.4,
+          "delay_increase": 1.9,
+          "stop_rate": 0.012,
+          "sample_n": 17
+        }
       ]
     },
     {
@@ -137,32 +382,97 @@
       "from": "김천(구미)",
       "to": "동대구",
       "hourly_delay": [
-        { "time": "00:00", "delay_min": 2.8, "type": "actual" },
-        { "time": "04:00", "delay_min": 3.1, "type": "actual" },
-        { "time": "08:00", "delay_min": 4.4, "type": "actual" },
-        { "time": "12:00", "delay_min": 6.1, "type": "actual" },
-        { "time": "16:00", "delay_min": 5.9, "type": "forecast" },
-        { "time": "20:00", "delay_min": 6.8, "type": "forecast" },
-        { "time": "24:00", "delay_min": 5.6, "type": "forecast" }
+        {
+          "time": "00:00",
+          "delay_min": 2.8,
+          "type": "actual"
+        },
+        {
+          "time": "04:00",
+          "delay_min": 3.1,
+          "type": "actual"
+        },
+        {
+          "time": "08:00",
+          "delay_min": 4.4,
+          "type": "actual"
+        },
+        {
+          "time": "12:00",
+          "delay_min": 6.1,
+          "type": "actual"
+        },
+        {
+          "time": "16:00",
+          "delay_min": 5.9,
+          "type": "actual"
+        },
+        {
+          "time": "20:00",
+          "delay_min": 6.8,
+          "type": "actual"
+        },
+        {
+          "time": "24:00",
+          "delay_min": 5.6,
+          "type": "actual"
+        }
       ],
       "delay_increase_trend": [
-        { "date": "2026-07-01", "delay_increase": 2.1 },
-        { "date": "2026-07-02", "delay_increase": 2.9 },
-        { "date": "2026-07-03", "delay_increase": 4.0 },
-        { "date": "2026-07-04", "delay_increase": 3.5 },
-        { "date": "2026-07-05", "delay_increase": 2.7 },
-        { "date": "2026-07-06", "delay_increase": 4.6 },
-        { "date": "2026-07-07", "delay_increase": 6.1 }
+        {
+          "date": "2026-07-01",
+          "delay_increase": 2.1
+        },
+        {
+          "date": "2026-07-02",
+          "delay_increase": 2.9
+        },
+        {
+          "date": "2026-07-03",
+          "delay_increase": 4.0
+        },
+        {
+          "date": "2026-07-04",
+          "delay_increase": 3.5
+        },
+        {
+          "date": "2026-07-05",
+          "delay_increase": 2.7
+        },
+        {
+          "date": "2026-07-06",
+          "delay_increase": 4.6
+        },
+        {
+          "date": "2026-07-07",
+          "delay_increase": 6.1
+        }
       ],
       "by_alert": [
-        { "alert_type": "호우", "alert_level": "경보",   "avg_delay": 6.1, "sample_n": 33 },
-        { "alert_type": "호우", "alert_level": "주의보", "avg_delay": 4.8, "sample_n": 26 },
-        { "alert_type": "폭염", "alert_level": "주의보", "avg_delay": 4.1, "sample_n": 21 }
-      ],
-      "cases": [
-        { "date": "2026-06-18", "alert_type": "호우", "delay_min": 9 },
-        { "date": "2026-06-07", "alert_type": "폭염", "delay_min": 6 },
-        { "date": "2026-05-21", "alert_type": null,   "delay_min": 3 }
+        {
+          "alert_type": "호우",
+          "alert_level": "경보",
+          "avg_delay": 6.1,
+          "delay_increase": 3.5,
+          "stop_rate": 0.01,
+          "sample_n": 33
+        },
+        {
+          "alert_type": "호우",
+          "alert_level": "주의보",
+          "avg_delay": 4.8,
+          "delay_increase": 2.4,
+          "stop_rate": 0.008,
+          "sample_n": 26
+        },
+        {
+          "alert_type": "폭염",
+          "alert_level": "주의보",
+          "avg_delay": 4.1,
+          "delay_increase": 1.6,
+          "stop_rate": 0.006,
+          "sample_n": 21
+        }
       ]
     },
     {
@@ -170,32 +480,89 @@
       "from": "밀양",
       "to": "부산",
       "hourly_delay": [
-        { "time": "00:00", "delay_min": 2.0, "type": "actual" },
-        { "time": "04:00", "delay_min": 2.4, "type": "actual" },
-        { "time": "08:00", "delay_min": 3.6, "type": "actual" },
-        { "time": "12:00", "delay_min": 5.4, "type": "actual" },
-        { "time": "16:00", "delay_min": 5.1, "type": "forecast" },
-        { "time": "20:00", "delay_min": 5.9, "type": "forecast" },
-        { "time": "24:00", "delay_min": 4.8, "type": "forecast" }
+        {
+          "time": "00:00",
+          "delay_min": 2.0,
+          "type": "actual"
+        },
+        {
+          "time": "04:00",
+          "delay_min": 2.4,
+          "type": "actual"
+        },
+        {
+          "time": "08:00",
+          "delay_min": 3.6,
+          "type": "actual"
+        },
+        {
+          "time": "12:00",
+          "delay_min": 5.4,
+          "type": "actual"
+        },
+        {
+          "time": "16:00",
+          "delay_min": 5.1,
+          "type": "actual"
+        },
+        {
+          "time": "20:00",
+          "delay_min": 5.9,
+          "type": "actual"
+        },
+        {
+          "time": "24:00",
+          "delay_min": 4.8,
+          "type": "actual"
+        }
       ],
       "delay_increase_trend": [
-        { "date": "2026-07-01", "delay_increase": 1.4 },
-        { "date": "2026-07-02", "delay_increase": 2.2 },
-        { "date": "2026-07-03", "delay_increase": 3.3 },
-        { "date": "2026-07-04", "delay_increase": 2.8 },
-        { "date": "2026-07-05", "delay_increase": 2.0 },
-        { "date": "2026-07-06", "delay_increase": 3.9 },
-        { "date": "2026-07-07", "delay_increase": 5.4 }
+        {
+          "date": "2026-07-01",
+          "delay_increase": 1.4
+        },
+        {
+          "date": "2026-07-02",
+          "delay_increase": 2.2
+        },
+        {
+          "date": "2026-07-03",
+          "delay_increase": 3.3
+        },
+        {
+          "date": "2026-07-04",
+          "delay_increase": 2.8
+        },
+        {
+          "date": "2026-07-05",
+          "delay_increase": 2.0
+        },
+        {
+          "date": "2026-07-06",
+          "delay_increase": 3.9
+        },
+        {
+          "date": "2026-07-07",
+          "delay_increase": 5.4
+        }
       ],
       "by_alert": [
-        { "alert_type": "호우", "alert_level": "경보",   "avg_delay": 5.4, "sample_n": 7 },
-        { "alert_type": "호우", "alert_level": "주의보", "avg_delay": 3.9, "sample_n": 13 },
-        { "alert_type": "강풍", "alert_level": "주의보", "avg_delay": 3.2, "sample_n": 9 }
-      ],
-      "cases": [
-        { "date": "2026-06-16", "alert_type": "호우", "delay_min": 7 },
-        { "date": "2026-06-04", "alert_type": "강풍", "delay_min": 5 },
-        { "date": "2026-05-18", "alert_type": null,   "delay_min": 2 }
+        {
+          "alert_type": "호우",
+          "alert_level": "경보",
+          "avg_delay": 5.4,
+          "delay_increase": 2.9,
+          "stop_rate": 0.0,
+          "sample_n": 7
+        },
+        {
+          "alert_type": "호우",
+          "alert_level": "주의보",
+          "avg_delay": 3.9,
+          "delay_increase": 1.7,
+          "stop_rate": 0.0,
+          "sample_n": 13
+        }
       ]
     }
   ]

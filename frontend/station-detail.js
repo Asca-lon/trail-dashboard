@@ -1,10 +1,43 @@
+/*
 const STATION_DETAIL_MOCK_URL = "../mock/station_details.json";
 const VULNERABILITY_STATIONS_MOCK_URL = "../mock/vulnerability_stations.json";
+const ACTIVE_ALERTS_MOCK_URL = "../mock/alerts_active.json";
+*/
+
+const STATION_DETAIL_MOCK_URL = (() => {
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get("station_id") || params.get("station") || "대전";
+  return "/station/" + encodeURIComponent(id);
+})();
+const VULNERABILITY_STATIONS_MOCK_URL = "/vulnerability/stations";
+const ACTIVE_ALERTS_MOCK_URL = "/alerts/active";
+
 const STATION_QUERY_PARAM = "station";
 const STATION_ID_QUERY_PARAM = "station_id";
 
+const GYEONGBU_HIGH_SPEED_STATIONS = [
+  { station_id: "seoul", station: "서울" },
+  { station_id: "gwangmyeong", station: "광명" },
+  { station_id: "cheonan_asan", station: "천안아산" },
+  { station_id: "osong", station: "오송" },
+  { station_id: "daejeon", station: "대전" },
+  { station_id: "gimcheon_gumi", station: "김천(구미)" },
+  { station_id: "dongdaegu", station: "동대구" },
+  { station_id: "gyeongju", station: "경주" },
+  { station_id: "ulsan", station: "울산" },
+  { station_id: "busan", station: "부산" },
+];
+
 const HIGH_DELAY_RATE_THRESHOLD = 0.4;
 const WARNING_DELAY_RATE_THRESHOLD = 0.25;
+const LINE_CHART_MAX_VALUE = 40;
+const LINE_CHART_MIN_X = 42;
+const LINE_CHART_MAX_X = 590;
+const LINE_CHART_MIN_Y = 24;
+const LINE_CHART_MAX_Y = 192;
+const BAR_CHART_MAX_VALUE = 30;
+const BAR_CHART_MAX_HEIGHT = 180;
+const BAR_CHART_MIN_HEIGHT = 8;
 
 const RISK_LABELS = {
   high: "높음",
@@ -12,15 +45,14 @@ const RISK_LABELS = {
   interest: "관심",
   none: "정보 없음",
 };
-
-const STATION_ADDRESS_BY_NAME = {
-  대전: "대전광역시 동구 중앙로 215",
-};
+const STATION_RISK_STATUS_MODIFIER_CLASSES = Object.keys(RISK_LABELS).map(
+  (riskLevel) => `station-risk-status--${riskLevel}`,
+);
 
 const stationInfoElements = {
+  updatedTime: document.querySelector("[data-station-detail-updated-time]"),
   name: document.querySelector("[data-station-detail-name]"),
   line: document.querySelector("[data-station-detail-line]"),
-  address: document.querySelector("[data-station-detail-address]"),
   riskCard: document.querySelector("[data-station-detail-risk-card]"),
   riskTitle: document.querySelector("[data-station-detail-risk-title]"),
   riskText: document.querySelector("[data-station-detail-risk-text]"),
@@ -37,15 +69,48 @@ const alertTableElements = {
   body: document.querySelector("[data-station-detail-alert-table-body]"),
 };
 
-const historyElements = {
-  list: document.querySelector("[data-station-detail-history-list]"),
+const chartElements = {
+  lineChart: document.querySelector("[data-station-detail-line-chart]"),
+  lineWeekday: document.querySelector("[data-station-detail-line-weekday]"),
+  lineHoliday: document.querySelector("[data-station-detail-line-holiday]"),
+  linePoint: document.querySelector("[data-station-detail-line-point]"),
+  lineTooltipBox: document.querySelector("[data-station-detail-line-tooltip-box]"),
+  lineTooltip: document.querySelector("[data-station-detail-line-tooltip]"),
+  alertComparisonChart: document.querySelector("[data-station-detail-alert-comparison-chart]"),
 };
 
 const stationSelectionElements = {
   toggleButton: document.querySelector("[data-station-select-toggle]"),
-  selector: document.querySelector("[data-station-selector]"),
+  modal: document.querySelector("[data-station-change-modal]"),
+  form: document.querySelector("[data-station-change-form]"),
   select: document.querySelector("[data-station-select]"),
+  closeButtons: Array.from(document.querySelectorAll("[data-station-change-close]")),
 };
+
+function formatUpdatedDateTime(value) {
+  const date = new Date(value);
+
+  if (!value || Number.isNaN(date.getTime())) {
+    return "업데이트 정보 없음";
+  }
+
+  return new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
+function renderStationUpdatedTime(updatedAt) {
+  if (stationInfoElements.updatedTime) {
+    stationInfoElements.updatedTime.textContent = formatUpdatedDateTime(updatedAt);
+    stationInfoElements.updatedTime.dateTime = updatedAt || "";
+  }
+}
 
 function getRiskLevelByDelayRate(delayRate) {
   if (!Number.isFinite(delayRate)) {
@@ -71,10 +136,6 @@ function formatStationName(stationName) {
   return stationName.endsWith("역") ? stationName : `${stationName}역`;
 }
 
-function formatStationAddress(stationName) {
-  return STATION_ADDRESS_BY_NAME[stationName] || "주소 정보 없음(mock 미제공)";
-}
-
 function formatPercent(rate) {
   if (!Number.isFinite(rate)) {
     return "-";
@@ -89,6 +150,39 @@ function formatSignedNumber(value) {
   }
 
   return `+${value.toFixed(1)}`;
+}
+
+function getLineChartPoint(item, index, itemCount, valueKey) {
+  const safeCount = Math.max(itemCount - 1, 1);
+  const value = Number.isFinite(item[valueKey]) ? item[valueKey] : 0;
+  const x = LINE_CHART_MIN_X + ((LINE_CHART_MAX_X - LINE_CHART_MIN_X) / safeCount) * index;
+  const clampedValue = Math.max(0, Math.min(value, LINE_CHART_MAX_VALUE));
+  const y = LINE_CHART_MAX_Y - (clampedValue / LINE_CHART_MAX_VALUE) * (LINE_CHART_MAX_Y - LINE_CHART_MIN_Y);
+
+  return {
+    x: Number(x.toFixed(1)),
+    y: Number(y.toFixed(1)),
+    value,
+  };
+}
+
+function getLineChartPoints(hourlyDelayData, valueKey) {
+  return hourlyDelayData.map((item, index) => getLineChartPoint(item, index, hourlyDelayData.length, valueKey));
+}
+
+function toPolylinePoints(points) {
+  return points.map((point) => `${point.x},${point.y}`).join(" ");
+}
+
+function getBarHeight(value) {
+  if (!Number.isFinite(value)) {
+    return BAR_CHART_MIN_HEIGHT;
+  }
+
+  return Math.max(
+    BAR_CHART_MIN_HEIGHT,
+    Math.min((value / BAR_CHART_MAX_VALUE) * BAR_CHART_MAX_HEIGHT, BAR_CHART_MAX_HEIGHT),
+  );
 }
 
 function setMetricCard(card, value, unit, comparisonLabel, comparisonValue, ariaLabel) {
@@ -123,6 +217,15 @@ function setMetricCard(card, value, unit, comparisonLabel, comparisonValue, aria
   card.setAttribute("aria-label", ariaLabel);
 }
 
+function setStationRiskStatusLevel(riskLevel) {
+  if (!stationInfoElements.riskCard) {
+    return;
+  }
+
+  stationInfoElements.riskCard.classList.remove(...STATION_RISK_STATUS_MODIFIER_CLASSES);
+  stationInfoElements.riskCard.classList.add(`station-risk-status--${riskLevel}`);
+}
+
 function renderEmptyStationDetail() {
   if (stationInfoElements.name) {
     stationInfoElements.name.textContent = "역 정보 없음";
@@ -140,12 +243,15 @@ function renderEmptyStationDetail() {
     stationInfoElements.riskText.textContent = "기준 정보 없음";
   }
 
+  setStationRiskStatusLevel("none");
+
   setMetricCard(metricElements.avgDelay, "-", "분", "mock 데이터", "없음", "평균 지연 시간 데이터 없음");
   setMetricCard(metricElements.deltaDelay, "-", "분", "mock 데이터", "없음", "평균 지연 증가량 데이터 없음");
   setMetricCard(metricElements.delayRate, "-", "%", "mock 데이터", "없음", "지연률 데이터 없음");
   setMetricCard(metricElements.stopRate, "-", "%", "mock 데이터", "없음", "운행 중단률 데이터 없음");
   renderEmptyAlertStatsTable();
   renderEmptyHistoryList();
+  renderStationCharts({});
 }
 
 function getSelectedStationMetrics(stationName, vulnerabilityStationsData) {
@@ -167,7 +273,9 @@ function getStationByName(stationName, vulnerabilityStationsData) {
 }
 
 function getStationById(stationId, vulnerabilityStationsData) {
-  return getStations(vulnerabilityStationsData).find((station) => station.station_id === stationId) || null;
+  return GYEONGBU_HIGH_SPEED_STATIONS.find((station) => station.station_id === stationId)
+    || getStations(vulnerabilityStationsData).find((station) => station.station_id === stationId)
+    || null;
 }
 
 function getStationNameById(stationId, vulnerabilityStationsData) {
@@ -175,11 +283,12 @@ function getStationNameById(stationId, vulnerabilityStationsData) {
 }
 
 function getStationIdByName(stationName, vulnerabilityStationsData) {
-  return getStationByName(stationName, vulnerabilityStationsData)?.station_id || null;
+  return GYEONGBU_HIGH_SPEED_STATIONS.find((station) => station.station === stationName)?.station_id
+    || getStationByName(stationName, vulnerabilityStationsData)?.station_id
+    || null;
 }
 
 function getInitialSelectedStationName(stationDetailData, vulnerabilityStationsData) {
-  const stations = getStations(vulnerabilityStationsData);
   const params = new URLSearchParams(window.location.search);
   const stationIdFromUrl = params.get(STATION_ID_QUERY_PARAM);
   const stationNameFromUrl = params.get(STATION_QUERY_PARAM);
@@ -189,13 +298,13 @@ function getInitialSelectedStationName(stationDetailData, vulnerabilityStationsD
     return stationNameById;
   }
 
-  if (getStationByName(stationNameFromUrl, vulnerabilityStationsData)) {
+  if (stationNameFromUrl) {
     return stationNameFromUrl;
   }
 
-  return getStationByName(stationDetailData.station, vulnerabilityStationsData)
+  return GYEONGBU_HIGH_SPEED_STATIONS.some((station) => station.station === stationDetailData.station)
     ? stationDetailData.station
-    : stations[0]?.station;
+    : GYEONGBU_HIGH_SPEED_STATIONS[0].station;
 }
 
 function updateStationQueryString(stationName, vulnerabilityStationsData) {
@@ -221,6 +330,8 @@ function createSelectedStationDetail(stationDetailData, selectedStationName) {
     station: selectedStationName,
     by_alert: hasStationSpecificDetail ? stationDetailData.by_alert : [],
     cases: hasStationSpecificDetail ? stationDetailData.cases : [],
+    hourly_delay: hasStationSpecificDetail ? stationDetailData.hourly_delay : [],
+    alert_delay_comparison: hasStationSpecificDetail ? stationDetailData.alert_delay_comparison : [],
   };
 }
 
@@ -240,10 +351,6 @@ function renderStationInfo(stationDetailData, vulnerabilityStationsData, station
     stationInfoElements.line.textContent = lineName;
   }
 
-  if (stationInfoElements.address) {
-    stationInfoElements.address.textContent = formatStationAddress(stationDetailData.station);
-  }
-
   if (stationInfoElements.riskTitle) {
     stationInfoElements.riskTitle.textContent = `현재 위험도: ${riskLabel}`;
   }
@@ -251,6 +358,8 @@ function renderStationInfo(stationDetailData, vulnerabilityStationsData, station
   if (stationInfoElements.riskText) {
     stationInfoElements.riskText.textContent = `${alertType} ${alertLevel}`.trim() + " 기준";
   }
+
+  setStationRiskStatusLevel(riskLevel);
 
   if (stationInfoElements.riskCard) {
     stationInfoElements.riskCard.setAttribute(
@@ -377,101 +486,102 @@ function renderAlertStatsTable(stationDetailData) {
   );
 }
 
-function formatCaseDate(dateString) {
-  const date = new Date(dateString);
+function renderStationLineChart(stationDetailData) {
+  const hourlyDelayData = Array.isArray(stationDetailData.hourly_delay) ? stationDetailData.hourly_delay : [];
+  const weekdayPoints = getLineChartPoints(hourlyDelayData, "weekday_delay");
+  const holidayPoints = getLineChartPoints(hourlyDelayData, "holiday_delay");
+  const highlightPoint = weekdayPoints[weekdayPoints.length - 1] || null;
 
-  if (Number.isNaN(date.getTime())) {
-    return "날짜 정보 없음";
+  if (chartElements.lineChart) {
+    chartElements.lineChart.setAttribute(
+      "aria-label",
+      hourlyDelayData.length > 0
+        ? `${formatStationName(stationDetailData.station)} 시간대별 평균 지연 시간 차트`
+        : "시간대별 평균 지연 시간 데이터 없음",
+    );
   }
 
-  const formatter = new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  const parts = Object.fromEntries(
-    formatter.formatToParts(date).map((part) => [part.type, part.value]),
-  );
-
-  return `${parts.year}.${parts.month}.${parts.day}`;
-}
-
-function getHistoryRiskLevel(caseItem) {
-  if (!caseItem.alert_type) {
-    return "interest";
+  if (chartElements.lineWeekday) {
+    chartElements.lineWeekday.setAttribute("points", toPolylinePoints(weekdayPoints));
   }
 
-  if (caseItem.delay_min >= 20) {
-    return "high";
+  if (chartElements.lineHoliday) {
+    chartElements.lineHoliday.setAttribute("points", toPolylinePoints(holidayPoints));
   }
 
-  return "warning";
+  if (chartElements.linePoint) {
+    chartElements.linePoint.toggleAttribute("hidden", !highlightPoint);
+
+    if (highlightPoint) {
+      chartElements.linePoint.setAttribute("cx", String(highlightPoint.x));
+      chartElements.linePoint.setAttribute("cy", String(highlightPoint.y));
+    }
+  }
+
+  if (chartElements.lineTooltip) {
+    chartElements.lineTooltip.textContent = highlightPoint ? `${highlightPoint.value.toFixed(1)}분` : "-";
+
+    if (highlightPoint) {
+      chartElements.lineTooltip.setAttribute("x", String(highlightPoint.x));
+      chartElements.lineTooltip.setAttribute("y", String(Math.max(highlightPoint.y - 12, 18)));
+    }
+  }
+
+  if (chartElements.lineTooltipBox) {
+    chartElements.lineTooltipBox.toggleAttribute("hidden", !highlightPoint);
+
+    if (highlightPoint) {
+      chartElements.lineTooltipBox.setAttribute("x", String(highlightPoint.x - 29));
+      chartElements.lineTooltipBox.setAttribute("y", String(Math.max(highlightPoint.y - 42, 0)));
+    }
+  }
 }
 
-function createHistoryItem(caseItem) {
-  const item = document.createElement("li");
-  const label = document.createElement("span");
-  const content = document.createElement("div");
-  const title = document.createElement("strong");
-  const alertDescription = document.createElement("p");
-  const delayDescription = document.createElement("p");
-  const button = document.createElement("button");
-  const alertLabel = caseItem.alert_type || "평상시";
-  const riskLevel = getHistoryRiskLevel(caseItem);
-  const formattedDate = formatCaseDate(caseItem.date);
+function createAlertComparisonGroup(comparisonItem) {
+  const group = document.createElement("div");
+  const normalBar = document.createElement("div");
+  const alertBar = document.createElement("div");
+  const normalValue = document.createElement("span");
+  const alertValue = document.createElement("span");
+  const label = document.createElement("strong");
 
-  item.className = "station-history-item";
-  label.className = `station-history-item__label station-history-item__label--${riskLevel}`;
-  label.textContent = alertLabel;
+  group.className = "station-bar-chart__group";
+  normalBar.className = "station-bar-chart__bar station-bar-chart__bar--normal";
+  alertBar.className = "station-bar-chart__bar station-bar-chart__bar--alert";
+  normalBar.style.height = `${getBarHeight(comparisonItem.normal_avg_delay).toFixed(0)}px`;
+  alertBar.style.height = `${getBarHeight(comparisonItem.alert_avg_delay).toFixed(0)}px`;
+  normalValue.textContent = Number.isFinite(comparisonItem.normal_avg_delay)
+    ? comparisonItem.normal_avg_delay.toFixed(1)
+    : "-";
+  alertValue.textContent = Number.isFinite(comparisonItem.alert_avg_delay)
+    ? comparisonItem.alert_avg_delay.toFixed(1)
+    : "-";
+  label.textContent = comparisonItem.alert_type || "특보";
 
-  content.className = "station-history-item__content";
-  title.textContent = `${formattedDate} ${alertLabel}`;
-  alertDescription.textContent = caseItem.alert_type
-    ? `${caseItem.alert_type} 영향 기록`
-    : "특보 미발효 기준 기록";
-  delayDescription.textContent = Number.isFinite(caseItem.delay_min)
-    ? `기록된 지연 ${caseItem.delay_min}분`
-    : "지연 정보 없음";
-  content.append(title, alertDescription, delayDescription);
+  normalBar.append(normalValue);
+  alertBar.append(alertValue);
+  group.append(normalBar, alertBar, label);
 
-  button.className = "station-history-item__button";
-  button.type = "button";
-  button.textContent = "상세보기";
-  button.setAttribute("aria-label", `${formattedDate} ${alertLabel} 사례 상세보기`);
-
-  item.append(label, content, button);
-
-  return item;
+  return group;
 }
 
-function renderEmptyHistoryList() {
-  if (!historyElements.list) {
+function renderStationAlertComparisonChart(stationDetailData) {
+  if (!chartElements.alertComparisonChart) {
     return;
   }
 
-  const item = document.createElement("li");
-
-  item.className = "station-history-item";
-  item.textContent = "과거 주요 사례 데이터가 없습니다.";
-  historyElements.list.replaceChildren(item);
-}
-
-function renderHistoryList(stationDetailData) {
-  if (!historyElements.list) {
-    return;
-  }
-
-  const rows = Array.isArray(stationDetailData.cases)
-    ? stationDetailData.cases.map(createHistoryItem)
+  const axisItems = Array.from(chartElements.alertComparisonChart.querySelectorAll(".station-bar-chart__y"));
+  const comparisonData = Array.isArray(stationDetailData.alert_delay_comparison)
+    ? stationDetailData.alert_delay_comparison
     : [];
+  const groups = comparisonData.map(createAlertComparisonGroup);
 
-  if (rows.length === 0) {
-    renderEmptyHistoryList();
-    return;
-  }
+  chartElements.alertComparisonChart.replaceChildren(...axisItems, ...groups);
+}
 
-  historyElements.list.replaceChildren(...rows);
+function renderStationCharts(stationDetailData) {
+  renderStationLineChart(stationDetailData);
+  renderStationAlertComparisonChart(stationDetailData);
 }
 
 function renderStationDetail(stationDetailData, vulnerabilityStationsData, selectedStationName = stationDetailData.station) {
@@ -486,7 +596,7 @@ function renderStationDetail(stationDetailData, vulnerabilityStationsData, selec
   renderStationInfo(selectedStationDetail, vulnerabilityStationsData, stationMetrics);
   renderStationMetrics(stationMetrics);
   renderAlertStatsTable(selectedStationDetail);
-  renderHistoryList(selectedStationDetail);
+  renderStationCharts(selectedStationDetail);
 }
 
 function buildStationSelectOptions(vulnerabilityStationsData, selectedStationName) {
@@ -494,8 +604,7 @@ function buildStationSelectOptions(vulnerabilityStationsData, selectedStationNam
     return;
   }
 
-  const stations = getStations(vulnerabilityStationsData);
-  const options = stations.map((station) => {
+  const options = GYEONGBU_HIGH_SPEED_STATIONS.map((station) => {
     const option = document.createElement("option");
 
     option.value = station.station_id || station.station;
@@ -509,37 +618,69 @@ function buildStationSelectOptions(vulnerabilityStationsData, selectedStationNam
     getStationIdByName(selectedStationName, vulnerabilityStationsData) || selectedStationName;
 }
 
-function initializeStationSelection(stationDetailData, vulnerabilityStationsData, selectedStationName) {
-  const queryParams = new URLSearchParams(window.location.search);
-  const hasStationQuery = queryParams.has(STATION_ID_QUERY_PARAM) || queryParams.has(STATION_QUERY_PARAM);
+function openStationChangeModal() {
+  if (!stationSelectionElements.modal) {
+    return;
+  }
 
+  stationSelectionElements.modal.hidden = false;
+  stationSelectionElements.toggleButton?.setAttribute("aria-expanded", "true");
+  stationSelectionElements.select?.focus();
+}
+
+function closeStationChangeModal() {
+  if (!stationSelectionElements.modal) {
+    return;
+  }
+
+  stationSelectionElements.modal.hidden = true;
+  stationSelectionElements.toggleButton?.setAttribute("aria-expanded", "false");
+  stationSelectionElements.toggleButton?.focus();
+}
+
+function initializeStationSelection(stationDetailData, vulnerabilityStationsData, selectedStationName) {
   buildStationSelectOptions(vulnerabilityStationsData, selectedStationName);
 
-  if (stationSelectionElements.toggleButton && stationSelectionElements.selector) {
-    stationSelectionElements.selector.hidden = !hasStationQuery;
-    stationSelectionElements.toggleButton.setAttribute("aria-expanded", String(hasStationQuery));
-
+  if (stationSelectionElements.toggleButton && stationSelectionElements.modal) {
+    stationSelectionElements.toggleButton.setAttribute("aria-haspopup", "dialog");
+    stationSelectionElements.toggleButton.setAttribute("aria-expanded", "false");
     stationSelectionElements.toggleButton.addEventListener("click", () => {
-      const shouldShowSelector = stationSelectionElements.selector.hidden;
+      const currentStationName = getInitialSelectedStationName(stationDetailData, vulnerabilityStationsData);
 
-      stationSelectionElements.selector.hidden = !shouldShowSelector;
-      stationSelectionElements.toggleButton.setAttribute("aria-expanded", String(shouldShowSelector));
-
-      if (shouldShowSelector) {
-        stationSelectionElements.select?.focus();
-      }
+      stationSelectionElements.select.value =
+        getStationIdByName(currentStationName, vulnerabilityStationsData) || currentStationName;
+      openStationChangeModal();
     });
   }
 
-  if (stationSelectionElements.select) {
-    stationSelectionElements.select.addEventListener("change", (event) => {
+  stationSelectionElements.closeButtons.forEach((button) => {
+    button.addEventListener("click", closeStationChangeModal);
+  });
+
+  stationSelectionElements.modal?.addEventListener("click", (event) => {
+    if (event.target === stationSelectionElements.modal) {
+      closeStationChangeModal();
+    }
+  });
+
+  if (stationSelectionElements.form && stationSelectionElements.select) {
+    stationSelectionElements.form.addEventListener("submit", (event) => {
+      event.preventDefault();
       const selectedStationName =
-        getStationNameById(event.target.value, vulnerabilityStationsData) || event.target.value;
+        getStationNameById(stationSelectionElements.select.value, vulnerabilityStationsData)
+        || stationSelectionElements.select.value;
 
       updateStationQueryString(selectedStationName, vulnerabilityStationsData);
       renderStationDetail(stationDetailData, vulnerabilityStationsData, selectedStationName);
+      closeStationChangeModal();
     });
   }
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && stationSelectionElements.modal && !stationSelectionElements.modal.hidden) {
+      closeStationChangeModal();
+    }
+  });
 
   window.addEventListener("popstate", () => {
     const selectedStationNameFromUrl = getInitialSelectedStationName(stationDetailData, vulnerabilityStationsData);
@@ -560,17 +701,20 @@ async function fetchJson(url) {
 
 async function initializeStationDetail() {
   try {
-    const [stationDetailData, vulnerabilityStationsData] = await Promise.all([
+    const [stationDetailData, vulnerabilityStationsData, alertsData] = await Promise.all([
       fetchJson(STATION_DETAIL_MOCK_URL),
       fetchJson(VULNERABILITY_STATIONS_MOCK_URL),
+      fetchJson(ACTIVE_ALERTS_MOCK_URL),
     ]);
 
     const selectedStationName = getInitialSelectedStationName(stationDetailData, vulnerabilityStationsData);
 
     initializeStationSelection(stationDetailData, vulnerabilityStationsData, selectedStationName);
+    renderStationUpdatedTime(alertsData.updated_at);
     renderStationDetail(stationDetailData, vulnerabilityStationsData, selectedStationName);
   } catch (error) {
     console.error(error);
+    renderStationUpdatedTime(null);
     renderEmptyStationDetail();
   }
 }

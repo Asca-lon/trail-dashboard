@@ -43,13 +43,19 @@ trail-dashboard/
 | `backend/` | B | 읽기 전용 API (FastAPI). CONTRACT §5 를 그대로 노출 |
 | `frontend/` | C | 대시보드(순위표·히트맵·상세) |
 | `mock/` | 공유 | CONTRACT §5 모양의 mock JSON. **협업의 핵심** |
-| `index.html` | B | GitHub Pages 콘솔 — mock 을 안정 URL 로 호스팅 + 살아있는 API 문서 |
+| `index.html` | C | 루트 접속을 `frontend/dashboard.html`로 연결하는 대시보드 진입점 |
+
+### 프론트엔드 초기 표시 원칙
+
+대시보드, 역 상세, 구간 상세 페이지는 HTML에 실제처럼 보이는 예시 데이터를 포함하지 않습니다. 데이터 요청 중에는 `불러오는 중` 상태를 표시하고, 응답이 완료된 뒤 연결된 Mock/API 데이터만 렌더링합니다. 페이지별 데이터 연결 기준은 `.docs/Frontend_Hardcoded_Data_Mapping.md`에서 관리합니다.
+
+구간 상세 페이지의 현재 발효 특보 카드는 `alerts_active.json`에서 선택 구간의 출발역·도착역과 관련된 특보만 필터링하여 표시합니다.
 
 ## GitHub Pages (mock 호스팅)
 
 Settings → Pages → Source: `main` 브랜치 `/ (root)` 로 배포하면:
 
-- 콘솔: `https://<계정>.github.io/<레포>/`
+- 대시보드: `https://<계정>.github.io/<레포>/`
 - mock: `https://<계정>.github.io/<레포>/mock/vulnerability_segments.json`
 
 C는 이 URL 로 화면을 만들고, 백엔드 완성 후 **base URL 만 교체**한다(파싱 코드는 그대로 — 계약이 지켜지면 그래야 한다).
