@@ -1,0 +1,60 @@
+# trail-dashboard — 팀 누구나 clone 후 한 방에 실행.
+#
+# ── 기본 (DB 없이, mock 모드) ─────────────────────────────────
+#   docker compose up
+#   → http://localhost:8000  (API + 화면 한 포트)
+#   A의 DB가 아직 없어도 C의 화면이 mock 값으로 그대로 돈다.
+#
+# ── DB까지 (A의 집계가 준비된 뒤) ─────────────────────────────
+#   USE_MOCK=0 docker compose --profile db up
+#   → postgres 컨테이너가 뜨고, api 가 USE_MOCK=0 으로 그 DB를 읽는다.
+#   db/init_schema.sql 이 최초 1회 자동 실행되어 빈 스키마가 만들어진다.
+#   (집계 데이터 적재는 A의 collector/processor 몫 — 이 compose 범위 밖)
+#
+# 운영 상주가 아니라 "어디서든 clone → 실행"이 목적. 완성 후 서버에서 내려도
+# 팀원은 이 파일 하나로 동일 환경을 재현한다.
+
+services:
+  api:
+    build: .
+    image: trail-dashboard-api
+    ports:
+      - "8000:8000"
+    environment:
+      # 기본은 mock. USE_MOCK=0 을 넘기고 --profile db 로 띄우면 db 서비스를 읽는다.
+      USE_MOCK: "${USE_MOCK:-1}"
+      CORS_ORIGINS: "${CORS_ORIGINS:-*}"
+      # USE_MOCK=0 일 때만 사용. 기본은 db 서비스를 가리킨다.
+      DATABASE_URL: "${DATABASE_URL:-postgresql://readonly:readonly@db:5432/trail}"
+    restart: unless-stopped
+    # db 프로파일로 함께 뜰 때만 DB를 기다린다. mock 단독 실행엔 영향 없음.
+    depends_on:
+      db:
+        condition: service_healthy
+        required: false
+
+  db:
+    # 순수 PostgreSQL 스키마(IF NOT EXISTS, timescale 확장 없음)라 표준 이미지로 충분.
+    # A가 Timescale 하이퍼테이블을 도입하면 image 를 timescale/timescaledb 로 바꾼다.
+    image: postgres:16-alpine
+    profiles: ["db"]           # 기본 up 에는 안 뜬다. --profile db 일 때만.
+    environment:
+      POSTGRES_DB: trail
+      POSTGRES_USER: trail
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-trail}"
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # 최초 기동 시 1회 실행: 빈 스키마 생성. 데이터는 A가 별도로 적재.
+      - ./db/init_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./db/seed_stations.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trail -d trail"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  pgdata:
