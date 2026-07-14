@@ -14,8 +14,13 @@ load_dotenv(BASE_DIR / ".env")
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://postgres:7784@localhost:5432/postgres",
+    # 기본값은 compose DB(trail). .env 가 있으면 그 값이 우선한다.
+    "postgresql://trail:trail@localhost:5432/trail",
 )
+
+# 별칭: processor 등에서 SQLAlchemy create_engine(DB_URL) 에 쓰는 URL 문자열.
+# vulnerability.py 가 이 이름을 import 한다. DATABASE_URL 과 같은 값.
+DB_URL = DATABASE_URL
 
 @contextmanager
 def get_writer_conn():
