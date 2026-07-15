@@ -1,0 +1,15 @@
+# collector/ · processor/ 전용 의존성 (수집 · 집계 파이프라인)
+#
+# backend/requirements.txt 는 API 서버(FastAPI)용이고, 이 파일은 데이터 파이프라인용이다.
+# Dockerfile 이 둘 다 설치하므로 하나의 이미지 안에서 API 도 백필도 돌아간다(방식 A).
+#
+# 실행 예:
+#   docker compose exec api python collector/rail_collector.py --date 2026-04-24
+#   docker compose exec api python processor/vulnerability.py
+
+pandas              # 집계 · CSV/엑셀 처리 (vulnerability.py, delay.py, excel_to_csv.py)
+openpyxl            # pd.read_excel 로 .xlsx 읽기 (excel_to_csv.py)
+requests            # 코레일 · 기상청 API 호출 (rail_collector.py, weather_collector.py)
+sqlalchemy          # create_engine 으로 DB 읽기 (vulnerability.py)
+
+# psycopg[binary], python-dotenv 는 backend/requirements.txt 에 이미 있어 중복 명시하지 않는다.

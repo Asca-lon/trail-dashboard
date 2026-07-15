@@ -15,8 +15,13 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # 의존성 먼저 복사 → 레이어 캐시. 소스만 바뀌면 pip 재설치 안 함.
+#   backend/requirements.txt   : API 서버(FastAPI)용
+#   requirements-pipeline.txt  : 수집기·집계용(pandas·requests·sqlalchemy·openpyxl)
+# 둘 다 설치해서 이 이미지 하나로 API 도 백필도 돌린다(컨테이너에서 실행하므로
+# 팀원이 호스트에 파이썬·패키지를 따로 깔 필요가 없다).
 COPY backend/requirements.txt ./backend/requirements.txt
-RUN pip install --no-cache-dir -r backend/requirements.txt
+COPY requirements-pipeline.txt ./requirements-pipeline.txt
+RUN pip install --no-cache-dir -r backend/requirements.txt -r requirements-pipeline.txt
 
 # 프로젝트 전체 복사. serve.py 가 ROOT 기준으로 frontend·mock·backend 를 참조하므로
 # 루트 구조를 그대로 유지해야 한다(.dockerignore 로 불필요한 것만 제외).

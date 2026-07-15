@@ -20,14 +20,24 @@ services:
     image: trail-dashboard-api
     ports:
       - "8000:8000"
+    # .env 전체를 컨테이너로 전달한다. 수집기(rail/weather collector)가 컨테이너 안에서
+    # 돌 때 PUBLIC_DATA_API_KEY · KMA_API_KEY 가 필요하기 때문.
+    # (.dockerignore 가 .env 를 이미지에서 빼므로, 런타임에 이렇게 주입해야 한다.)
+    #
+    # required: false — .env 는 gitignore 라 fresh clone 에는 없다.
+    # 없어도 그냥 뜨게 한다(→ USE_MOCK 기본 1, mock 모드). 백필하려면 .env 를 만든다.
+    # ⚠️ 아래 environment: 가 env_file 보다 우선한다 → DATABASE_URL 은 host=db 로 덮어써진다.
+    env_file:
+      - path: .env
+        required: false
     environment:
       # 기본은 mock. .env 의 USE_MOCK=0 을 읽어 DB 모드로 뜬다.
       USE_MOCK: "${USE_MOCK:-1}"
       CORS_ORIGINS: "${CORS_ORIGINS:-*}"
       # ⚠️ 컨테이너 '안'에서는 DB host 가 반드시 서비스명 'db' 여야 한다.
-      #    .env 의 DATABASE_URL 은 host=localhost (호스트에서 실행하는 수집기·집계용)이라
+      #    .env 의 DATABASE_URL 은 host=localhost (호스트에서 실행할 때용)이라
       #    그 값을 그대로 쓰면 컨테이너가 자기 자신을 DB로 찾아 실패한다.
-      #    그래서 여기서는 .env 를 참조하지 않고 host=db 로 '고정'한다.
+      #    그래서 여기서 host=db 로 '고정'해 env_file 값을 덮어쓴다.
       DATABASE_URL: "postgresql://trail:${POSTGRES_PASSWORD:-trail}@db:5432/trail"
     restart: unless-stopped
     # db 프로파일로 함께 뜰 때만 DB를 기다린다. mock 단독 실행엔 영향 없음.
