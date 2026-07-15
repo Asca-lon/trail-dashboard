@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import argparse
 import requests
 import traceback
@@ -17,6 +18,13 @@ if str(BASE_DIR) not in sys.path:
 from collector.db_writer import get_writer_conn
 
 PUBLIC_API_KEY = os.getenv("PUBLIC_DATA_API_KEY")
+
+# 일시 장애 재시도 설정.
+#   502/503/504 는 공공데이터포털 게이트웨이의 순간 장애로, 잠시 뒤 재시도하면 대개 성공한다.
+#   재시도 없이 중단하면 그 날짜가 반쪽만 적재되어 집계가 왜곡된다.
+MAX_RETRIES = 4
+RETRY_BACKOFF = 3          # 3, 9, 27, 81초
+TRANSIENT_STATUS = {500, 502, 503, 504}
 KORAIL_RUN_API_URL = os.getenv("KORail_RUN_API_URL", "https://apis.data.go.kr/B551457/run/v2").rstrip('/')
 
 # =====================================================================
@@ -83,6 +91,24 @@ def classify_train_type(train_no):
     else:
         return "무궁화"
 
+def load_target_stations(cur):
+    """수집 대상 역 코드 집합을 DB에서 읽는다(= seed_stations.sql 의 경부선 역).
+
+    이 API(travelerTrainRunInfo2)는 runYmd 만 받고 **전국 모든 열차·역**을 돌려준다.
+    노선/역 필터 파라미터가 없어 서버 쪽에서 못 줄이므로, 받아온 뒤 여기서 거른다.
+
+    기준을 seed 로 두는 이유:
+      - 하드코딩하면 seed_stations.sql 과 어긋난다.
+      - region_code 가 있는 역만 취약도 집계에 쓰인다(vulnerability.py 의
+        `WHERE region_code IS NOT NULL`). 즉 집계에 쓸 역만 저장하면 충분하다.
+    """
+    cur.execute(
+        "SELECT station_code FROM stations "
+        "WHERE line = '경부선' AND region_code IS NOT NULL"
+    )
+    return {str(r["station_code"]).strip() for r in cur.fetchall()}
+
+
 def collect_rail_by_date(target_date=None):
     if not PUBLIC_API_KEY:
         print("❌ PUBLIC_DATA_API_KEY가 설정되지 않았습니다.")
@@ -98,6 +124,14 @@ def collect_rail_by_date(target_date=None):
 
     with get_writer_conn() as conn:
         with conn.cursor() as cur:
+            # 경부선 대상 역만 수집한다(전국 데이터를 다 넣지 않는다).
+            target_stations = load_target_stations(cur)
+            if not target_stations:
+                print("❌ 대상 역이 없습니다. db/seed_stations.sql 이 적재됐는지 확인하세요.")
+                return
+            print(f"🎯 수집 대상: 경부선 {len(target_stations)}개 역")
+
+            skipped = 0
             while True:
                 params = {
                     'serviceKey': requests.utils.unquote(PUBLIC_API_KEY),
@@ -108,19 +142,52 @@ def collect_rail_by_date(target_date=None):
                 }
 
                 try:
-                    response = requests.get(url, params=params, timeout=15)
+                    # 502/503/504 와 네트워크 오류는 서버 측 일시 장애다. 여기서 그냥 중단하면
+                    # 그 날짜가 '반쪽'만 적재된 채 다음 날짜로 넘어가 데이터에 구멍이 생긴다.
+                    # 지수 백오프로 재시도하고, 소진되면 날짜 단위로 실패를 알린다.
+                    response = None
+                    for attempt in range(1, MAX_RETRIES + 1):
+                        try:
+                            response = requests.get(url, params=params, timeout=30)
+                            if response.status_code in TRANSIENT_STATUS:
+                                wait = RETRY_BACKOFF ** attempt
+                                print(f"  ⚠️ HTTP {response.status_code} (일시 오류) — "
+                                      f"{wait}초 후 재시도 {attempt}/{MAX_RETRIES}", flush=True)
+                                time.sleep(wait)
+                                response = None
+                                continue
+                            break
+                        except requests.exceptions.RequestException as re_err:
+                            wait = RETRY_BACKOFF ** attempt
+                            print(f"  ⚠️ 네트워크 오류({re_err.__class__.__name__}) — "
+                                  f"{wait}초 후 재시도 {attempt}/{MAX_RETRIES}", flush=True)
+                            time.sleep(wait)
+
+                    if response is None:
+                        print(f"  ❌ page {page_no}: 재시도 {MAX_RETRIES}회 소진 — "
+                              f"{target_date} 미완성 상태로 중단", flush=True)
+                        print(f"     → 나중에 이 날짜만 다시 돌리세요: "
+                              f"python collector/rail_collector.py --date {target_date}", flush=True)
+                        break
+
                     if response.status_code != 200:
+                        print(f"  ❌ HTTP {response.status_code} — 중단. 응답: {response.text[:300]}", flush=True)
                         break
 
                     data = response.json()
                     header = data.get('response', {}).get('header', {})
-                    if str(header.get('resultCode')) not in ['0', '00']:
+                    result_code = str(header.get('resultCode'))
+                    if result_code not in ['0', '00']:
+                        # 쿼터 초과·키 오류 등이 여기로 온다. 조용히 끝내면 원인을 알 수 없다.
+                        print(f"  ❌ API 오류 resultCode={result_code}, "
+                              f"msg={header.get('resultMsg')} — 중단", flush=True)
                         break
 
                     body = data.get('response', {}).get('body', {})
                     items = body.get('items', {}).get('item', [])
 
                     if not items:
+                        print(f"  ℹ️ page {page_no}: 항목 없음 (totalCount={body.get('totalCount')}) — 종료", flush=True)
                         break
 
                     if isinstance(items, dict):
@@ -144,6 +211,21 @@ def collect_rail_by_date(target_date=None):
                         if stn_cd_str == 'station_code' or stn_nm_str == 'station_name':
                             continue
 
+                        # ── 경부선 필터 ──────────────────────────────────────
+                        # API 가 전국 열차를 주므로 대상 역이 아니면 버린다.
+                        # 이걸 안 걸면 하루 79만 행(전국) × 90일 ≈ 7천만 행이 쌓이는데,
+                        # 정작 집계에 쓰이는 건 region_code 가 있는 경부선 역뿐이다.
+                        if stn_cd_str not in target_stations:
+                            skipped += 1
+                            continue
+
+                        # 전체 노선을 받으려면 위 3줄을 주석 처리한다.
+                        # (그 경우 stations 에 전국 역이 쌓이고 line_nm 미제공 건은
+                        #  아래 기본값 때문에 '경부선' 으로 오라벨링되니 주의.)
+                        # ─────────────────────────────────────────────────────
+
+                        # 대상 역은 seed 에 이미 있다(ON CONFLICT DO NOTHING 이라 seed 의
+                        # region_code·lat·lon 은 보존된다). 만약을 위해 유지.
                         stations_to_insert.add((stn_cd_str, stn_nm_str, str(line_nm)))
 
                         seq_val = int(item.get('trn_run_sn') or item.get('trnRunSn') or 0)
@@ -230,10 +312,11 @@ def collect_rail_by_date(target_date=None):
                                 status = EXCLUDED.status;
                         """, batch_data)
                         conn.commit()
-                        print(f"✅ Page {page_no}: {len(batch_data)}건 적재 완료")
+                        print(f"✅ Page {page_no}: 경부선 {len(batch_data)}건 적재 (누적 제외 {skipped}건)")
 
                     total_count = body.get('totalCount', 0)
                     if page_no * num_of_rows >= total_count:
+                        print(f"🏁 {target_date} 완료 — 총 {page_no}페이지 조회, 경부선 외 {skipped}건 제외")
                         break
 
                     page_no += 1

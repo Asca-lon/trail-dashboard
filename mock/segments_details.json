@@ -4,7 +4,7 @@
     {
       "segment_id": "daejeon-gimcheon_gumi",
       "from": "대전",
-      "to": "김천(구미)",
+      "to": "김천구미",
       "hourly_delay": [
         {
           "time": "00:00",
@@ -100,8 +100,8 @@
       ]
     },
     {
-      "segment_id": "cheonan-daejeon",
-      "from": "천안",
+      "segment_id": "osong-daejeon",
+      "from": "오송",
       "to": "대전",
       "hourly_delay": [
         {
@@ -190,9 +190,9 @@
       ]
     },
     {
-      "segment_id": "yeongdeungpo-suwon",
-      "from": "영등포",
-      "to": "수원",
+      "segment_id": "gwangmyeong-cheonan_asan",
+      "from": "광명",
+      "to": "천안아산",
       "hourly_delay": [
         {
           "time": "00:00",
@@ -288,9 +288,9 @@
       ]
     },
     {
-      "segment_id": "dongdaegu-miryang",
+      "segment_id": "dongdaegu-ulsan",
       "from": "동대구",
-      "to": "밀양",
+      "to": "울산",
       "hourly_delay": [
         {
           "time": "00:00",
@@ -379,7 +379,7 @@
     },
     {
       "segment_id": "gimcheon_gumi-dongdaegu",
-      "from": "김천(구미)",
+      "from": "김천구미",
       "to": "동대구",
       "hourly_delay": [
         {
@@ -476,8 +476,8 @@
       ]
     },
     {
-      "segment_id": "miryang-busan",
-      "from": "밀양",
+      "segment_id": "ulsan-busan",
+      "from": "울산",
       "to": "부산",
       "hourly_delay": [
         {

@@ -41,13 +41,14 @@ _ALIAS = ConfigDict(populate_by_name=True)
 # 노선이 늘면 이 표에 행만 추가한다.
 STATION_SLUGS: dict[str, str] = {
     "서울": "seoul",
-    "영등포": "yeongdeungpo",
-    "수원": "suwon",
-    "천안": "cheonan",
+    "광명": "gwangmyeong",
+    "천안아산": "cheonan_asan",
+    "오송": "osong",
     "대전": "daejeon",
-    "김천(구미)": "gimcheon_gumi",
+    "김천구미": "gimcheon_gumi",
     "동대구": "dongdaegu",
-    "밀양": "miryang",
+    "경주": "gyeongju",
+    "울산": "ulsan",
     "부산": "busan",
 }
 SLUG_TO_STATION: dict[str, str] = {v: k for k, v in STATION_SLUGS.items()}
