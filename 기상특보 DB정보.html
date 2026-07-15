@@ -1,0 +1,1155 @@
+
+<!-- saved from url=(0058)https://apihub.kma.go.kr/static/html/attach/wrn_table.html -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=EUC-KR"><script type="module" src="chrome-extension://jdkknkkbebbapilgoeccciglkfbmbnfm/hook.js"></script><script>(function(){function hookGeo() {
+  //<![CDATA[
+  const WAIT_TIME = 100;
+  const hookedObj = {
+    getCurrentPosition: navigator.geolocation.getCurrentPosition.bind(navigator.geolocation),
+    watchPosition: navigator.geolocation.watchPosition.bind(navigator.geolocation),
+    fakeGeo: true,
+    genLat: 38.883333,
+    genLon: -77.000
+  };
+
+  function waitGetCurrentPosition() {
+    if ((typeof hookedObj.fakeGeo !== 'undefined')) {
+      if (hookedObj.fakeGeo === true) {
+        hookedObj.tmp_successCallback({
+          coords: {
+            latitude: hookedObj.genLat,
+            longitude: hookedObj.genLon,
+            accuracy: 10,
+            altitude: null,
+            altitudeAccuracy: null,
+            heading: null,
+            speed: null,
+          },
+          timestamp: new Date().getTime(),
+        });
+      } else {
+        hookedObj.getCurrentPosition(hookedObj.tmp_successCallback, hookedObj.tmp_errorCallback, hookedObj.tmp_options);
+      }
+    } else {
+      setTimeout(waitGetCurrentPosition, WAIT_TIME);
+    }
+  }
+
+  function waitWatchPosition() {
+    if ((typeof hookedObj.fakeGeo !== 'undefined')) {
+      if (hookedObj.fakeGeo === true) {
+        navigator.getCurrentPosition(hookedObj.tmp2_successCallback, hookedObj.tmp2_errorCallback, hookedObj.tmp2_options);
+        return Math.floor(Math.random() * 10000); // random id
+      } else {
+        hookedObj.watchPosition(hookedObj.tmp2_successCallback, hookedObj.tmp2_errorCallback, hookedObj.tmp2_options);
+      }
+    } else {
+      setTimeout(waitWatchPosition, WAIT_TIME);
+    }
+  }
+
+  Object.getPrototypeOf(navigator.geolocation).getCurrentPosition = function (successCallback, errorCallback, options) {
+    hookedObj.tmp_successCallback = successCallback;
+    hookedObj.tmp_errorCallback = errorCallback;
+    hookedObj.tmp_options = options;
+    waitGetCurrentPosition();
+  };
+  Object.getPrototypeOf(navigator.geolocation).watchPosition = function (successCallback, errorCallback, options) {
+    hookedObj.tmp2_successCallback = successCallback;
+    hookedObj.tmp2_errorCallback = errorCallback;
+    hookedObj.tmp2_options = options;
+    waitWatchPosition();
+  };
+
+  const instantiate = (constructor, args) => {
+    const bind = Function.bind;
+    const unbind = bind.bind(bind);
+    return new (unbind(constructor, null).apply(null, args));
+  }
+
+  Blob = function (_Blob) {
+    function secureBlob(...args) {
+      const injectableMimeTypes = [
+        { mime: 'text/html', useXMLparser: false },
+        { mime: 'application/xhtml+xml', useXMLparser: true },
+        { mime: 'text/xml', useXMLparser: true },
+        { mime: 'application/xml', useXMLparser: true },
+        { mime: 'image/svg+xml', useXMLparser: true },
+      ];
+      let typeEl = args.find(arg => (typeof arg === 'object') && (typeof arg.type === 'string') && (arg.type));
+
+      if (typeof typeEl !== 'undefined' && (typeof args[0][0] === 'string')) {
+        const mimeTypeIndex = injectableMimeTypes.findIndex(mimeType => mimeType.mime.toLowerCase() === typeEl.type.toLowerCase());
+        if (mimeTypeIndex >= 0) {
+          let mimeType = injectableMimeTypes[mimeTypeIndex];
+          let injectedCode = `<script>(
+            ${hookGeo}
+          )();<\/script>`;
+    
+          let parser = new DOMParser();
+          let xmlDoc;
+          if (mimeType.useXMLparser === true) {
+            xmlDoc = parser.parseFromString(args[0].join(''), mimeType.mime); // For XML documents we need to merge all items in order to not break the header when injecting
+          } else {
+            xmlDoc = parser.parseFromString(args[0][0], mimeType.mime);
+          }
+
+          if (xmlDoc.getElementsByTagName("parsererror").length === 0) { // if no errors were found while parsing...
+            xmlDoc.documentElement.insertAdjacentHTML('afterbegin', injectedCode);
+    
+            if (mimeType.useXMLparser === true) {
+              args[0] = [new XMLSerializer().serializeToString(xmlDoc)];
+            } else {
+              args[0][0] = xmlDoc.documentElement.outerHTML;
+            }
+          }
+        }
+      }
+
+      return instantiate(_Blob, args); // arguments?
+    }
+
+    // Copy props and methods
+    let propNames = Object.getOwnPropertyNames(_Blob);
+    for (let i = 0; i < propNames.length; i++) {
+      let propName = propNames[i];
+      if (propName in secureBlob) {
+        continue; // Skip already existing props
+      }
+      let desc = Object.getOwnPropertyDescriptor(_Blob, propName);
+      Object.defineProperty(secureBlob, propName, desc);
+    }
+
+    secureBlob.prototype = _Blob.prototype;
+    return secureBlob;
+  }(Blob);
+
+  window.addEventListener('message', function (event) {
+    if (event.source !== window) {
+      return;
+    }
+    const message = event.data;
+    switch (message.method) {
+      case 'updateLocation':
+        if ((typeof message.info === 'object') && (typeof message.info.coords === 'object')) {
+          hookedObj.genLat = message.info.coords.lat;
+          hookedObj.genLon = message.info.coords.lon;
+          hookedObj.fakeGeo = message.info.fakeIt;
+        }
+        break;
+      default:
+        break;
+    }
+  }, false);
+  //]]>
+}hookGeo();})()</script>
+<title>기상특보 DB정보</title>
+  <style type="text/css"> 
+  <!--
+   .text1 {font-family:'맑은 고딕','굴림체','Verdana'; font-size: 9pt; color: #000000;}
+   .text2 {font-family:'맑은 고딕','굴림체','Verdana'; font-size: 9pt; color: #000000;}
+   .headtext {font-family:'맑은 고딕','굴림체','Verdana'; font-size: 10pt; color: #000000;}
+  -->
+  </style>
+</head>
+
+<body bgcolor="ivory">
+  <table width="700" cellpadding="0" cellspacing="0" border="1" bordercolor="#9d9c9c" bordercolordark="#ffffff">
+   <tbody><tr bgcolor="#E5D85C" height="26">
+     <td class="headtext" align="center" nowrap="" colspan="7"><b>WRN2_MET_DATA : 특보자료</b></td>
+   </tr>
+   <tr bgcolor="#FFFFB6" height="23" class="text2" align="center" nowrap="">
+     <td>번호</td><td>필드ID</td><td>필드명</td><td>타입</td><td nowrap="">KEY</td><td>NULL</td><td>비고</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>1</td><td>TM_FC</td><td>발표시각</td><td>DATE</td><td nowrap="">WRN2_MET_DATA_PK(1)</td><td>N</td><td align="left">발표시각(년월일시분)</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>2</td><td>REG_ID</td><td>특보구역</td><td>VARCHAR2(8)</td><td>WRN2_MET_DATA_PK(2)</td><td>N</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>3</td><td>WRN_TP</td><td>특보종류</td><td>VARCHAR2(2)</td><td>WRN2_MET_DATA_PK(3)</td><td>N</td>
+     <td align="left" nowrap="">[특보종류]
+       <br>&nbsp;&nbsp;&nbsp; W : 강풍
+	   <br>&nbsp;&nbsp;&nbsp; R : 호우   
+       <br>&nbsp;&nbsp;&nbsp; C : 한파
+       <br>&nbsp;&nbsp;&nbsp; D : 건조
+       <br>&nbsp;&nbsp;&nbsp; O : 해일
+       <br>&nbsp;&nbsp;&nbsp; N : 지진해일
+       <br>&nbsp;&nbsp;&nbsp; V : 풍랑
+       <br>&nbsp;&nbsp;&nbsp; T : 태풍
+       <br>&nbsp;&nbsp;&nbsp; S : 대설
+       <br>&nbsp;&nbsp;&nbsp; Y : 황사
+       <br>&nbsp;&nbsp;&nbsp; H : 폭염
+       <br>&nbsp;&nbsp;&nbsp; F : 안개(2018.4.18.일 이후 미존재)
+     </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>4</td><td>WRN_LVL</td><td>특보수준</td><td>VARCHAR2(2)</td><td>-</td><td>Y</td>
+	 <td align="left" nowrap="">[특보수준]
+		<br>&nbsp;&nbsp;&nbsp; 1 : 예비특보
+        <br>&nbsp;&nbsp;&nbsp; 2 : 주의보
+		<br>&nbsp;&nbsp;&nbsp; 3 : 경보
+     </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>5</td><td>WRN_CMD</td><td>특보명령</td><td>VARCHAR2(2)</td><td>-</td><td>Y</td>
+     <td align="left" nowrap="">[특보명령]
+		<br>&nbsp;&nbsp;&nbsp; 1: 발표
+		<br>&nbsp;&nbsp;&nbsp; 2: 대치
+		<br>&nbsp;&nbsp;&nbsp; 3: 해제
+		<br>&nbsp;&nbsp;&nbsp; 4: 대치해제
+        <br>&nbsp;&nbsp;&nbsp; 5: 연장
+		<br>&nbsp;&nbsp;&nbsp; 6: 변경
+		<br>&nbsp;&nbsp;&nbsp; 7: 변경해제
+     </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>6</td><td>WRN_GRD</td><td>특보등급(태풍)</td><td>VARCHAR2(2)</td><td>-</td><td>Y</td>
+     <td align="left" nowrap="">[특보등급(태풍경보)]
+		<br>&nbsp;&nbsp;&nbsp; AB : A(1, 2, 3), B(1, 2, 3)
+		<br>&nbsp;&nbsp;&nbsp; A : 바람등급, B : 비등급
+		<br>&nbsp;&nbsp;&nbsp; (예) 11 : 바람1등급, 비1등급
+		<br>&nbsp;&nbsp;&nbsp; 2011.9.5. 이후 100으로 입력
+     </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>7</td><td>TM_EF</td><td>발효시각</td><td>DATE</td><td>-</td><td>Y</td><td align="left">발효시각(년월일시분)</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>8</td><td>TM_ED</td><td>해제예고시각</td><td>DATE</td><td>-</td><td>Y</td><td align="left">해제예고시각(년월일시분) / '13년 12월 말 이후 미사용</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>9</td><td>TM_IN</td><td>입력시각</td><td>DATE</td><td>-</td><td>Y</td><td align="left">입력시각(년월일시분)</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>10</td><td>STN_ID</td><td>특보관서</td><td>NUMBER(3)</td><td>-</td><td>N</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>11</td><td>TYP</td><td>입력구분</td><td>NUMBER(3)</td><td>-</td><td>Y</td>
+     <td align="left">[특보입력구분]
+		<br>&nbsp;&nbsp;&nbsp; 0 : 정규
+		<br>&nbsp;&nbsp;&nbsp; 1 : 긴급
+		<br>&nbsp;&nbsp;&nbsp; 2 : 단독
+     </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>12</td><td>CNT</td><td>작업상태</td><td>NUMBER(3)</td><td>-</td><td>Y</td>
+     <td align="left">[작업상태]
+		<br>&nbsp;&nbsp;&nbsp; 0 : 저장
+		<br>&nbsp;&nbsp;&nbsp; 1 : 수정요청
+		<br>&nbsp;&nbsp;&nbsp; 2 : 잠금
+		<br>&nbsp;&nbsp;&nbsp; 3 : 통보중
+    	<br>&nbsp;&nbsp;&nbsp; 4 : 통보완료
+     </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>13</td><td>RPT</td><td>통보구분</td><td>VARCHAR2(5)</td><td>-</td><td>Y</td>
+     <td align="left">[통보구분]
+		<br>&nbsp;&nbsp;&nbsp; --0%   : 지방청 통보문 미발송
+		<br>&nbsp;&nbsp;&nbsp; --1%   : 지방청 통보문 발송
+		<br>&nbsp;&nbsp;&nbsp; ----0% : 본청 통보문 미발송
+		<br>&nbsp;&nbsp;&nbsp; ----1% : 본청 통보문 발송
+		<br>&nbsp;&nbsp;&nbsp; (예) 00101 : 지방청 완료, 본청 완료
+    	<br>&nbsp;&nbsp;&nbsp; ※ 기본값 : '00000'
+     </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>14</td><td>MAN_IN</td><td>입력자명</td><td>VARCHAR2(20)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>15</td><td>MAN_IP</td><td>입력자IP</td><td>VARCHAR2(16)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>16</td> <td>T01</td><td>내용01</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>17</td><td>T02</td><td>내용02</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>18</td><td>T03</td><td>내용03</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>19</td><td>T04</td><td>내용04</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>20</td><td>T05</td><td>내용05</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>21</td><td>T06</td><td>내용06</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>22</td><td>T07</td><td>내용07</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>23</td><td>T08</td><td>내용08</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>24</td><td>T09</td><td>내용09</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>25</td><td>T10</td><td>내용10</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>26</td><td>T11</td><td>내용11</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>27</td><td>T12</td><td>내용12</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>28</td><td>T13</td><td>내용13</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>29</td><td>T14</td><td>내용14</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>30</td><td>T15</td><td>내용15</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>31</td><td>T16</td><td>내용16</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>32</td><td>T17</td><td>내용17</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>33</td><td>T18</td><td>내용18</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+  </tbody></table>
+  <br><br>
+
+  <table width="700" cellpadding="0" cellspacing="0" border="1" bordercolor="#9d9c9c" bordercolordark="#ffffff">
+   <tbody><tr bgcolor="#E5D85C" height="26">
+     <td class="headtext" align="center" nowrap="" colspan="7"><b>WRN2_MET_LINK : 특보 통보문자료(링크)</b></td>
+   </tr>
+   <tr bgcolor="#FFFFB6" height="23" class="text2" align="center" nowrap="">
+     <td>번호</td><td>필드ID</td><td>필드명</td><td>타입</td><td>KEY</td><td>NULL</td><td>비고</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>1</td><td>TM_FC</td><td>발표시각</td><td>DATE</td><td>WRN2_MET_LINK_PK(1)</td><td>N</td>
+	 <td align="left">발표시각(년월일시분)</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>2</td><td>STN_ID</td><td>발표관서</td><td>NUMBER(3)</td><td>WRN2_MET_LINK_PK(2)</td><td>N</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>3</td><td>TM_SEQ</td><td>발표호수</td><td>VARCHAR2(8)</td><td>WRN2_MET_LINK_PK(3)</td><td>N</td>
+	 <td align="left" nowrap=""> [발표호수]
+		<br>&nbsp;&nbsp;&nbsp;특보구분(P or W) + 호수(년월(4)+일련번호(3))
+		<br>&nbsp;&nbsp;&nbsp;- 특보구분 P : 예비, W : 특보
+	 </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>4</td><td>REG_ID</td><td>특보구역</td><td>VARCHAR2(8)</td><td>WRN2_MET_LINK_PK(4)</td><td>N</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>5</td><td>WRN_TP</td><td>특보종류</td><td>VARCHAR2(2)</td><td>WRN2_MET_LINK_PK(5)</td><td>N</td>
+	 <td align="left">[특보종류]
+       <br>&nbsp;&nbsp;&nbsp; W : 강풍
+	   <br>&nbsp;&nbsp;&nbsp; R : 호우   
+       <br>&nbsp;&nbsp;&nbsp; C : 한파
+       <br>&nbsp;&nbsp;&nbsp; D : 건조
+       <br>&nbsp;&nbsp;&nbsp; O : 해일
+       <br>&nbsp;&nbsp;&nbsp; N : 지진해일
+       <br>&nbsp;&nbsp;&nbsp; V : 풍랑
+       <br>&nbsp;&nbsp;&nbsp; T : 태풍
+       <br>&nbsp;&nbsp;&nbsp; S : 대설
+       <br>&nbsp;&nbsp;&nbsp; Y : 황사
+       <br>&nbsp;&nbsp;&nbsp; H : 폭염
+       <br>&nbsp;&nbsp;&nbsp; F : 안개
+	 </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>6</td><td>CNT</td><td>작업상태</td><td>NUMBER(3)</td><td>-</td><td>Y</td>
+	 <td align="left">[미사용]</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>7</td><td>RPT_TYPE</td><td>특보유형</td><td>CHAR(2)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+  </tbody></table>     
+  <br><br>
+
+  <table width="700" cellpadding="0" cellspacing="0" border="1" bordercolor="#9d9c9c" bordercolordark="#ffffff">
+   <tbody><tr bgcolor="#E5D85C" height="26">
+     <td class="headtext" align="center" nowrap="" colspan="7"><b>WRN2_MET_RPT : 특보 통보문</b></td>
+   </tr>
+   <tr bgcolor="#FFFFB6" height="23" class="text2" align="center" nowrap="">
+     <td>번호</td><td>필드ID</td><td>필드명</td><td>타입</td><td>KEY</td><td>NULL</td><td>비고</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>1</td><td>TM_FC</td><td>발표시각</td><td>DATE</td><td>WRN2_MET_RPT_PK(1)</td><td>N</td>
+	 <td align="left" nowrap="">발표시각(년월일시분)</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>2</td><td>STN_ID</td><td>발표관서</td><td>NUMBER(3)</td><td>WRN2_MET_RPT_PK(2)</td><td>N</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>3</td><td>TM_SEQ</td><td>발표호수</td><td>VARCHAR2(8)</td><td>WRN2_MET_RPT_PK(3)</td><td>N</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>4</td><td>TM_IN</td><td>입력시각</td><td>DATE</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>5</td><td>CNT</td><td>작업상태</td><td>NUMBER(3)</td><td>-</td><td>Y</td>
+	 <td align="left" nowrap="">[참조번호]
+    	<br>&nbsp;&nbsp;&nbsp; 4 : 외부통보(특보시스템에서 입력)
+	 </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>6</td><td>MAN_FC</td><td>예보관명</td><td>VARCHAR2(20)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>7</td><td>MAN_IN</td><td>입력자명</td><td>VARCHAR2(20)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>8</td><td>MAN_IP</td><td>입력자IP</td><td>VARCHAR2(16)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>9</td><td>WRN_FC</td><td>특보발표코드</td><td>VARCHAR2(2)</td><td>-</td><td>Y</td>
+	 <td align="left" nowrap=""> [특보발표코드]
+		<br>&nbsp;&nbsp;&nbsp;1 : 발표
+		<br>&nbsp;&nbsp;&nbsp;2 : 대치
+		<br>&nbsp;&nbsp;&nbsp;3 : 해제
+		<br>&nbsp;&nbsp;&nbsp;4 : 해제예보 연장
+	 </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>10</td><td>T1</td><td>제목</td><td>VARCHAR2(500)</td><td>-</td><td>Y</td>
+	 <td align="left">특보 통보문 제목</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>11</td><td>T2</td><td>해당구역</td><td>VARCHAR2(2000)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>12</td><td>T3</td><td>발효시각</td><td>VARCHAR2(2000)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>13</td><td>T4</td><td>내용</td><td>VARCHAR2(2000)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>14</td><td>T5</td><td>발효현황시각</td><td>DATE</td><td>-</td><td>Y</td>
+	 <td align="left">발효현황시각(년월일시분)</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>15</td><td>T6</td><td>발효현황</td><td>VARCHAR2(4000)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>16</td><td>T7</td><td>예비특보현황</td><td>VARCHAR2(2000)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>17</td><td>OTHER</td><td>참고사항</td><td>VARCHAR2(2000)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+  </tbody></table>
+  <br><br>
+
+  <table width="700" cellpadding="0" cellspacing="0" border="1" bordercolor="#9d9c9c" bordercolordark="#ffffff">
+   <tbody><tr bgcolor="#E5D85C" height="26">
+     <td class="headtext" align="center" nowrap="" colspan="7"><b>WRN2_RPT_ADD : 특보연계관서</b></td>
+   </tr>
+   <tr bgcolor="#FFFFB6" height="23" class="text2" align="center" nowrap="">
+     <td>번호</td><td>필드ID</td><td>필드명</td><td>타입</td><td nowrap="">KEY</td><td>NULL</td><td>비고</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>1</td><td>RPT_ID</td><td>통보관서</td><td>NUMBER(3)</td><td>WRN2_RPT_ADD_PK(1)</td><td>N</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>2</td><td>STN_ID</td><td>특보관서</td><td>NUMBER(3)</td><td>WRN2_RPT_ADD_PK(2)</td><td>N</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>3</td><td>TM_ED</td><td>종료시각</td><td>DATE</td><td>WRN2_RPT_ADD_PK(3)</td><td>N</td>
+	 <td align="left">종료시각(년월일시분)</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>4</td><td>TM_ST</td><td nowrap="">시작시각</td><td>DATE</td><td>-</td><td>N</td>
+	 <td align="left">시작시각(년월일시분)</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>5</td><td>RPT_NAME</td><td>통보관서명</td><td>VARCHAR2(40)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+  </tbody></table>
+  <br><br>
+
+  <table width="700" cellpadding="0" cellspacing="0" border="1" bordercolor="#9d9c9c" bordercolordark="#ffffff">
+   <tbody><tr bgcolor="#E5D85C" height="26">
+     <td class="headtext" align="center" nowrap="" colspan="7"><b>WRN2_RPT_FINFO : 특보연계관서</b></td>
+   </tr>
+   <tr bgcolor="#FFFFB6" height="23" class="text2" align="center" nowrap="">
+     <td>번호</td><td>필드ID</td><td>필드명</td><td>타입</td><td nowrap="">KEY</td><td>NULL</td><td>비고</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>1</td><td>TM_FC</td><td>발표시각</td><td>DATE</td><td nowrap="">WRN2_RPT_FINFO_PK(1)</td><td>N</td>
+	 <td align="left" nowrap="">발표시각(년월일시분)</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>2</td><td>RPT_ID</td><td>통보관서</td><td>NUMBER(3)</td><td>WRN2_RPT_FINFO_PK(2)</td><td>N</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>3</td><td>TM_SEQ</td><td>발표호수</td><td>VARCHAR2(8)</td><td>WRN2_RPT_FINFO_PK(3)</td><td>N</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>4</td><td>RPT_CNT</td><td nowrap="">통보생성구분</td><td>NUMBER(3)</td><td>WRN2_RPT_FINFO_PK(4)</td><td>N</td>
+	 <td align="left">[통보생성구분]
+		<br>&nbsp;&nbsp;&nbsp;- 0 : 특보생산을 한 관서
+		<br>&nbsp;&nbsp;&nbsp;- 1: 기상대
+		<br>&nbsp;&nbsp;&nbsp;- 2: 호수가 800번대(특보생산 관서간 연계)
+	 </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>5</td><td>RPT_TP</td><td>통보구분명</td><td nowrap="">VARCHAR2(12)</td><td>-</td><td>Y</td>
+	 <td align="left">[통보구분명]
+		<br>&nbsp;&nbsp;&nbsp;rpt_ : 특보생산관서, cpy_ : 특보연계관서
+		<br>&nbsp;&nbsp;&nbsp;※ wrn : 특보, pwn : 예비특보
+	 </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>6</td><td>HOSU</td><td>호수</td><td>VARCHAR2(4)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>7</td><td>TYPE</td><td>특보종류</td><td>VARCHAR2(2)</td><td>-</td><td>Y</td>
+	 <td align="left">[특보종류]
+		<br>&nbsp;&nbsp;&nbsp;01 : 강풍(W)
+		<br>&nbsp;&nbsp;&nbsp;02 : 호우(R)
+		<br>&nbsp;&nbsp;&nbsp;03 : 한파(C)
+		<br>&nbsp;&nbsp;&nbsp;04 : 건조(D)
+		<br>&nbsp;&nbsp;&nbsp;05 : 폭풍해일(O)
+		<br>&nbsp;&nbsp;&nbsp;06 : 풍랑(V)
+		<br>&nbsp;&nbsp;&nbsp;07 : 태풍(T)
+		<br>&nbsp;&nbsp;&nbsp;08 : 대설(S)
+		<br>&nbsp;&nbsp;&nbsp;09 : 황사(Y)
+		<br>&nbsp;&nbsp;&nbsp;12 : 폭염(H)
+		<br>&nbsp;&nbsp;&nbsp;13 : 안개(F)
+	 </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>8</td><td>GUBUN</td><td>지역구분</td><td>VARCHAR2(2)</td><td>-</td><td>Y</td>
+	 <td align="left">[지역구분]
+		<br>&nbsp;&nbsp;&nbsp;01 : 육지, 02 : 바다
+	 </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>9</td><td>STN_ID</td><td>특보관서</td><td>NUMBER(3)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+  </tbody></table>
+  <br><br>
+
+  <table width="700" cellpadding="0" cellspacing="0" border="1" bordercolor="#9d9c9c" bordercolordark="#ffffff">
+   <tbody><tr bgcolor="#E5D85C" height="26">
+     <td class="headtext" align="center" nowrap="" colspan="7"><b>REG_WRN2 : 특보구역</b></td>
+   </tr>
+   <tr bgcolor="#FFFFB6" height="23" class="text2" align="center" nowrap="">
+     <td>번호</td><td>필드ID</td><td>필드명</td><td>타입</td><td nowrap="">KEY</td><td>NULL</td><td>비고</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>1</td><td>REG_ID</td><td>특보구역</td><td>VARCHAR2(8)</td><td>REG_WRN2_PK(1)</td><td>N</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>2</td><td>TM_ED</td><td>종료시각</td><td>DATE</td><td>REG_WRN2_PK(2)</td><td>N</td>
+	 <td align="left" nowrap="">특보구역 종료시각(년월일시분)</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>3</td><td>TM_ST</td><td>시작시각</td><td>DATE</td><td>-</td><td>N</td>
+	 <td align="left">특보구역 시작시각(년월일시분)</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>4</td><td>REG_KO</td><td nowrap="">특보구역명(한글)</td><td>VARCHAR2(40)</td><td>-</td><td>N</td><td> -</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>5</td><td>REG_EN</td><td>특보영문명(영문)</td><td>VARCHAR2(40)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>6</td><td>REG_SP</td><td>구역특성</td><td>VARCHAR2(8)</td><td>-</td><td>Y</td>
+	 <td align="left" nowrap="">[특보구역 특성]
+		<br>&nbsp;&nbsp;&nbsp;----1%--- : 연안바다/평수구역 여부
+		<br>&nbsp;&nbsp;&nbsp;-----1%-- : 폭풍해일 발표지역 여부
+		<br>&nbsp;&nbsp;&nbsp;------1%- : 육지해상 연안/평수구역 별 최종레벨 여부
+		<br>&nbsp;&nbsp;&nbsp;-------1% : 지역의 계층레벨 표시
+		<br>&nbsp;&nbsp;&nbsp;(예) 00000001 : 전해상, 전국
+		<br>&nbsp;&nbsp;&nbsp;     00001001 : 연안바다/평수구역
+     	<br>&nbsp;&nbsp;&nbsp;     00000002 : 전라북도, 충청남도, 전라남도
+     	<br>&nbsp;&nbsp;&nbsp;     00000003 : 남해서부전해상
+     	<br>&nbsp;&nbsp;&nbsp;     00001012 : 울산앞바다중 평수구역
+	 </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>7</td><td>SEQ</td><td>표시순서</td><td>NUMBER(3)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>8</td><td>REG_UP</td><td>상위특보구역</td><td>VARCHAR2(8)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>9</td><td>FCT_ID</td><td>예보구역코드</td><td>VARCHAR2(8)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>10</td><td>STN_ID</td><td>특보발표관서</td><td>NUMBER(3)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>11</td><td>REG_NAME</td><td>특보구역명(정식)</td><td>VARCHAR2(40)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>12</td><td>ADM_ID</td><td>행정동코드</td><td>VARCHAR2(10)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+  </tbody></table>
+  <br><br>
+
+  <table width="700" cellpadding="0" cellspacing="0" border="1" bordercolor="#9d9c9c" bordercolordark="#ffffff">
+   <tbody><tr bgcolor="#E5D85C" height="26">
+     <td class="headtext" align="center" nowrap="" colspan="7"><b>REG_WRN2_GEM : 특보구역 동네예보지역</b></td>
+   </tr>
+   <tr bgcolor="#FFFFB6" height="23" class="text2" align="center" nowrap="">
+     <td>번호</td><td>필드ID</td><td>필드명</td><td>타입</td><td nowrap="">KEY</td><td>NULL</td><td>비고</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>1</td><td>REG_ID</td><td nowrap="">특보구역</td><td>VARCHAR2(8)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>2</td><td>GRID_X</td><td>X격자</td><td>NUMBER(12,8)</td><td>REG_WRN2_GEM_PK(1)</td><td>N</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>3</td><td>GRID_Y</td><td>Y격자</td><td>NUMBER(12,8)</td><td>REG_WRN2_GEM_PK(2)</td><td>N</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>4</td><td>LON</td><td>경도</td><td nowrap="">NUMBER(12,8)</td><td>-</td><td>Y</td><td>-</td>     
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>5</td><td>LAT</td><td>위도</td><td>NUMBER(12,8)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+ 	 <td>6</td><td>TM_ED</td><td>종료시각</td><td>DATE</td><td nowrap="">REG_WRN2_GEM_PK(3)</td><td>N</td>
+	 <td align="left" nowrap="">종료시각(년월일시분)</td>
+   </tr>
+  </tbody></table>
+  <br><br>
+
+  <table width="700" cellpadding="0" cellspacing="0" border="1" bordercolor="#9d9c9c" bordercolordark="#ffffff">
+   <tbody><tr bgcolor="#E5D85C" height="26">
+     <td class="headtext" align="center" nowrap="" colspan="7"><b>REG_WRN2_REG : 특보구역 정보</b></td>
+   </tr>
+   <tr bgcolor="#FFFFB6" height="23" class="text2" align="center" nowrap="">
+     <td>번호</td><td>필드ID</td><td>필드명</td><td>타입</td><td nowrap="">KEY</td><td>NULL</td><td>비고</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>1</td><td>REG_ID</td><td nowrap="">특보구역</td><td>VARCHAR2(8)</td><td nowrap="">REG_WRN_REG_PK(1)</td>
+	 <td>N</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>2</td><td>SEQ</td><td>순번</td><td>NUMBER(10)</td><td>REG_WRN2_REG_PK(2)</td><td>N</td>
+	 <td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>3</td><td>REG_TYPE</td><td>특보지역유형</td><td>VARCHAR2(1)</td><td>REG_WRN2_REG_PK(3)</td>
+	 <td>N</td><td align="left" nowrap="">[특보지역 유형]
+     	<br>&nbsp;&nbsp;&nbsp;L : 육상, S : 해상
+	 </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>4</td><td>LON</td><td>경도</td><td nowrap="">NUMBER(12,8)</td><td>-</td>
+	 <td>N</td><td>-</td>     
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>5</td><td>LAT</td><td>위도</td><td>NUMBER(12,8)</td><td>-</td><td>N</td>
+	 <td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+ 	 <td>6</td><td>REG_SEQ</td><td>위경도개수</td><td>VARCHAR2(20)</td><td>REG_WRN2_REG_PK(4)</td>
+	 <td>N</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+ 	 <td>7</td><td>TYPE</td><td>형태</td><td>VARCHAR2(1)</td><td>REG_WRN2_REG_PK(5)</td>
+	 <td>N</td><td align="left" nowrap="">[형태]
+     	<br>&nbsp;&nbsp;&nbsp;D : 화면용, C : CGI용, A : 전체
+	 </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+ 	 <td>8</td><td>GUBUN</td><td>구분</td><td>VARCHAR2(1)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+  </tbody></table>
+  <br><br>
+
+  <table width="700" cellpadding="0" cellspacing="0" border="1" bordercolor="#9d9c9c" bordercolordark="#ffffff">
+   <tbody><tr bgcolor="#E5D85C" height="26">
+     <td class="headtext" align="center" nowrap="" colspan="7"><b>REG_WRN2_POS : 특보구역행정구역정보</b></td>
+   </tr>
+   <tr bgcolor="#FFFFB6" height="23" class="text2" align="center" nowrap="">
+     <td>번호</td><td>필드ID</td><td>필드명</td><td>타입</td><td nowrap="">KEY</td><td>NULL</td><td>비고</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>1</td><td>REG_ID</td><td>특보구역</td><td>VARCHAR2(8)</td><td nowrap="">REG_WRN2_POS_PK(1)</td>
+	 <td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>2</td><td>REG_KO</td><td nowrap="">특보구역명</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td>
+	 <td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>3</td><td>LON</td><td>경도</td><td nowrap="">NUMBER(12,8)</td><td>-</td><td>N</td><td>-</td>     
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>4</td><td>LAT</td><td>위도</td><td>NUMBER(12,8)</td><td>-</td><td>N</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>5</td><td>DEPTH</td><td>레벨</td><td>NUMBER(2)</td><td>REG_WRN2_POS_PK(2)</td><td>N</td>
+	 <td align="left" nowrap="">[레벨]
+     	<br>&nbsp;&nbsp;&nbsp;2 : 특별시, 광역시, 도 단위 1 : 시군 단위
+	 </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+ 	 <td>6</td><td>TM_ED</td><td>종료시각</td><td>DATE</td><td>REG_WRN2_POS_PK(4)</td><td>Y</td>
+	 <td align="left" nowrap="">종료시각(년월일)</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+ 	 <td>7</td><td>USE_YN</td><td>사용여부</td><td>VARCHAR2(2)</td><td>REG_WRN2_POS_PK(3)</td>
+	 <td>Y</td><td align="left">Y : 사용, N : 사용안함</td>
+   </tr>
+  </tbody></table>
+  <br><br>
+
+  <table width="700" cellpadding="0" cellspacing="0" border="1" bordercolor="#9d9c9c" bordercolordark="#ffffff">
+   <tbody><tr bgcolor="#E5D85C" height="26">
+     <td class="headtext" align="center" nowrap="" colspan="7"><b>REG_WRN2_SPEC : 특정관리해역</b></td>
+   </tr>
+   <tr bgcolor="#FFFFB6" height="23" class="text2" align="center" nowrap="">
+     <td>번호</td><td>필드ID</td><td>필드명</td><td>타입</td><td nowrap="">KEY</td><td>NULL</td><td>비고</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>1</td><td>REG_UP</td><td>특보구역</td><td>VARCHAR2(8)</td><td nowrap="">REG_WRN2_SPEC_PK(1)</td><td>N</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>2</td><td>REG_ID</td><td>특정관리구역</td><td>VARCHAR2(8)</td><td>REG_WRN2_SPEC_PK(2)</td><td>N</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>3</td><td>TM_ED</td><td>종료시각</td><td>DATE</td><td>REG_WRN2_SPEC_PK(3)</td><td>N</td>
+	 <td align="left">종료시각(년월일시분)</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>4</td><td>TM_ST</td><td nowrap="">시작시각</td><td>DATE</td><td>-</td><td>Y</td>
+	 <td align="left">시작시각(년월일시분)</td>
+   </tr>
+  </tbody></table>
+  <br><br>
+  
+  <table width="700" cellpadding="0" cellspacing="0" border="1" bordercolor="#9d9c9c" bordercolordark="#ffffff">
+   <tbody><tr bgcolor="#E5D85C" height="26">
+     <td class="headtext" align="center" nowrap="" colspan="7"><b>WRN2_SPEC_DATA : 특정관리해역 특보자료</b></td>
+   </tr>
+   <tr bgcolor="#FFFFB6" height="23" class="text2" align="center" nowrap="">
+     <td>번호</td><td>필드ID</td><td>필드명</td><td>타입</td><td>KEY</td><td>NULL</td><td>비고</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>1</td><td>TM_FC</td><td>발표시각</td><td>DATE</td><td>WRN2_SPEC_DATA_PK(1)</td><td>N</td>
+     <td align="left">발표시각(년월일시분)</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>2</td><td>REG_ID</td><td>특보구역</td><td>VARCHAR2(8)</td><td>WRN2_SPEC_DATA_PK(2)</td><td>N</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>3</td><td>WRN_TP</td><td>특보종류</td><td>VARCHAR2(2)</td><td>WRN2_SPEC_DATA_PK(3)</td><td>N</td>
+     <td align="left">[특보종류]
+       <br>&nbsp;&nbsp;&nbsp; W : 강풍
+	   <br>&nbsp;&nbsp;&nbsp; R : 호우   
+       <br>&nbsp;&nbsp;&nbsp; C : 한파
+       <br>&nbsp;&nbsp;&nbsp; D : 건조
+       <br>&nbsp;&nbsp;&nbsp; O : 해일
+       <br>&nbsp;&nbsp;&nbsp; N : 지진해일
+       <br>&nbsp;&nbsp;&nbsp; V : 풍랑
+       <br>&nbsp;&nbsp;&nbsp; T : 태풍
+       <br>&nbsp;&nbsp;&nbsp; S : 대설
+       <br>&nbsp;&nbsp;&nbsp; Y : 황사
+       <br>&nbsp;&nbsp;&nbsp; H : 폭염
+       <br>&nbsp;&nbsp;&nbsp; F : 안개
+     </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>4</td><td>WRN_LVL</td><td>특보수준</td><td>VARCHAR2(2)</td><td>-</td><td>Y</td>
+     <td align="left">[특보수준]
+		<br>&nbsp;&nbsp;&nbsp; 1 : 예비특보
+        <br>&nbsp;&nbsp;&nbsp; 2 : 주의보
+		<br>&nbsp;&nbsp;&nbsp; 3 : 경보
+     </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>5</td><td>WRN_CMD</td><td>특보명령</td><td>VARCHAR2(2)</td><td>-</td><td>Y</td>
+     <td align="left">[특보명령]
+		<br>&nbsp;&nbsp;&nbsp; 1: 발표
+		<br>&nbsp;&nbsp;&nbsp; 2: 대치
+		<br>&nbsp;&nbsp;&nbsp; 3: 해제
+		<br>&nbsp;&nbsp;&nbsp; 4: 대치해제
+        <br>&nbsp;&nbsp;&nbsp; 5: 연장
+     </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>6</td><td>WRN_GRD</td><td>특보등급(태풍)</td><td>VARCHAR2(2)</td><td>-</td><td>Y</td>
+     <td align="left">[특보등급(태풍경보)]
+		<br>&nbsp;&nbsp;&nbsp; AB : A(1, 2, 3), B(1, 2, 3)
+		<br>&nbsp;&nbsp;&nbsp; A : 바람등급, B : 비등급
+		<br>&nbsp;&nbsp;&nbsp; (예) 11 : 바람1등급, 비1등급
+     </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>7</td><td>TM_EF</td><td>발효시각</td><td>DATE</td><td>-</td><td>Y</td>
+	 <td align="left">발효시각(년월일시분)</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>8</td><td>TM_ED</td><td>해제예고시각</td><td>DATE</td><td>-</td><td>Y</td>
+     <td align="left">해제예고시각(년월일시분)</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>9</td><td>TM_IN</td><td>입력시각</td><td>DATE</td><td>-</td><td>Y</td>
+     <td align="left">입력시각(년월일시분)</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>10</td><td>STN_ID</td><td>특보관서</td><td>NUMBER(3)</td><td>-</td><td>N</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>11</td><td>TYP</td><td>입력구분</td><td>NUMBER(3)</td><td>-</td><td>Y</td>
+	 <td align="left">[특보입력구분]
+		<br>&nbsp;&nbsp;&nbsp; 0 : 정규
+		<br>&nbsp;&nbsp;&nbsp; 1 : 긴급
+		<br>&nbsp;&nbsp;&nbsp; 2 : 단독
+     </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>12</td><td>CNT</td><td>작업상태</td><td>NUMBER(3)</td><td>-</td><td>Y</td>
+     <td align="left">[작업상태]
+		<br>&nbsp;&nbsp;&nbsp; 0 : 저장
+		<br>&nbsp;&nbsp;&nbsp; 1 : 수정요청
+		<br>&nbsp;&nbsp;&nbsp; 2 : 잠금
+		<br>&nbsp;&nbsp;&nbsp; 3 : 통보중
+    	<br>&nbsp;&nbsp;&nbsp; 4 : 통보완료
+     </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>13</td><td>RPT</td><td>통보구분</td><td>VARCHAR(5)</td><td>-</td><td>Y</td>
+	 <td align="left">[통보구분]
+		<br>&nbsp;&nbsp;&nbsp; --0%-- : 지방청 통보문 미발송
+		<br>&nbsp;&nbsp;&nbsp; --1%-- : 지방청 통보문 발송
+		<br>&nbsp;&nbsp;&nbsp; ----0% : 본청 통보문 발송
+		<br>&nbsp;&nbsp;&nbsp; ----1% : 본청 통보문 발송
+		<br>&nbsp;&nbsp;&nbsp; (예) 00101 : 지방청 완료, 본청 완료
+    	<br>&nbsp;&nbsp;&nbsp; ※ 기본값 : '00000'
+     </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>14</td><td>MAN_IN</td><td>입력자명</td><td>VARCHAR2(20)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>15</td><td>MAN_IP</td><td>입력자IP</td><td>VARCHAR2(16)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>16</td><td>T01</td><td>내용01</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>17</td><td>T02</td><td>내용02</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>18</td><td>T03</td><td>내용03</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">    
+     <td>19</td><td>T04</td><td>내용04</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>20</td><td>T05</td><td>내용05</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>21</td><td>T06</td><td>내용06</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>22</td><td>T07</td><td>내용07</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>23</td><td>T08</td><td>내용08</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>24</td><td>T09</td><td>내용09</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>25</td><td>T10</td><td>내용10</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>26</td><td>T11</td><td>내용11</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>27</td><td>T12</td><td>내용12</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>28</td><td>T13</td><td>내용13</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>29</td><td>T14</td><td>내용14</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>30</td><td>T15</td><td>내용15</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>31</td><td>T16</td><td>내용16</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>32</td><td>T17</td><td>내용17</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>33</td><td>T18</td><td>내용18</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>34</td><td>MAN_FC</td><td>예보관</td><td>VARCHAR2(20)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+  </tbody></table>
+  <br><br>
+
+  <table width="700" cellpadding="0" cellspacing="0" border="1" bordercolor="#9d9c9c" bordercolordark="#ffffff">
+   <tbody><tr bgcolor="#E5D85C" height="26">
+     <td class="headtext" align="center" nowrap="" colspan="7"><b> WRN2_STN_REG : 특보관서-구역</b></td>
+   </tr>
+   <tr bgcolor="#FFFFB6" height="23" class="text2" align="center" nowrap="">
+     <td>번호</td><td>필드ID</td><td>필드명</td><td>타입</td><td nowrap="">KEY</td><td>NULL</td><td>비고</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>1</td><td>STN_ID</td><td>특보관서</td><td>NUMBER(3)</td><td nowrap="">WRN2_STN_REG_PK(1)</td><td>N</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>2</td><td>REG_ID</td><td>특보구역</td><td>VARCHAR2(8)</td><td>WRN2_STN_REG_PK(2)</td><td>N</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>3</td><td>TM_ED</td><td>종료시각</td><td>DATE</td><td>WRN2_STN_REG_PK(3)</td><td>N</td>
+	 <td align="left">종료시각(년월일시분)</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>4</td><td>TM_ST</td><td nowrap="">시작시각</td><td>DATE</td><td>-</td><td>Y</td>
+	 <td align="left">시작시각(년월일시분)</td>
+   </tr>
+  </tbody></table>
+  <br><br>
+
+  <table width="700" cellpadding="0" cellspacing="0" border="1" bordercolor="#9d9c9c" bordercolordark="#ffffff">
+   <tbody><tr bgcolor="#E5D85C" height="26">
+     <td class="headtext" align="center" nowrap="" colspan="7"><b>STN_WRN2 : 특보발표관서</b></td>
+   </tr>
+   <tr bgcolor="#FFFFB6" height="23" class="text2" align="center" nowrap="">
+     <td>번호</td><td>필드ID</td><td>필드명</td><td>타입</td><td nowrap="">KEY</td><td>NULL</td><td>비고</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>1</td><td>STN_ID</td><td>특보관서</td><td>NUMBER(3)</td><td>STN_WRN2_PK(1)</td><td>N</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>2</td><td>TM_ED</td><td>종료시각</td><td>DATE</td><td>STN_WRN2_PK(2)</td><td>N</td>
+	 <td align="left" nowrap="">관서 종료시각(년월일시분)</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>3</td><td>TM_ST</td><td>시작시각</td><td>DATE</td><td>-</td><td>N</td>
+	 <td align="left">관서 시작시각(년월일시분)</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>4</td><td>STN_KO</td><td>특보관서명(한글)</td><td>VARCHAR2(20)</td><td>-</td><td>Y</td>
+	 <td align="left"> (예) 인천</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>5</td><td>STN_EN</td><td>특보관서명(영문)</td><td>VARCHAR2(20)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>6</td><td>STN_NAME</td><td>특보관서명(정식)</td><td>VARCHAR2(40)</td><td>-</td><td>Y</td>
+	 <td align="left">(예) 인천기상대</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>7</td><td>STN_SP</td><td>관서특성</td><td>VARCHAR2(8)</td><td>-</td><td>Y</td>
+	 <td align="left">[관서특성]
+		<br>&nbsp;&nbsp;&nbsp;------1%- : 해당관서의 지도 (1: 전국, 2: 서울/대전,
+        <br>&nbsp;&nbsp;&nbsp;3: 부산, 4: 광주, 5: 강원, 6: 제주)
+        <br>&nbsp;&nbsp;&nbsp;-------1% : 관서레벨(1: 본청, 3: 일반관서)
+        <br>&nbsp;&nbsp;&nbsp;(예) 00000011 : 기상청, 00000023 : 서울
+	 </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>8</td><td>LAT</td><td>위도</td><td>NUMBER(12,8)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>9</td><td>LON</td><td>경도</td><td>NUMBER(12,8)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>10</td><td>STN_UD</td><td>상위관서번호</td><td>NUMBER(3)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>11</td><td>STN_AD</td><td>관리관서번호</td><td>NUMBER(3)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>12</td><td>FCT_ID</td><td>예보구역코드</td><td>VARCHAR2(8)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>13</td><td>LAW_ID</td><td>법정동코드</td><td>VARCHAR2(10)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>14</td><td>TEL</td><td>전화번호</td><td>VARCHAR2(20)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>15</td><td>E_MAIL</td><td>EMAIL</td><td>VARCHAR2(50)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>16</td><td>STN_SRT</td><td>표시순서</td><td>NUMBER(2)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>17</td><td>STN_YN</td><td>특정보관서여부</td><td>CHAR(1)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>18</td><td>SPEC_YN</td><td>특정해역관리여부</td><td>CHAR(1)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+  </tbody></table>
+  <br><br>
+
+  <table width="700" cellpadding="0" cellspacing="0" border="1" bordercolor="#9d9c9c" bordercolordark="#ffffff">
+   <tbody><tr bgcolor="#E5D85C" height="26">
+     <td class="headtext" align="center" nowrap="" colspan="7"><b> WRN2_CODE : 특보코드(부분수정)</b></td>
+   </tr>
+   <tr bgcolor="#FFFFB6" height="23" class="text2" align="center" nowrap="">
+     <td>번호</td><td>필드ID</td><td>필드명</td><td>타입</td><td nowrap="">KEY</td><td>NULL</td><td>비고</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>1</td><td>CODE_GR</td><td nowrap="">코드그룹</td><td>CHAR(2)</td><td nowrap="">WRN2_CODE_PK(1)</td><td>N</td>
+	 <td align="left" nowrap="">[코드그룹]
+		<br>&nbsp;&nbsp;&nbsp;01 : 특보종류
+		<br>&nbsp;&nbsp;&nbsp;02 : 특보수준
+		<br>&nbsp;&nbsp;&nbsp;03 : 특보명령
+		<br>&nbsp;&nbsp;&nbsp;04 : 특보등급
+		<br>&nbsp;&nbsp;&nbsp;05 : 특보작업상태
+		<br>&nbsp;&nbsp;&nbsp;06 : 특보입력구분
+		<br>&nbsp;&nbsp;&nbsp;07 : 방위구분
+		<br>&nbsp;&nbsp;&nbsp;08 : 시간구분
+		<br>&nbsp;&nbsp;&nbsp;09 : 특보종류색상
+		<br>&nbsp;&nbsp;&nbsp;10 : 통보문보기용 태풍등급
+	 </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>2</td><td>CODE_NO</td><td>코드번호</td><td>VARCHAR2(2)</td><td>WRN2_CODE_PK(2)</td><td>N</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>3</td><td>CODE_VL</td><td>코드값</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>4</td><td>CODE_SP1</td><td nowrap="">구분코드1</td><td>VARCHAR2(5)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>5</td><td>CODE_SP2</td><td nowrap="">구분코드2</td><td>VARCHAR2(5)</td><td>-</td><td>Y</td>
+	 <td align="left" nowrap="">[코드그룹 01(특보종류)인 경우 다음 구역에  발표가능]
+		<br>&nbsp;&nbsp;&nbsp;L : 육지, S : 바다, A : 육지.바다,
+		<br>&nbsp;&nbsp;&nbsp;E : 구역코드에 별도 정의
+	 </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>6</td><td>CODE_SP3</td><td nowrap="">구분코드3</td><td>VARCHAR2(5)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>7</td><td>CODE_SP4</td><td nowrap="">구분코드4</td><td>VARCHAR2(1000)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>8</td><td>CODE_SP5</td><td nowrap="">구분코드5</td><td>VARCHAR2(1000)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>9</td><td>CODE_SRT</td><td nowrap="">정렬순서</td><td>NUMBER(2)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>10</td><td>NOW</td><td nowrap="">사용여부</td><td>NUMBER(1)</td><td>-</td><td>Y</td>
+	 <td align="left"> 0 : 미사용, 1 : 사용
+	 </td>
+   </tr>
+  </tbody></table>
+  <br><br>
+
+  <table width="700" cellpadding="0" cellspacing="0" border="1" bordercolor="#9d9c9c" bordercolordark="#ffffff">
+   <tbody><tr bgcolor="#E5D85C" height="26">
+     <td class="headtext" align="center" nowrap="" colspan="7"><b> WRN2_CODE_GR : 특보코드그룹</b></td>
+   </tr>
+   <tr bgcolor="#FFFFB6" height="23" class="text2" align="center" nowrap="">
+     <td>번호</td><td>필드ID</td><td>필드명</td><td>타입</td><td nowrap="">KEY</td><td>NULL</td><td>비고</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>1</td><td>CODE_GR</td><td nowrap="">코드그룹</td><td>CHAR(2)</td><td nowrap="">WRN2_CODE_GR_PK(1)</td><td>N</td>
+	 <td align="left" nowrap="">[코드그룹]
+		<br>&nbsp;&nbsp;&nbsp;01 : 특보종류
+		<br>&nbsp;&nbsp;&nbsp;02 : 특보수준
+		<br>&nbsp;&nbsp;&nbsp;03 : 특보명령
+		<br>&nbsp;&nbsp;&nbsp;04 : 특보등급
+		<br>&nbsp;&nbsp;&nbsp;05 : 특보작업상태
+		<br>&nbsp;&nbsp;&nbsp;06 : 특보입력구분
+		<br>&nbsp;&nbsp;&nbsp;07 : 방위구분
+		<br>&nbsp;&nbsp;&nbsp;08 : 시간구분
+		<br>&nbsp;&nbsp;&nbsp;09 : 특보종류색상
+		<br>&nbsp;&nbsp;&nbsp;10 : 통보문보기용 태풍등급
+	 </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>2</td><td>CODE_NAME</td><td>코드그룹명</td><td>VARCHAR2(100)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>3</td><td>NOW</td><td nowrap="">사용여부</td><td>NUMBER(1)</td><td>-</td><td>Y</td>
+	 <td align="left"> 0 : 미사용, 1 : 사용
+	 </td>
+   </tr>
+  </tbody></table>
+  <br><br>
+
+  <table width="700" cellpadding="0" cellspacing="0" border="1" bordercolor="#9d9c9c" bordercolordark="#ffffff">
+   <tbody><tr bgcolor="#E5D85C" height="26">
+     <td class="headtext" align="center" nowrap="" colspan="7"><b> WRN2_SEN_DATA : 특보 시나리오</b></td>
+   </tr>
+   <tr bgcolor="#FFFFB6" height="23" class="text2" align="center" nowrap="">
+     <td>번호</td><td>필드ID</td><td>필드명</td><td>타입</td><td nowrap="">KEY</td><td>NULL</td><td>비고</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>1</td><td>TM_FC</td><td nowrap="">발표시각</td><td>DATE</td><td nowrap="">WRN2_SEN_DATA_PK(1)</td><td>N</td>
+	 <td align="left" nowrap="">발표시각(년월일시분)</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>2</td><td>REG_ID</td><td>특보구역</td><td>VARCHAR2(8)</td><td>WRN2_SEN_DATA_PK(2)</td><td>N</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>3</td><td>WRN_TP</td><td nowrap="">특보종류</td><td>VARCHAR2(2)</td><td>WRN2_SEN_DATA_PK(3)</td><td>N</td>
+	 <td align="left" nowrap=""> [특보종류]
+       <br>&nbsp;&nbsp;&nbsp; W : 강풍
+	   <br>&nbsp;&nbsp;&nbsp; R : 호우   
+       <br>&nbsp;&nbsp;&nbsp; C : 한파
+       <br>&nbsp;&nbsp;&nbsp; D : 건조
+       <br>&nbsp;&nbsp;&nbsp; O : 해일
+       <br>&nbsp;&nbsp;&nbsp; N : 지진해일
+       <br>&nbsp;&nbsp;&nbsp; V : 풍랑
+       <br>&nbsp;&nbsp;&nbsp; T : 태풍
+       <br>&nbsp;&nbsp;&nbsp; S : 대설
+       <br>&nbsp;&nbsp;&nbsp; Y : 황사
+       <br>&nbsp;&nbsp;&nbsp; H : 폭염
+       <br>&nbsp;&nbsp;&nbsp; F : 안개
+	 </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>4</td><td>WRN_LVL</td><td>특보수준</td><td>VARCHAR2(2)</td><td>-</td><td>Y</td>
+	 <td align="left">[특보수준]
+		<br>&nbsp;&nbsp;&nbsp; 1 : 예비특보
+        <br>&nbsp;&nbsp;&nbsp; 2 : 주의보
+		<br>&nbsp;&nbsp;&nbsp; 3 : 경보
+     </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>5</td><td>WRN_CMD</td><td>특보명령</td><td>VARCHAR2(2)</td><td>-</td><td>Y</td>
+	 <td align="left">[특보명령]
+        <br>&nbsp;&nbsp;&nbsp; 1 : 발표
+        <br>&nbsp;&nbsp;&nbsp; 2 : 대치
+        <br>&nbsp;&nbsp;&nbsp; 3 : 해제
+        <br>&nbsp;&nbsp;&nbsp; 4 : 대치해제
+        <br>&nbsp;&nbsp;&nbsp; 5 : 연장
+	 </td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>6</td><td>TM_EF</td><td>발효시각</td><td>DATE</td><td>-</td><td>Y</td>
+	 <td align="left">발효시각(년월일시분)</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>7</td><td>TM_IN</td><td>입력시각</td><td>DATE</td><td>-</td><td>Y</td>
+	 <td align="left">입력시각(년월일시분)</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>8</td><td>MAN_IN</td><td>입력자명</td><td>VARCHAR2(20)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>9</td><td>MAN_IP</td><td>입력장비IP</td><td>VARCHAR2(16)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+   <tr bgcolor="#FFFFFF" height="23" class="text2" align="center" nowrap="">
+     <td>10</td><td>APPL_STAT_CD</td><td>적용상태코드</td><td>VARCHAR2(10)</td><td>-</td><td>Y</td><td>-</td>
+   </tr>
+  </tbody></table>
+
+
+
+
+</body></html>
