@@ -779,19 +779,6 @@ select {
   line-height: 20px;
 }
 
-.summary-card__comparison {
-  margin: 0;
-  color: var(--color-description-text);
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 16px;
-}
-
-.summary-card__comparison strong {
-  margin-left: 4px;
-  color: var(--color-danger-red);
-  font-weight: 600;
-}
 .map-card {
   overflow: hidden;
   width: 840px;
@@ -1871,11 +1858,6 @@ select {
   border-color: var(--color-primary-blue);
 }
 
-.station-line-chart__legend-line--holiday {
-  border-color: #94A3B8;
-  border-top-style: dotted;
-}
-
 .station-line-chart__svg {
   display: block;
   width: 100%;
@@ -2587,10 +2569,6 @@ select {
 
 .route-chart-legend__line--actual {
   background: var(--color-primary-blue);
-}
-
-.route-chart-legend__line--forecast {
-  border-top: 3px dashed var(--color-primary-blue);
 }
 
 .route-chart-legend__bar--previous {
