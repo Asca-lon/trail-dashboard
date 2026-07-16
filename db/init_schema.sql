@@ -21,7 +21,17 @@ CREATE TABLE IF NOT EXISTS train_stops (
     planned_departure TIMESTAMPTZ,
     actual_departure TIMESTAMPTZ,
     delay_min INTEGER,
-    status TEXT NOT NULL DEFAULT '정상' CHECK (status IN ('정상','지연','운행중단')),
+    -- 상태 구분:
+    --   정상/지연     : 계획·실제 시각이 모두 있어 지연을 계산한 결과
+    --   운행중단      : API 가 중단으로 표기
+    --   실적미확정    : 계획시각 또는 실제시각이 없어 지연을 계산할 수 없음
+    --                  ← 이 경우 delay_min 은 NULL. 0 으로 채우면 '정시'로 오인되어
+    --                    평균을 끌어내리고 정시율을 부풀린다(집계는 NULL 을 제외한다).
+    status TEXT NOT NULL DEFAULT '정상'
+        CHECK (status IN ('정상','지연','운행중단','실적미확정')),
+    -- 실제 기상 노출 시각 = COALESCE(실제도착, 실제출발, 계획도착, 계획출발).
+    -- 특보 매칭('그 열차가 실제로 그 시각에 그 기상에 노출됐나')과 시간대별 분석의 기준축.
+    -- ⚠️ 계획시각이 아니다. 계획 기준 축이 필요하면 planned_arrival 을 직접 쓴다.
     event_time TIMESTAMPTZ NOT NULL,
     ingested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     -- 자연키: 한 열차(train_no)는 하루(run_date)에 한 역(station_code)에 한 번 선다.

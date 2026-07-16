@@ -131,34 +131,70 @@ def get_lines():
 
 # ── GET /vulnerability/segments ───────────────────────────────
 @app.get("/vulnerability/segments", response_model=SegmentsResponse)
-def get_segments(line: str = "경부선", alert_type: str = "호우",
-                 alert_level: str = "경보", train_type: str = "all"):
+def get_segments(line: str = "경부선", alert_type: str | None = None,
+                 alert_level: str | None = None, train_type: str | None = None):
+    """구간별 취약도.
+
+    alert_type·alert_level 을 주면 그 조합만, **생략하면 전체를 합쳐서** 본다
+    (/vulnerability/stations, /heatmap 과 같은 규칙).
+    예전엔 기본값이 호우·경보로 고정이라, 프론트에서 '전체'를 골라도
+    호우 경보만 나오고 다른 조합은 보이지 않았다.
+    """
     _check(alert_type, alert_level, train_type)
     if USE_MOCK:
         d = _mock("vulnerability_segments.json")
-        d["line"], d["alert_type"], d["alert_level"] = line, alert_type, alert_level
+        d["line"] = line
+        d["alert_type"] = alert_type or "전체"
+        d["alert_level"] = alert_level or "전체"
         for s in d["segments"]:
             s.setdefault("segment_id", segment_slug(s["from"], s["to"]))
         return d
     from db import fetch_all
-    # NOTE(계약 갭): 현재 segment_vulnerability(§4)에는 train_type 컬럼이 없다.
-    # train_type 필터는 A가 집계에 차원을 추가해야 실제 동작한다. 지금은 무시(all 취급).
+
+    conds = ["v.line = %(line)s"]
+    params = {"line": line}
+    if alert_type:
+        conds.append("v.alert_type = %(at)s")
+        params["at"] = alert_type
+    else:
+        conds.append("v.alert_type IN ('호우','폭염')")
+    if alert_level:
+        conds.append("v.alert_level = %(al)s")
+        params["al"] = alert_level
+    where = " AND ".join(conds)
+
+    # NOTE(계약 갭): segment_vulnerability 에는 train_type 차원이 없다.
+    #   지금은 KTX 만 수집하므로 필터를 받아도 결과가 같다. 무궁화·ITX 를 추가할 때
+    #   집계 테이블에 train_type 컬럼을 넣고 여기에 조건을 붙인다.
+    #
+    # 여러 조합을 합칠 땐 표본수 가중평균(단순 평균은 표본 적은 조합을 과대평가).
     rows = fetch_all(
-        # segment_vulnerability.from_station/to_station 은 역 '코드'(stations FK)다.
-        # 계약 §5 는 역 '이름'("대전")을 요구하므로 JOIN 으로 변환한다.
-        # (station_vulnerability 조회와 같은 방식. 변환 없이 내보내면 segment_id 도
-        #  '3900895-3900114' 가 되어 C의 상세 링크가 깨진다.)
+        # from_station/to_station 은 역 '코드'다. 계약은 역 '이름'을 요구하므로 JOIN 으로 변환한다.
         'SELECT sf.station_name AS "from", st.station_name AS "to", '
-        "v.avg_delay_incr, v.stop_rate, v.sample_n "
+        "  SUM(v.avg_delay_incr * v.sample_n) / NULLIF(SUM(v.sample_n),0) AS avg_delay_incr, "
+        "  SUM(v.stop_rate      * v.sample_n) / NULLIF(SUM(v.sample_n),0) AS stop_rate, "
+        "  SUM(v.sample_n) AS sample_n "
         "FROM segment_vulnerability v "
         "  JOIN stations sf ON sf.station_code=v.from_station "
         "  JOIN stations st ON st.station_code=v.to_station "
-        "WHERE v.line=%(line)s AND v.alert_type=%(at)s AND v.alert_level=%(al)s "
-        "ORDER BY v.avg_delay_incr DESC NULLS LAST",
-        {"line": line, "at": alert_type, "al": alert_level},
+        f"WHERE {where} "
+        'GROUP BY sf.station_name, st.station_name '
+        "ORDER BY 3 DESC NULLS LAST",
+        params,
     )
-    segments = [{**r, "segment_id": segment_slug(r["from"], r["to"])} for r in rows]
-    return {"line": line, "alert_type": alert_type, "alert_level": alert_level, "segments": segments}
+    segments = [{
+        "segment_id": segment_slug(r["from"], r["to"]),
+        "from": r["from"], "to": r["to"],
+        "avg_delay_incr": _r1(r["avg_delay_incr"]),
+        "stop_rate": round(r["stop_rate"], 2) if r["stop_rate"] is not None else None,
+        "sample_n": r["sample_n"],
+    } for r in rows]
+    return {
+        "line": line,
+        "alert_type": alert_type or "전체",
+        "alert_level": alert_level or "전체",
+        "segments": segments,
+    }
 
 
 # ── GET /vulnerability/stations ───────────────────────────────
@@ -550,28 +586,65 @@ def get_alerts_active(line: str = "경부선"):
     # 현재 발효 = end_time IS NULL (§1-1). 호우·폭염만.
     # region_code 기준으로 묶는다. 한 특보구역에 여러 region_name 이 매핑될 수 있어
     # (예: 같은 구역코드에 '김천'·'대구'), region_name 으로 묶으면 특보 1건이 중복 노출된다.
+    # ⚠️ 역↔특보구역은 반드시 station_regions(1:N)로 잇는다.
+    #    stations.region_code 는 '대표 구역' 1개뿐이라, 다른 하위구역으로 발령된 특보를
+    #    놓친다(예: 부산역 대표=L1082600 부산중부인데 L1082500 부산동부로 발령).
+    #    그러면 vulnerability.py(station_regions 사용)에는 잡힌 특보가
+    #    현재 특보 화면에는 안 뜨는 불일치가 생긴다.
     active_rows = fetch_all(
-        "SELECT wa.region_code, MIN(s.region_name) AS region_name, "
+        "SELECT wa.region_code, MIN(sr.note) AS region_name, "
         "  wa.alert_type, wa.alert_level, MIN(wa.start_time) AS since "
-        "FROM weather_alerts wa JOIN stations s ON s.region_code=wa.region_code "
+        "FROM weather_alerts wa "
+        "  JOIN station_regions sr ON sr.region_code = wa.region_code "
+        "  JOIN stations s ON s.station_code = sr.station_code "
         "WHERE wa.end_time IS NULL AND wa.alert_type IN ('호우','폭염') AND s.line=%(line)s "
         "GROUP BY wa.region_code, wa.alert_type, wa.alert_level",
         {"line": line},
     )
     active = []
     for a in active_rows:
-        # 그 구역에 걸린 취약 역. TODO(A와 확정): 구역→구간 귀속 규칙.
+        # 그 구역에 속한 역들의 취약도 상위. station_regions 로 이어야
+        # 위 active_rows 와 같은 기준이 된다.
         affected_rows = fetch_all(
-            "SELECT s.station_name AS station, v.avg_delay "
-            "FROM station_vulnerability v JOIN stations s ON s.station_code=v.station_code "
-            "WHERE s.region_code=%(rc)s AND v.alert_type=%(at)s "
-            "ORDER BY v.avg_delay DESC NULLS LAST LIMIT 5",
-            {"rc": a["region_code"], "at": a["alert_type"]},
+            "SELECT s.station_name AS station, MAX(v.avg_delay) AS avg_delay "
+            "FROM station_regions sr "
+            "  JOIN stations s ON s.station_code = sr.station_code "
+            "  LEFT JOIN station_vulnerability v "
+            "    ON v.station_code = sr.station_code AND v.alert_type = %(at)s "
+            "WHERE sr.region_code = %(rc)s AND s.line = %(line)s "
+            "GROUP BY s.station_name "
+            "ORDER BY 2 DESC NULLS LAST LIMIT 5",
+            {"rc": a["region_code"], "at": a["alert_type"], "line": line},
         )
         affected = [{
             "type": "station", "station": r["station"], "vuln_rank": i + 1,
             "note": f"{a['alert_type']} {a['alert_level']} 시 평균 +{(r['avg_delay'] or 0):.1f}분",
         } for i, r in enumerate(affected_rows)]
+
+        # 영향 '구간'. 역만 내보내면 프론트의 '영향 구간' 카드가 항상 0 이 된다
+        # (프론트는 affected 에서 type=="segment" 를 센다).
+        # 귀속 규칙: 구간의 두 역 중 하나라도 이 특보구역에 속하면 영향으로 본다.
+        #   구간은 두 역에 걸쳐 있어 어느 한쪽만 특보구역이어도 그 선로는 영향을 받는다.
+        affected_segments = fetch_all(
+            'SELECT sf.station_name AS "from", st.station_name AS "to", '
+            "  MAX(v.avg_delay_incr) AS avg_delay_incr "
+            "FROM segment_vulnerability v "
+            "  JOIN stations sf ON sf.station_code = v.from_station "
+            "  JOIN stations st ON st.station_code = v.to_station "
+            "WHERE v.line = %(line)s AND v.alert_type = %(at)s "
+            "  AND EXISTS ( "
+            "    SELECT 1 FROM station_regions sr "
+            "     WHERE sr.region_code = %(rc)s "
+            "       AND sr.station_code IN (v.from_station, v.to_station) "
+            "  ) "
+            'GROUP BY sf.station_name, st.station_name '
+            "ORDER BY 3 DESC NULLS LAST LIMIT 5",
+            {"rc": a["region_code"], "at": a["alert_type"], "line": line},
+        )
+        affected += [{
+            "type": "segment", "from": r["from"], "to": r["to"], "vuln_rank": i + 1,
+            "note": f"{a['alert_type']} {a['alert_level']} 시 평균 +{(r['avg_delay_incr'] or 0):.1f}분",
+        } for i, r in enumerate(affected_segments)]
         active.append({
             "region_name": a["region_name"], "alert_type": a["alert_type"],
             "alert_level": a["alert_level"],

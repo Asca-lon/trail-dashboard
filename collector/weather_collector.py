@@ -218,9 +218,10 @@ def save(intervals):
 
 
 def collect(tmfc1=None, tmfc2=None):
+    """성공하면 True, 실패하면 False. 호출자가 종료코드로 옮긴다(리뷰 3.12)."""
     if not KMA_API_KEY:
         print("❌ KMA_API_KEY가 설정되지 않았습니다.")
-        return
+        return False
     try:
         label = f"{tmfc1}~{tmfc2}" if tmfc1 else "현재 발효분"
         print(f"🌦️ 기상 특보 수집: {label}", flush=True)
@@ -228,9 +229,11 @@ def collect(tmfc1=None, tmfc2=None):
         events = parse_events(raw)
         intervals = build_intervals(events)
         save(intervals)
+        return True
     except Exception as e:
         print(f"❌ 기상 데이터 수집 중 오류: {e}")
         traceback.print_exc()
+        return False
 
 
 if __name__ == "__main__":
@@ -244,8 +247,9 @@ if __name__ == "__main__":
     if args.backfill:
         start = (datetime.now() - timedelta(days=args.backfill)).strftime("%Y%m%d")
         end = datetime.now().strftime("%Y%m%d")
-        collect(f"{start}0000", f"{end}2359")
+        ok = collect(f"{start}0000", f"{end}2359")
     elif args.date_from and args.date_to:
-        collect(f"{args.date_from}0000", f"{args.date_to}2359")
+        ok = collect(f"{args.date_from}0000", f"{args.date_to}2359")
     else:
-        collect()
+        ok = collect()
+    sys.exit(0 if ok else 1)

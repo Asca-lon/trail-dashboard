@@ -45,7 +45,7 @@ log "① 열차 실적 수집"
 if docker compose exec -T api python -u collector/rail_collector.py >>"$LOG" 2>&1; then
     log "   ✅ 완료"
 else
-    log "   ❌ 실패 (아래 집계는 계속 진행)"
+    log "   ❌ 실패"
     fail=1
 fi
 
@@ -63,12 +63,21 @@ fi
 
 # ── 3) 취약도 집계 ───────────────────────────────────────────
 # TRUNCATE 후 전체 재계산이라 매번 최신 상태가 된다.
-log "③ 취약도 집계 (역 + 구간)"
-if docker compose exec -T api python -u processor/vulnerability.py >>"$LOG" 2>&1; then
-    log "   ✅ 완료"
+#
+# ⚠️ 원시 수집(①②)이 하나라도 실패하면 집계를 건너뛴다(리뷰 3.12).
+#    불완전한 원시 데이터로 TRUNCATE + 재집계하면 멀쩡하던 이전 집계를 지우고
+#    구멍 난 결과로 덮어쓴다. 옛 집계를 그대로 두는 편이 안전하다.
+if [ "$fail" -ne 0 ]; then
+    log "③ 취약도 집계 — 건너뜀 (원시 수집 실패. 불완전한 데이터로 덮어쓰지 않음)"
+    log "   → 원인 해결 후 수동 실행: docker compose exec api python -u processor/vulnerability.py"
 else
-    log "   ❌ 실패"
-    fail=1
+    log "③ 취약도 집계 (역 + 구간)"
+    if docker compose exec -T api python -u processor/vulnerability.py >>"$LOG" 2>&1; then
+        log "   ✅ 완료"
+    else
+        log "   ❌ 실패"
+        fail=1
+    fi
 fi
 
 # ── 결과 요약 ────────────────────────────────────────────────

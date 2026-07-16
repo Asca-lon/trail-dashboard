@@ -1385,10 +1385,34 @@ function createDashboardFilterQuery(filters) {
   const params = new URLSearchParams();
 
   Object.entries(FILTER_QUERY_PARAM_NAMES).forEach(([filterName, queryParamName]) => {
-    params.set(queryParamName, normalizedFilters[filterName]);
+    const value = normalizedFilters[filterName];
+    // "all"(전체)은 파라미터를 아예 넘기지 않는다.
+    // API 는 허용값(호우/폭염, 주의보/경보)만 받아 "all" 을 주면 400 이고,
+    // 생략하면 전체를 합쳐서 준다.
+    if (isAllFilterValue(value)) {
+      return;
+    }
+    params.set(queryParamName, value);
   });
 
   return params.toString();
+}
+
+// 필터를 붙인 URL. 쿼리가 비면(전체) 기본 경로 그대로.
+function withFilterQuery(baseUrl, query, allowedParams) {
+  if (!query) {
+    return baseUrl;
+  }
+  const source = new URLSearchParams(query);
+  const params = new URLSearchParams();
+  allowedParams.forEach((name) => {
+    // 엔드포인트마다 받는 파라미터가 다르다. 안 받는 걸 넘기면 무시되거나 400 이다.
+    if (source.has(name)) {
+      params.set(name, source.get(name));
+    }
+  });
+  const qs = params.toString();
+  return qs ? `${baseUrl}?${qs}` : baseUrl;
 }
 
 function isAllFilterValue(value) {
@@ -1514,25 +1538,65 @@ function renderDashboardData(data) {
   renderInspectionTable(data.checklistData, data.vulnerabilityStationsData);
 }
 
-function renderFilteredDashboard() {
+// 필터가 걸린 데이터를 API 에서 새로 받아 dashboardState 를 갱신한다.
+//
+// 왜 재호출이 필요한가(리뷰 3.8):
+//   API 응답은 이미 그 조합으로 집계된 결과다. 예를 들어 /vulnerability/stations 는
+//   {alert_type, alert_level, stations[]} 를 주지 특보별 내역을 주지 않는다.
+//   따라서 받아온 데이터를 프론트에서 다시 특보별로 거르는 건 불가능하다.
+//   필터를 바꾸면 서버에서 그 조합으로 다시 받아야 한다.
+async function fetchFilteredDashboardData(query) {
+  const [vulnerabilitySegmentsData, vulnerabilityStationsData, heatmapData] = await Promise.all([
+    // 엔드포인트마다 받는 파라미터가 다르다(히트맵은 등급·열차종을 안 받는다).
+    fetchJson(withFilterQuery(VULNERABILITY_SEGMENTS_MOCK_URL, query, ["alert_type", "alert_level", "train_type"])),
+    fetchJson(withFilterQuery(VULNERABILITY_STATIONS_MOCK_URL, query, ["alert_type", "alert_level"])),
+    fetchJson(withFilterQuery(HEATMAP_MOCK_URL, query, ["alert_type"])),
+  ]);
+
+  return { vulnerabilitySegmentsData, vulnerabilityStationsData, heatmapData };
+}
+
+async function renderFilteredDashboard() {
   if (!dashboardState) {
     return;
   }
 
   const filters = getSelectedFilterValues();
+  const query = createDashboardFilterQuery(filters);
 
   dashboardState.activeFilters = filters;
-  dashboardState.filterQuery = createDashboardFilterQuery(filters);
+  dashboardState.filterQuery = query;
+
+  try {
+    const fresh = await fetchFilteredDashboardData(query);
+    Object.assign(dashboardState, fresh);
+  } catch (error) {
+    // 재호출이 실패해도 화면을 비우지 않는다 — 직전 데이터로 계속 그린다.
+    console.error("필터 적용 중 데이터를 새로 받지 못했습니다.", error);
+  }
+
+  // 노선 필터는 서버가 이미 처리하지만, 클라이언트 필터도 그대로 둔다(중복 적용은 무해).
   renderDashboardData(getFilteredDashboardData(dashboardState, filters));
 }
 
-function renderUnfilteredDashboard() {
+async function renderUnfilteredDashboard() {
   if (!dashboardState) {
     return;
   }
 
-  dashboardState.activeFilters = { ...DEFAULT_DASHBOARD_FILTERS };
-  dashboardState.filterQuery = createDashboardFilterQuery(DEFAULT_DASHBOARD_FILTERS);
+  const filters = { ...DEFAULT_DASHBOARD_FILTERS };
+  const query = createDashboardFilterQuery(filters);   // 전체 → 빈 문자열
+
+  dashboardState.activeFilters = filters;
+  dashboardState.filterQuery = query;
+
+  try {
+    const fresh = await fetchFilteredDashboardData(query);
+    Object.assign(dashboardState, fresh);
+  } catch (error) {
+    console.error("필터 초기화 중 데이터를 새로 받지 못했습니다.", error);
+  }
+
   renderDashboardData(dashboardState);
 }
 

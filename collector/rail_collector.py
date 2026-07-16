@@ -28,6 +28,11 @@ TRANSIENT_STATUS = {500, 502, 503, 504}
 
 # 수집할 열차종류. 경부고속선 프로젝트라 KTX 만. (전체를 받으려면 아래 필터 주석 참고)
 TARGET_TRAIN_TYPES = {"KTX"}
+
+# 지연 '판정' 기준(분). 운영 기준을 따른다 — KTX 5분, 일반열차 10분.
+# 1분만 늦어도 지연으로 세면 지연율이 실제 운영 기준보다 크게 부풀려진다.
+# (delay_min 은 원값 그대로 저장하고, 판정만 이 기준을 쓴다.)
+DELAY_THRESHOLD_MIN = {"KTX": 5, "새마을": 10, "무궁화": 10, "일반": 10}
 KORAIL_RUN_API_URL = os.getenv("KORail_RUN_API_URL", "https://apis.data.go.kr/B551457/run/v2").rstrip('/')
 
 # =====================================================================
@@ -121,10 +126,34 @@ def load_target_stations(cur):
     return {str(r["station_code"]).strip() for r in cur.fetchall()}
 
 
+def _report_quality(target_date, q):
+    """수집 품질 리포트 (리뷰 3.1 — '계획시각 미매칭률 집계').
+
+    계획시각을 못 찾으면 지연을 계산할 수 없다(delay_min=NULL, status='실적미확정').
+    그런 행이 많으면 취약도 집계의 표본이 조용히 줄어든다.
+    예전에는 실제시각을 복사해 delay=0 으로 저장했는데, 그건 '정시'로 오인되어
+    평균을 끌어내렸다. 이제는 제외하지만, **얼마나 제외됐는지는 알아야 한다.**
+    """
+    total = q['총']
+    if not total:
+        return
+    ok = q['지연계산됨']
+    rate = ok / total * 100
+    print(f"  📊 {target_date} 품질: 대상 {total:,} / 지연계산 {ok:,} ({rate:.1f}%)", flush=True)
+    print(f"     계획시각 출처 — CSV {q['CSV매칭']:,} · API {q['API계획']:,} · 없음 {q['계획없음']:,}", flush=True)
+    if q['실제없음'] or q['파싱오류']:
+        print(f"     실제시각 없음 {q['실제없음']:,} · 파싱오류 {q['파싱오류']:,}", flush=True)
+    if rate < 90:
+        print(f"     ⚠️ 지연계산률 {rate:.1f}% — 표본의 {100-rate:.1f}% 가 분석에서 빠집니다.", flush=True)
+        if q['계획없음'] > total * 0.1:
+            print(f"     → 계획시각 미매칭이 주원인입니다. 시각표 CSV 가 이 날짜와 맞는지 확인하세요"
+                  f" (python collector/excel_to_csv.py).", flush=True)
+
+
 def collect_rail_by_date(target_date=None):
     if not PUBLIC_API_KEY:
         print("❌ PUBLIC_DATA_API_KEY가 설정되지 않았습니다.")
-        return
+        return False
 
     if not target_date:
         target_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
@@ -143,17 +172,22 @@ def collect_rail_by_date(target_date=None):
                 print("   → 이대로 수집하면 planned_arrival 이 actual 로 대체돼 "
                       "지연이 전부 0 이 됩니다.", flush=True)
                 print("   → 먼저 실행하세요:  python collector/excel_to_csv.py", flush=True)
-                return
+                return False
             print(f"🗓️ 계획시각 {len(plan_long):,}건 로드됨", flush=True)
 
             # 경부선 대상 역만 수집한다(전국 데이터를 다 넣지 않는다).
             target_stations = load_target_stations(cur)
             if not target_stations:
                 print("❌ 대상 역이 없습니다. db/seed_stations.sql 이 적재됐는지 확인하세요.")
-                return
+                return False
             print(f"🎯 수집 대상: 경부선 {len(target_stations)}개 역")
 
             skipped = 0
+            failed = False
+            # 데이터 품질 지표 (리뷰 3.1) — 계획시각을 못 찾으면 지연을 계산할 수 없다.
+            # 조용히 '실적미확정'으로 빠지면 미매칭률을 알 수 없으므로 여기서 센다.
+            q = {'총': 0, 'CSV매칭': 0, 'API계획': 0, '계획없음': 0,
+                 '실제없음': 0, '지연계산됨': 0, '파싱오류': 0}
             while True:
                 params = {
                     'serviceKey': requests.utils.unquote(PUBLIC_API_KEY),
@@ -188,12 +222,14 @@ def collect_rail_by_date(target_date=None):
                     if response is None:
                         print(f"  ❌ page {page_no}: 재시도 {MAX_RETRIES}회 소진 — "
                               f"{target_date} 미완성 상태로 중단", flush=True)
+                        failed = True
                         print(f"     → 나중에 이 날짜만 다시 돌리세요: "
                               f"python collector/rail_collector.py --date {target_date}", flush=True)
                         break
 
                     if response.status_code != 200:
                         print(f"  ❌ HTTP {response.status_code} — 중단. 응답: {response.text[:300]}", flush=True)
+                        failed = True
                         break
 
                     data = response.json()
@@ -203,6 +239,7 @@ def collect_rail_by_date(target_date=None):
                         # 쿼터 초과·키 오류 등이 여기로 온다. 조용히 끝내면 원인을 알 수 없다.
                         print(f"  ❌ API 오류 resultCode={result_code}, "
                               f"msg={header.get('resultMsg')} — 중단", flush=True)
+                        failed = True
                         break
 
                     body = data.get('response', {}).get('body', {})
@@ -260,16 +297,34 @@ def collect_rail_by_date(target_date=None):
                         # =====================================================================
                         csv_planned_time = get_planned_time_from_csv(trn_no, stn_nm_str, run_ymd_param)
                         
+                        q['총'] += 1
                         if csv_planned_time:
+                            q['CSV매칭'] += 1
                             planned_arr = csv_planned_time
                             planned_dpt = csv_planned_time
                         else:
-                            # CSV에 없으면 기존 API 로직 (또는 실제시간 복사) 사용
-                            planned_arr = parse_iso_time(run_ymd_param, item.get('plt_arvl_dt') or item.get('pltArvlDt')) or actual_arr
-                            planned_dpt = parse_iso_time(run_ymd_param, item.get('plt_dptre_dt') or item.get('pltDptreDt')) or actual_dpt
+                            # ⚠️ 예전엔 여기서 `or actual_arr` 로 실제시각을 복사했다.
+                            #    그러면 delay = actual - actual = 0 이 되어, 계획시각을 못 찾은
+                            #    행이 '정시 운행'으로 둔갑한다. 평균을 끌어내리고 정시율을 부풀려
+                            #    특보 시 지연이 평시보다 낮게 나오는 착시를 만든다.
+                            #    → 복사하지 않는다. 계획시각이 없으면 지연은 '계산 불가'다.
+                            planned_arr = parse_iso_time(run_ymd_param, item.get('plt_arvl_dt') or item.get('pltArvlDt'))
+                            planned_dpt = parse_iso_time(run_ymd_param, item.get('plt_dptre_dt') or item.get('pltDptreDt'))
+                            if planned_arr or planned_dpt:
+                                q['API계획'] += 1
+                            else:
+                                q['계획없음'] += 1
                         # =====================================================================
 
-                        event_time = actual_arr or actual_dpt or f"{target_date} 00:00:00+09:00"
+                        # event_time = **실제 기상 노출 시각** (리뷰 3.5 정의 통일).
+                        #   특보 매칭은 "그 열차가 실제로 그 시각에 그 기상에 노출됐나"를 보므로
+                        #   계획시각이 아니라 실제시각이 기준이다.
+                        #   실적이 없으면 계획시각으로 대체한다 — 자정(00:00)으로 찍으면
+                        #   엉뚱한 시간대·특보에 매칭될 수 있다.
+                        #   (그런 행은 delay_min=NULL 이라 집계에서는 어차피 제외된다.)
+                        event_time = (actual_arr or actual_dpt
+                                      or planned_arr or planned_dpt
+                                      or f"{target_date} 00:00:00+09:00")
                         train_type = classify_train_type(trn_no)
 
                         # ── 열차종류 필터 ────────────────────────────────────
@@ -283,29 +338,38 @@ def collect_rail_by_date(target_date=None):
                         # 모든 열차종류를 받으려면 위 3줄을 주석 처리한다.
                         # ─────────────────────────────────────────────────────
 
-                        delay_min = 0
-                        status = "정상"
+                        # 기본은 '계산 불가'. 계획·실제가 모두 있어야만 지연을 매긴다.
+                        # delay_min=None → 집계의 `WHERE delay_min IS NOT NULL` 에서 자동 제외된다.
+                        delay_min = None
+                        status = "실적미확정"
 
+                        pair = None
                         if actual_arr and planned_arr:
-                            try:
-                                act_dt = datetime.fromisoformat(actual_arr)
-                                pln_dt = datetime.fromisoformat(planned_arr)
-                                diff_seconds = (act_dt - pln_dt).total_seconds()
-                                if diff_seconds > 0:
-                                    delay_min = int(diff_seconds / 60)
-                                    status = "지연"
-                            except ValueError:
-                                pass
+                            pair = (actual_arr, planned_arr)
                         elif actual_dpt and planned_dpt:
+                            pair = (actual_dpt, planned_dpt)
+
+                        if not (actual_arr or actual_dpt):
+                            q['실제없음'] += 1
+
+                        if pair:
                             try:
-                                act_dt = datetime.fromisoformat(actual_dpt)
-                                pln_dt = datetime.fromisoformat(planned_dpt)
-                                diff_seconds = (act_dt - pln_dt).total_seconds()
-                                if diff_seconds > 0:
-                                    delay_min = int(diff_seconds / 60)
-                                    status = "지연"
+                                act_dt = datetime.fromisoformat(pair[0])
+                                pln_dt = datetime.fromisoformat(pair[1])
+                                diff_min = int((act_dt - pln_dt).total_seconds() / 60)
+                                # 자정 넘김 보정: 계획 23:50 / 실제 익일 00:10 이면 -1420 이 된다.
+                                if diff_min < -720:
+                                    diff_min += 1440
+                                elif diff_min > 720:
+                                    diff_min -= 1440
+                                delay_min = max(0, diff_min)
+                                # 지연 '판정'은 운영 기준(KTX 5분)을 따른다. delay_min 자체는 원값.
+                                status = "지연" if delay_min >= DELAY_THRESHOLD_MIN.get(train_type, 5) else "정상"
+                                q['지연계산됨'] += 1
                             except ValueError:
-                                pass
+                                delay_min = None
+                                status = "실적미확정"
+                                q['파싱오류'] += 1
 
                         batch_data.append((
                             target_date,
@@ -359,10 +423,19 @@ def collect_rail_by_date(target_date=None):
                 except Exception as e:
                     traceback.print_exc()
                     conn.rollback()
+                    failed = True
                     break
+
+    # 성공 여부를 호출자에게 알린다. 여기서 반환을 빠뜨리면 None 이 되어
+    # main 이 항상 실패로 처리한다.
+    return not failed
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--date", type=str)
     args = parser.parse_args()
-    collect_rail_by_date(args.date)
+    # 실패는 반드시 종료코드로 알린다(리뷰 3.12).
+    # 조용히 0 으로 끝나면 daily_update.sh 가 성공으로 보고 불완전한 데이터로 집계한다.
+    ok = collect_rail_by_date(args.date)
+    sys.exit(0 if ok else 1)

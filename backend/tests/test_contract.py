@@ -273,3 +273,31 @@ def test_stations_partial_filter_is_ok():
     """종류만 주고 등급은 생략 가능해야 한다."""
     body = client.get("/vulnerability/stations?alert_type=호우").json()
     assert body["alert_type"] == "호우" and body["alert_level"] == "전체"
+
+
+@pytest.mark.parametrize("ep", [
+    "/vulnerability/segments", "/vulnerability/stations", "/heatmap",
+])
+def test_filters_are_optional_and_consistent(ep):
+    """세 엔드포인트 모두 필터 생략 = 전체. 하나만 기본값이 고정돼 있으면
+    프론트에서 '전체'를 골라도 그 엔드포인트만 특정 조합을 보여준다(리뷰 3.8)."""
+    assert client.get(ep).status_code == 200
+    assert client.get(f"{ep}?alert_type=호우").status_code == 200
+    assert client.get(f"{ep}?alert_type=강풍").status_code == 400
+
+
+@pytest.mark.parametrize("ep", ["/vulnerability/segments", "/vulnerability/stations"])
+def test_filter_echo_says_전체_when_omitted(ep):
+    body = client.get(ep).json()
+    assert body["alert_type"] == "전체" and body["alert_level"] == "전체"
+
+
+def test_alerts_active_affected_has_both_types():
+    """affected 에는 역과 구간이 모두 들어간다.
+    역만 내보내면 프론트의 '영향 구간' 카드가 항상 0 이 된다
+    (프론트는 type=="segment" 를 센다)."""
+    types = set()
+    for alert in client.get("/alerts/active").json()["active"]:
+        for aff in alert["affected"]:
+            types.add(aff["type"])
+    assert "segment" in types, f"구간이 없음: {types}"
