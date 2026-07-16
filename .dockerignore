@@ -29,3 +29,6 @@ venv
 # 개발 스크립트 (런타임에 불필요)
 setup_dev.sh
 setup_detail.sh
+
+# 일일 갱신 로그
+logs/

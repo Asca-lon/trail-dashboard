@@ -21,7 +21,6 @@ collector/weather_collector.py — 기상 특보 수집 (현재 + 과거 이력 
 """
 import os
 import sys
-import time
 import argparse
 import requests
 import traceback
@@ -41,12 +40,6 @@ from collector.db_writer import get_writer_conn
 KMA_API_KEY = os.getenv("KMA_API_KEY")
 KMA_WRN_DATA_URL = os.getenv("KMA_WRN_DATA_URL",
                              "https://apihub.kma.go.kr/api/typ01/url/wrn_met_data.php")
-
-# 일시 장애 재시도 (rail_collector 와 같은 정책).
-# 90일 백필은 단일 호출이라 502 한 번에 전부 날아간다 → 재시도가 특히 중요.
-MAX_RETRIES = 4
-RETRY_BACKOFF = 3          # 3, 9, 27, 81초
-TRANSIENT_STATUS = {500, 502, 503, 504}
 
 # WRN: 특보종류 문자코드 (기상청 표준).
 #   H = 폭염 — 데이터로 확인됨(LVL=4 중대경보는 폭염만 해당하는데 H 에서 관측).
@@ -81,9 +74,6 @@ def fetch(tmfc1=None, tmfc2=None):
     """특보 원자료를 받는다. tmfc1/tmfc2(발표시각 범위)로 과거 조회가 된다.
 
     ※ tmef1/tmef2 는 이 API 가 무시한다(검증됨). 반드시 tmfc 를 쓴다.
-
-    90일 백필은 '단일 호출'이라 일시 장애 한 번에 전부 날아간다.
-    502/503/504·네트워크 오류는 지수 백오프로 재시도한다.
     """
     params = {'authKey': KMA_API_KEY, 'disp': '0', 'help': '0'}
     if tmfc1:
@@ -91,31 +81,13 @@ def fetch(tmfc1=None, tmfc2=None):
     if tmfc2:
         params['tmfc2'] = tmfc2
 
-    last_err = None
-    for attempt in range(1, MAX_RETRIES + 1):
-        try:
-            r = requests.get(KMA_WRN_DATA_URL, params=params, timeout=60)
-            if r.status_code in TRANSIENT_STATUS:
-                wait = RETRY_BACKOFF ** attempt
-                print(f"  ⚠️ HTTP {r.status_code} (일시 오류) — {wait}초 후 재시도 "
-                      f"{attempt}/{MAX_RETRIES}", flush=True)
-                time.sleep(wait)
-                last_err = f"HTTP {r.status_code}"
-                continue
-            r.raise_for_status()
-            for enc in ("euc-kr", "utf-8"):
-                r.encoding = enc
-                if "\ufffd" not in r.text[:300]:
-                    break
-            return r.text
-        except requests.exceptions.RequestException as e:
-            wait = RETRY_BACKOFF ** attempt
-            last_err = f"{e.__class__.__name__}: {e}"
-            print(f"  ⚠️ 네트워크 오류({e.__class__.__name__}) — {wait}초 후 재시도 "
-                  f"{attempt}/{MAX_RETRIES}", flush=True)
-            time.sleep(wait)
-
-    raise RuntimeError(f"재시도 {MAX_RETRIES}회 소진 — 마지막 오류: {last_err}")
+    r = requests.get(KMA_WRN_DATA_URL, params=params, timeout=60)
+    r.raise_for_status()
+    for enc in ("euc-kr", "utf-8"):
+        r.encoding = enc
+        if "\ufffd" not in r.text[:300]:
+            break
+    return r.text
 
 
 def parse_events(raw):

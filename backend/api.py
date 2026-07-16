@@ -144,11 +144,17 @@ def get_segments(line: str = "경부선", alert_type: str = "호우",
     # NOTE(계약 갭): 현재 segment_vulnerability(§4)에는 train_type 컬럼이 없다.
     # train_type 필터는 A가 집계에 차원을 추가해야 실제 동작한다. 지금은 무시(all 취급).
     rows = fetch_all(
-        'SELECT from_station AS "from", to_station AS "to", '
-        "avg_delay_incr, stop_rate, sample_n "
-        "FROM segment_vulnerability "
-        "WHERE line=%(line)s AND alert_type=%(at)s AND alert_level=%(al)s "
-        "ORDER BY avg_delay_incr DESC NULLS LAST",
+        # segment_vulnerability.from_station/to_station 은 역 '코드'(stations FK)다.
+        # 계약 §5 는 역 '이름'("대전")을 요구하므로 JOIN 으로 변환한다.
+        # (station_vulnerability 조회와 같은 방식. 변환 없이 내보내면 segment_id 도
+        #  '3900895-3900114' 가 되어 C의 상세 링크가 깨진다.)
+        'SELECT sf.station_name AS "from", st.station_name AS "to", '
+        "v.avg_delay_incr, v.stop_rate, v.sample_n "
+        "FROM segment_vulnerability v "
+        "  JOIN stations sf ON sf.station_code=v.from_station "
+        "  JOIN stations st ON st.station_code=v.to_station "
+        "WHERE v.line=%(line)s AND v.alert_type=%(at)s AND v.alert_level=%(al)s "
+        "ORDER BY v.avg_delay_incr DESC NULLS LAST",
         {"line": line, "at": alert_type, "al": alert_level},
     )
     segments = [{**r, "segment_id": segment_slug(r["from"], r["to"])} for r in rows]
@@ -203,8 +209,12 @@ def get_heatmap(line: str = "경부선", alert_type: str = "호우"):
         {"line": line, "at": alert_type},
     )
     edges = fetch_all(
-        'SELECT from_station AS "from", to_station AS "to", avg_delay_incr '
-        "FROM segment_vulnerability WHERE line=%(line)s AND alert_type=%(at)s",
+        # 히트맵 edge 도 역 이름으로 내보낸다(계약 §5). 코드 → 이름 JOIN.
+        'SELECT sf.station_name AS "from", st.station_name AS "to", v.avg_delay_incr '
+        "FROM segment_vulnerability v "
+        "  JOIN stations sf ON sf.station_code=v.from_station "
+        "  JOIN stations st ON st.station_code=v.to_station "
+        "WHERE v.line=%(line)s AND v.alert_type=%(at)s",
         {"line": line, "at": alert_type},
     )
     def norm(vals):
@@ -337,11 +347,15 @@ def get_segments_details(line: str = "경부선"):
     )
 
     vuln_rows = fetch_all(
-        'SELECT from_station AS "from", to_station AS "to", alert_type, alert_level, '
-        "  avg_delay_incr, stop_rate, sample_n "
-        "FROM segment_vulnerability "
-        "WHERE line=%(line)s AND alert_type IN ('호우','폭염') "
-        "ORDER BY avg_delay_incr DESC NULLS LAST",
+        # 코드 → 이름 JOIN. 아래 hourly_rows·trend_rows 가 이미 station_name 으로
+        # 키를 만드므로, 여기서도 이름으로 맞춰야 key(r) 매칭이 성립한다.
+        'SELECT sf.station_name AS "from", st.station_name AS "to", '
+        "  v.alert_type, v.alert_level, v.avg_delay_incr, v.stop_rate, v.sample_n "
+        "FROM segment_vulnerability v "
+        "  JOIN stations sf ON sf.station_code=v.from_station "
+        "  JOIN stations st ON st.station_code=v.to_station "
+        "WHERE v.line=%(line)s AND v.alert_type IN ('호우','폭염') "
+        "ORDER BY v.avg_delay_incr DESC NULLS LAST",
         {"line": line},
     )
 
@@ -416,9 +430,14 @@ def get_checklist(line: str = "경부선"):
     from db import fetch_all
     # 우선 점검 Top-N: 구간 취약도 상위. TODO(A와 확정): 현재 발효 특보 반영해 상단 가중.
     rows = fetch_all(
-        "SELECT from_station, to_station, alert_type, alert_level, avg_delay_incr, sample_n "
-        "FROM segment_vulnerability WHERE line=%(line)s AND alert_type IN ('호우','폭염') "
-        "ORDER BY avg_delay_incr DESC NULLS LAST LIMIT 10",
+        # 코드 → 이름 JOIN. 이름이라야 target("대전→김천(구미) 구간")과 segment_id 가 맞다.
+        "SELECT sf.station_name AS from_station, st.station_name AS to_station, "
+        "  v.alert_type, v.alert_level, v.avg_delay_incr, v.sample_n "
+        "FROM segment_vulnerability v "
+        "  JOIN stations sf ON sf.station_code=v.from_station "
+        "  JOIN stations st ON st.station_code=v.to_station "
+        "WHERE v.line=%(line)s AND v.alert_type IN ('호우','폭염') "
+        "ORDER BY v.avg_delay_incr DESC NULLS LAST LIMIT 10",
         {"line": line},
     )
     items = [{

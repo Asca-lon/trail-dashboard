@@ -31,3 +31,5 @@ results/
 
 # ── 로컬 데이터베이스 ──
 *.db
+# 일일 갱신 로그 (scripts/daily_update.sh)
+logs/

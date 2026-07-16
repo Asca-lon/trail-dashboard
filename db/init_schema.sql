@@ -24,7 +24,11 @@ CREATE TABLE IF NOT EXISTS train_stops (
     status TEXT NOT NULL DEFAULT '정상' CHECK (status IN ('정상','지연','운행중단')),
     event_time TIMESTAMPTZ NOT NULL,
     ingested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CONSTRAINT uq_train_stops UNIQUE (run_date, train_no, station_code, event_time)
+    -- 자연키: 한 열차(train_no)는 하루(run_date)에 한 역(station_code)에 한 번 선다.
+    -- ⚠️ event_time 을 키에 넣으면 안 된다. API 가 실제 도착시각을 재조회마다
+    --    분 단위로 다르게 주기 때문에, 같은 정차가 매번 새 행이 되어 중복이 쌓인다.
+    --    event_time 은 식별자가 아니라 그 정차의 '속성'이다.
+    CONSTRAINT uq_train_stops UNIQUE (run_date, train_no, station_code)
 );
 
 CREATE INDEX IF NOT EXISTS idx_ts_line ON train_stops (line, event_time DESC);
@@ -41,6 +45,29 @@ CREATE TABLE IF NOT EXISTS weather_alerts (
 );
 
 CREATE INDEX IF NOT EXISTS idx_alert_region ON weather_alerts (region_code, start_time DESC);
+
+-- 역 ↔ 기상 특보구역 매핑 (1:N)
+--
+-- stations.region_code 한 칸으로는 부족해서 별도 테이블로 둔다. 이유 두 가지:
+--
+-- (1) 2026-05-31 특보구역 개편
+--     청주·김천·경주·대구 등은 이 날짜로 하위권역이 신설됐다(예: 김천 → 김천북부/남부).
+--     우리 분석 창(최근 3개월)이 개편일 전후로 갈리므로, 옛 코드와 새 코드를
+--     함께 매칭해야 이력이 끊기지 않는다.
+--
+-- (2) 권역 귀속 불확실
+--     역이 '경주동부'인지 '경주서부'인지 행정경계 없이는 단정할 수 없다.
+--     해당 시의 모든 하위권역 + 상위(광역시) 코드를 함께 넣어 과소매칭을 막는다.
+--     (과대매칭 위험은 있으나, 같은 시 안의 특보라 철도 영향 판단에는 무리가 없다.)
+--
+-- vulnerability.py 와 /alerts/active 가 이 테이블로 특보를 역에 귀속시킨다.
+CREATE TABLE IF NOT EXISTS station_regions (
+    station_code TEXT NOT NULL REFERENCES stations(station_code) ON DELETE CASCADE,
+    region_code  TEXT NOT NULL,   -- weather_alerts.region_code 와 매칭되는 L형식 특보구역
+    note         TEXT,            -- 구역명·비고 (사람이 읽기 위한 것)
+    PRIMARY KEY (station_code, region_code)
+);
+CREATE INDEX IF NOT EXISTS idx_station_regions_region ON station_regions (region_code);
 
 CREATE TABLE IF NOT EXISTS station_vulnerability (
     station_code TEXT REFERENCES stations(station_code),
