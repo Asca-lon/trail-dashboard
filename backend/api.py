@@ -163,31 +163,80 @@ def get_segments(line: str = "경부선", alert_type: str = "호우",
 
 # ── GET /vulnerability/stations ───────────────────────────────
 @app.get("/vulnerability/stations", response_model=StationsResponse)
-def get_stations(line: str = "경부선", alert_type: str = "폭염", alert_level: str = "경보"):
+def get_stations(line: str = "경부선", alert_type: str | None = None, alert_level: str | None = None):
+    """역별 취약도.
+
+    alert_type·alert_level 을 주면 그 조합만, **생략하면 전체를 합쳐서** 본다.
+    합치는 이유: 어떤 역은 폭염 주의보 이력만 있다(예: 울산 751건, 폭염 경보 0건).
+    한 조합으로 고정하면 그런 역이 통째로 '정보 없음'이 되어, 역 상세의
+    카드 4개가 전부 '-' 로 나온다(차트는 등급을 합치므로 값이 나오는데도).
+    """
     _check(alert_type, alert_level)
     if USE_MOCK:
         d = _mock("vulnerability_stations.json")
-        d["line"], d["alert_type"], d["alert_level"] = line, alert_type, alert_level
+        d["line"] = line
+        d["alert_type"] = alert_type or "전체"
+        d["alert_level"] = alert_level or "전체"
         for s in d["stations"]:
             s.setdefault("station_id", station_slug(s["station"]))
-            # mock 에 delay_count 가 없으면 sample_n * delay_rate 로 유도(프론트 추정식과 동일).
             if s.get("delay_count") is None and s.get("sample_n") is not None \
                     and s.get("delay_rate") is not None:
                 s["delay_count"] = round(s["sample_n"] * s["delay_rate"])
         return d
     from db import fetch_all
+
+    # 조건을 선택적으로 붙인다. 값 자체는 플레이스홀더로만 전달한다(인젝션 방지).
+    conds = ["s.line = %(line)s"]
+    params = {"line": line}
+    if alert_type:
+        conds.append("v.alert_type = %(at)s")
+        params["at"] = alert_type
+    else:
+        conds.append("v.alert_type IN ('호우','폭염')")
+    if alert_level:
+        conds.append("v.alert_level = %(al)s")
+        params["al"] = alert_level
+    where = " AND ".join(conds)
+
+    # 여러 조합을 합칠 땐 표본수 가중평균을 쓴다.
+    # 단순 평균이면 표본 6건짜리 주의보가 644건짜리 경보와 같은 무게를 갖는다.
+    # base_avg_delay 는 역 단위 기준선이라 조합과 무관하게 같은 값 → MAX 로 집어온다.
     rows = fetch_all(
-        "SELECT s.station_name AS station, v.avg_delay, v.delay_rate, v.stop_rate, "
-        "v.delta_delay, v.sample_n, "
-        # delay_count 컬럼은 없다. sample_n * delay_rate 를 반올림해 유도(프론트 추정식과 동일).
-        "ROUND(v.sample_n * v.delay_rate)::int AS delay_count "
+        "SELECT s.station_name AS station, "
+        "  SUM(v.avg_delay  * v.sample_n) / NULLIF(SUM(v.sample_n),0) AS avg_delay, "
+        "  SUM(v.delay_rate * v.sample_n) / NULLIF(SUM(v.sample_n),0) AS delay_rate, "
+        "  SUM(v.stop_rate  * v.sample_n) / NULLIF(SUM(v.sample_n),0) AS stop_rate, "
+        "  MAX(v.base_avg_delay) AS base_avg_delay, "
+        "  SUM(v.sample_n) AS sample_n "
         "FROM station_vulnerability v JOIN stations s ON s.station_code=v.station_code "
-        "WHERE s.line=%(line)s AND v.alert_type=%(at)s AND v.alert_level=%(al)s "
-        "ORDER BY v.avg_delay DESC NULLS LAST",
-        {"line": line, "at": alert_type, "al": alert_level},
+        f"WHERE {where} "
+        "GROUP BY s.station_name "
+        "ORDER BY 2 DESC NULLS LAST",
+        params,
     )
-    stations = [{**r, "station_id": station_slug(r["station"])} for r in rows]
-    return {"line": line, "alert_type": alert_type, "alert_level": alert_level, "stations": stations}
+    stations = []
+    for r in rows:
+        avg = _r1(r["avg_delay"])
+        base = _r1(r["base_avg_delay"])
+        n = r["sample_n"]
+        rate = r["delay_rate"]
+        stations.append({
+            "station_id": station_slug(r["station"]),
+            "station": r["station"],
+            "avg_delay": avg,
+            "delay_rate": round(rate, 2) if rate is not None else None,
+            "stop_rate": round(r["stop_rate"], 2) if r["stop_rate"] is not None else None,
+            "delta_delay": _r1((avg - base) if (avg is not None and base is not None) else None),
+            "sample_n": n,
+            # delay_count 는 DB 컬럼이 아니라 유도값(프론트 추정식과 동일)
+            "delay_count": round(n * rate) if (n is not None and rate is not None) else None,
+        })
+    return {
+        "line": line,
+        "alert_type": alert_type or "전체",
+        "alert_level": alert_level or "전체",
+        "stations": stations,
+    }
 
 
 # ── GET /heatmap ──────────────────────────────────────────────

@@ -356,7 +356,10 @@ function renderStationInfo(stationDetailData, vulnerabilityStationsData, station
   }
 
   if (stationInfoElements.riskText) {
-    stationInfoElements.riskText.textContent = `${alertType} ${alertLevel}`.trim() + " 기준";
+    // 필터 없이 조회하면 API 가 alert_type/alert_level 을 둘 다 "전체" 로 준다.
+    // 그대로 이으면 "전체 전체 기준" 이 되므로 중복을 없앤다.
+    const basis = alertType === alertLevel ? alertType : `${alertType} ${alertLevel}`.trim();
+    stationInfoElements.riskText.textContent = `${basis} 기준`;
   }
 
   setStationRiskStatusLevel(riskLevel);

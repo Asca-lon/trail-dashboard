@@ -258,3 +258,18 @@ def test_heatmap_node_per_station_is_unique():
     nodes = client.get("/heatmap").json()["nodes"]
     names = [n["station"] for n in nodes]
     assert len(names) == len(set(names)), f"중복 노드: {names}"
+
+
+def test_stations_without_filters_is_ok():
+    """필터 생략 = 전체 집계. 특정 조합(폭염 경보)으로 고정하면
+    그 이력이 없는 역(예: 울산 — 폭염 주의보만 751건)이 '정보 없음'이 된다."""
+    r = client.get("/vulnerability/stations")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["alert_type"] == "전체" and body["alert_level"] == "전체"
+
+
+def test_stations_partial_filter_is_ok():
+    """종류만 주고 등급은 생략 가능해야 한다."""
+    body = client.get("/vulnerability/stations?alert_type=호우").json()
+    assert body["alert_type"] == "호우" and body["alert_level"] == "전체"
