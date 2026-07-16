@@ -21,7 +21,7 @@ const GYEONGBU_HIGH_SPEED_STATIONS = [
   { station_id: "cheonan_asan", station: "천안아산" },
   { station_id: "osong", station: "오송" },
   { station_id: "daejeon", station: "대전" },
-  { station_id: "gimcheon_gumi", station: "김천(구미)" },
+  { station_id: "gimcheon_gumi", station: "김천구미" },
   { station_id: "dongdaegu", station: "동대구" },
   { station_id: "gyeongju", station: "경주" },
   { station_id: "ulsan", station: "울산" },

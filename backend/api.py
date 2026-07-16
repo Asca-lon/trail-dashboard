@@ -314,10 +314,23 @@ def get_station_detail(station_id: str):
     )
     hourly_delay = _bucket_rows_to_points(hourly_rows, "weekday_delay", "holiday_delay")
 
-    # 평시 vs 특보(경보) 평균 지연 비교. 호우·폭염 2행 고정 — 표본 없으면 null.
+    # 평시 vs 특보 시 평균 지연 비교. 호우·폭염 2행 고정 — 표본 없으면 null.
+    #
+    # ⚠️ 등급(주의보/경보)을 가리지 않고 합친다.
+    #    이 응답에는 alert_level 필드가 없다 — "평시 vs **특보**" 비교이지 등급별이 아니다.
+    #    경보만 보면 주의보 이력만 있는 역(예: 호우 주의보만 겪은 김천구미·동대구)이
+    #    빈 그래프가 된다. 실제로 그렇게 나왔다.
+    #
+    #    합치는 방식은 표본수 가중평균: SUM(avg_delay × sample_n) / SUM(sample_n).
+    #    단순 평균을 쓰면 표본 6건짜리 주의보와 500건짜리 경보가 같은 무게를 갖는다.
+    #    base_avg_delay 는 역 단위 기준선이라 등급과 무관하게 같은 값 → MAX 로 집어온다.
     cmp_rows = fetch_all(
-        "SELECT alert_type, base_avg_delay, avg_delay FROM station_vulnerability "
-        "WHERE station_code=%(c)s AND alert_level='경보' AND alert_type IN ('호우','폭염')",
+        "SELECT alert_type, "
+        "  MAX(base_avg_delay) AS base_avg_delay, "
+        "  SUM(avg_delay * sample_n) / NULLIF(SUM(sample_n), 0) AS avg_delay "
+        "FROM station_vulnerability "
+        "WHERE station_code=%(c)s AND alert_type IN ('호우','폭염') "
+        "GROUP BY alert_type",
         {"c": station_code},
     )
     cmp_by_type = {r["alert_type"]: r for r in cmp_rows}
