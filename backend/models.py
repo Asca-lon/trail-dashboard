@@ -179,8 +179,9 @@ class SegmentByAlert(BaseModel):
     """
     alert_type: str
     alert_level: str
-    avg_delay: Optional[float] = None
-    delay_increase: float
+    avg_delay: Optional[float] = None       # 도착역의 절대 지연 평균(누적)
+    delay_rate: Optional[float] = None      # 도착역 지연 비율 (운영 기준 KTX 5분 이상)
+    delay_increase: float                   # 이 구간에서 '새로' 생긴 지연
     stop_rate: float
     sample_n: int
 

@@ -304,9 +304,11 @@ def get_heatmap(line: str = "경부선", alert_type: str | None = None):
     nodes = fetch_all(
         # ⚠️ station_vulnerability 의 PK 는 (station_code, alert_type, alert_level) 다.
         #    종류·등급 조건 없이 JOIN 하면 여러 행이 붙어 역이 '중복 노드'로 나온다.
-        #    히트맵은 역당 한 점이므로 MAX 로 합친다.
-        #    MAX = 그 조건에서 겪은 '최악'의 평균지연 → 취약도 표시 목적에 맞다.
-        "SELECT s.station_name AS station, s.lat, s.lon, MAX(v.avg_delay) AS avg_delay "
+        #    히트맵은 역당 한 점이므로 MAX 로 합친다 = 그 조건에서 겪은 '최악'.
+        #
+        # vuln 은 delay_rate(지연율)로 만든다 — 취약 역 순위표가 쓰는 지표와 같아야
+        # 노선도 배지와 순위표 배지가 어긋나지 않는다.
+        "SELECT s.station_name AS station, s.lat, s.lon, MAX(v.delay_rate) AS delay_rate "
         "FROM stations s LEFT JOIN station_vulnerability v "
         f"  ON v.station_code=s.station_code AND {at_filter} "
         "WHERE s.line=%(line)s "
@@ -325,25 +327,42 @@ def get_heatmap(line: str = "경부선", alert_type: str | None = None):
         "GROUP BY sf.station_name, st.station_name",
         params,
     )
-    def norm(vals):
-        xs = [x for x in vals if x is not None]
-        lo, hi = (min(xs), max(xs)) if xs else (0, 1)
-        span = (hi - lo) or 1
-        return lo, span
-    lo_n, sp_n = norm([r["avg_delay"] for r in nodes])
-    lo_e, sp_e = norm([r["avg_delay_incr"] for r in edges])
+    # ── vuln(0~1) 산식 ────────────────────────────────────────────
+    # ⚠️ 예전엔 min-max 정규화를 썼다. 그러면 '조회된 것 중 최댓값'이 항상 1.0 이 되어,
+    #    전 구간 지연이 0.7~2.8분처럼 미미해도 최댓값 구간이 '높음'으로 표시됐다.
+    #    실제로 노선도는 '높음', 같은 구간의 TOP5 표는 '관심'으로 어긋났다
+    #    (TOP5 는 절대 분 기준 {높음 12분, 주의 7분}을 쓴다).
+    #
+    # → 프론트의 절대 임계값에 앵커를 맞춘 고정 산식으로 바꾼다.
+    #   프론트: vuln >= 0.7 → 높음, >= 0.5 → 주의
+    #   그래서 (주의 임계, 0.5) 와 (높음 임계, 0.7) 을 지나는 구간별 선형 매핑을 쓴다.
+    #   이러면 노선도와 순위표가 같은 판정을 내린다.
+    def _abs_vuln(v, warn_at, high_at):
+        """절대값 → 0~1. warn_at 에서 0.5, high_at 에서 0.7, 그 위는 완만히 1.0 까지."""
+        if v is None:
+            return None            # 표본 없음. 0.0(가장 덜 취약)과 구분해야 한다.
+        v = float(v)
+        if v <= 0:
+            return 0.0
+        if v < warn_at:
+            return round(v / warn_at * 0.5, 3)
+        if v < high_at:
+            return round(0.5 + (v - warn_at) / (high_at - warn_at) * 0.2, 3)
+        return round(min(1.0, 0.7 + (v - high_at) / high_at * 0.3), 3)
 
-    def scale(v, lo, span):
-        # 계약 §5-1(2)·§2-1(3): 표본 없음은 null(=데이터 없음). 0.0(취약도 낮음)과 구분해야 한다.
-        # (v or lo) 로 NULL 을 최솟값으로 대체하면 '데이터 없음'과 '가장 덜 취약'이 뭉개진다.
-        return None if v is None else round((v - lo) / span, 3)
+    # 역: 지연율(delay_rate) 기준 — 취약 역 순위표가 쓰는 지표와 같게 맞춘다
+    #     (프론트 stationDelayRate: 높음 0.4, 주의 0.25).
+    # 구간: 평균 신규 지연(분) 기준 — 위험 구간 순위표와 같게
+    #     (프론트 delayIncreaseMinutes: 높음 12, 주의 7).
+    STATION_WARN, STATION_HIGH = 0.25, 0.4
+    SEGMENT_WARN, SEGMENT_HIGH = 7.0, 12.0
 
     return {
         "line": line,
         "nodes": [{"station": r["station"], "lat": r["lat"], "lon": r["lon"],
-                   "vuln": scale(r["avg_delay"], lo_n, sp_n)} for r in nodes],
+                   "vuln": _abs_vuln(r["delay_rate"], STATION_WARN, STATION_HIGH)} for r in nodes],
         "edges": [{"from": r["from"], "to": r["to"],
-                   "vuln": scale(r["avg_delay_incr"], lo_e, sp_e)} for r in edges],
+                   "vuln": _abs_vuln(r["avg_delay_incr"], SEGMENT_WARN, SEGMENT_HIGH)} for r in edges],
     }
 
 
@@ -471,7 +490,8 @@ def get_segments_details(line: str = "경부선"):
         # 코드 → 이름 JOIN. 아래 hourly_rows·trend_rows 가 이미 station_name 으로
         # 키를 만드므로, 여기서도 이름으로 맞춰야 key(r) 매칭이 성립한다.
         'SELECT sf.station_name AS "from", st.station_name AS "to", '
-        "  v.alert_type, v.alert_level, v.avg_delay_incr, v.stop_rate, v.sample_n "
+        "  v.alert_type, v.alert_level, v.avg_delay_incr, v.avg_delay, "
+        "  v.delay_rate, v.stop_rate, v.sample_n "
         "FROM segment_vulnerability v "
         "  JOIN stations sf ON sf.station_code=v.from_station "
         "  JOIN stations st ON st.station_code=v.to_station "
@@ -529,9 +549,10 @@ def get_segments_details(line: str = "경부선"):
             "by_alert": [
                 {
                     "alert_type": r["alert_type"], "alert_level": r["alert_level"],
-                    # TODO(A): segment_vulnerability 에 avg_delay(도착역 절대 지연) 컬럼 추가 요청.
-                    #   추가 전까지 null. 키는 항상 존재한다(§5-1(2)).
-                    "avg_delay": None,
+                    # avg_delay = 도착역 절대 지연, delay_increase = 이 구간에서 새로 생긴 지연.
+                    # 둘은 다른 지표다. 구간 상세는 둘 다 보여준다.
+                    "avg_delay": _r1(r["avg_delay"]),
+                    "delay_rate": r["delay_rate"],
                     "delay_increase": r["avg_delay_incr"],
                     "stop_rate": r["stop_rate"], "sample_n": r["sample_n"],
                 }

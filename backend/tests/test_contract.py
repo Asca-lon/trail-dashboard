@@ -301,3 +301,13 @@ def test_alerts_active_affected_has_both_types():
         for aff in alert["affected"]:
             types.add(aff["type"])
     assert "segment" in types, f"구간이 없음: {types}"
+
+
+def test_segment_detail_has_delay_metrics():
+    """구간 상세는 절대 지연·지연율도 준다.
+    예전엔 avg_delay 가 코드에 null 로 박혀 있고 delay_rate 는 아예 없어
+    구간 상세의 '평균 지연 시간'·'운행 지연률' 카드가 비었다."""
+    for seg in client.get("/segments/details").json()["segments"]:
+        for b in seg["by_alert"]:
+            assert "avg_delay" in b and "delay_rate" in b
+            assert b["avg_delay"] is not None, "avg_delay 가 null — 집계 컬럼 확인"
