@@ -24,7 +24,11 @@ CREATE TABLE IF NOT EXISTS train_stops (
     status TEXT NOT NULL DEFAULT '정상' CHECK (status IN ('정상','지연','운행중단')),
     event_time TIMESTAMPTZ NOT NULL,
     ingested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CONSTRAINT uq_train_stops UNIQUE (run_date, train_no, station_code, event_time)
+    -- 자연키: 한 열차(train_no)는 하루(run_date)에 한 역(station_code)에 한 번 선다.
+    -- ⚠️ event_time 을 키에 넣으면 안 된다. API 가 실제 도착시각을 재조회마다
+    --    분 단위로 다르게 주기 때문에, 같은 정차가 매번 새 행이 되어 중복이 쌓인다.
+    --    event_time 은 식별자가 아니라 그 정차의 '속성'이다.
+    CONSTRAINT uq_train_stops UNIQUE (run_date, train_no, station_code)
 );
 
 CREATE INDEX IF NOT EXISTS idx_ts_line ON train_stops (line, event_time DESC);
