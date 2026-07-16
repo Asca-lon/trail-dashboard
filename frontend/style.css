@@ -1804,21 +1804,6 @@ select {
   font-weight: 500;
 }
 
-.station-metric-card__comparison {
-  margin: 2px 0 0;
-  color: var(--color-description-text);
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 18px;
-}
-
-.station-metric-card__comparison strong,
-.station-metric-card__comparison b {
-  margin-left: 16px;
-  color: var(--color-danger-red);
-  font-weight: 600;
-}
-
 .station-chart-card,
 .station-detail-card {
   flex: 1 1 0;
@@ -2300,13 +2285,6 @@ select {
   line-height: 24px;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.route-info-card__divider {
-  flex: 0 0 auto;
-  width: 1px;
-  height: 48px;
-  background: var(--color-border);
 }
 
 .route-risk-card {
@@ -4008,11 +3986,6 @@ select {
 
   .route-info-card__change-button {
     width: 100%;
-  }
-
-  .route-info-card__divider {
-    width: 100%;
-    height: 1px;
   }
 
   .route-tabs {
