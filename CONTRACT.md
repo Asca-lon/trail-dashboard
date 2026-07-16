@@ -188,232 +188,1156 @@ trail-dashboard/
 
 ---
 
-## 4. DB 스키마 (`db/schema.sql`)
+## 4. DB 스키마 (`db/init_schema.sql`)
+
+> 아래는 **실제 `db/init_schema.sql` 전문**이다(복붙이 아니라 파일 그대로).
+> compose 의 db 서비스가 최초 기동 시 이 파일을 자동 실행한다.
+
+> **하이퍼테이블(TimescaleDB)은 보류.** 데이터 규모(경부고속선 3개월, 약 9만 행)에서는
+> 순수 PostgreSQL 로 충분하고, 확장 설치·파티션 키 제약 등 복잡도만 늘기 때문이다.
+> 필요해지면 compose 의 `image` 를 `timescale/timescaledb` 로 바꾸고
+> `CREATE EXTENSION` + `create_hypertable` 두 줄을 추가하면 된다.
 
 ```sql
-CREATE EXTENSION IF NOT EXISTS timescaledb;
-
--- 4-1. 역 + 특보구역 매핑 (참조)
-CREATE TABLE stations (
-    station_code TEXT PRIMARY KEY,   -- 역코드
+CREATE TABLE IF NOT EXISTS stations (
+    station_code TEXT PRIMARY KEY,
     station_name TEXT NOT NULL,
-    line         TEXT NOT NULL,      -- '경부선'
-    seq_on_line  INTEGER,            -- 노선 내 역 순서(구간 표현용)
-    region_code  TEXT,               -- 기상 특보구역코드(수작업 매핑)
-    region_name  TEXT,
-    lat DOUBLE PRECISION, lon DOUBLE PRECISION
+    line TEXT NOT NULL,
+    seq_on_line INTEGER,
+    region_code TEXT,
+    region_name TEXT,
+    lat DOUBLE PRECISION,
+    lon DOUBLE PRECISION
 );
 
--- 4-2. 열차 역별 정차 이벤트 (계획+실제, 핵심 시계열)
-CREATE TABLE train_stops (
-    run_date          DATE NOT NULL,
-    train_no          TEXT NOT NULL,
-    seq               INTEGER,          -- 열차운행일련번호(정차 순서) = 구간 생성 키
-    station_code      TEXT NOT NULL REFERENCES stations(station_code),
-    line              TEXT,
-    train_type        TEXT,             -- KTX/무궁화/새마을 (열차번호 규칙으로 분류)
-    planned_arrival   TIMESTAMPTZ,
-    actual_arrival    TIMESTAMPTZ,
+CREATE TABLE IF NOT EXISTS train_stops (
+    run_date DATE NOT NULL,
+    train_no TEXT NOT NULL,
+    seq INTEGER,
+    station_code TEXT NOT NULL REFERENCES stations(station_code),
+    line TEXT,
+    train_type TEXT,
+    planned_arrival TIMESTAMPTZ,
+    actual_arrival TIMESTAMPTZ,
     planned_departure TIMESTAMPTZ,
-    actual_departure  TIMESTAMPTZ,
-    delay_min         INTEGER,          -- 실제도착 − 계획도착 (분)
-    status            TEXT NOT NULL DEFAULT '정상'
-                      CHECK (status IN ('정상','지연','운행중단')),
-    event_time        TIMESTAMPTZ NOT NULL,  -- COALESCE(planned_arrival, actual_arrival)
-    ingested_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+    actual_departure TIMESTAMPTZ,
+    delay_min INTEGER,
+    status TEXT NOT NULL DEFAULT '정상' CHECK (status IN ('정상','지연','운행중단')),
+    event_time TIMESTAMPTZ NOT NULL,
+    ingested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- 자연키: 한 열차(train_no)는 하루(run_date)에 한 역(station_code)에 한 번 선다.
+    -- ⚠️ event_time 을 키에 넣으면 안 된다. API 가 실제 도착시각을 재조회마다
+    --    분 단위로 다르게 주기 때문에, 같은 정차가 매번 새 행이 되어 중복이 쌓인다.
+    --    event_time 은 식별자가 아니라 그 정차의 '속성'이다.
+    CONSTRAINT uq_train_stops UNIQUE (run_date, train_no, station_code)
 );
-SELECT create_hypertable('train_stops', 'event_time');
-CREATE INDEX idx_ts_line   ON train_stops (line, event_time DESC);
-CREATE INDEX idx_ts_train  ON train_stops (run_date, train_no, seq);   -- 구간 조인용
-CREATE UNIQUE INDEX uq_ts  ON train_stops (run_date, train_no, station_code, event_time);
 
--- 4-3. 기상 특보
-CREATE TABLE weather_alerts (
-    alert_id    BIGSERIAL PRIMARY KEY,
+CREATE INDEX IF NOT EXISTS idx_ts_line ON train_stops (line, event_time DESC);
+CREATE INDEX IF NOT EXISTS idx_ts_train ON train_stops (run_date, train_no, seq);
+
+CREATE TABLE IF NOT EXISTS weather_alerts (
+    alert_id BIGSERIAL PRIMARY KEY,
     region_code TEXT NOT NULL,
-    alert_type  TEXT NOT NULL,   -- 대설/호우/폭염/강풍/태풍/한파
-    alert_level TEXT NOT NULL,   -- 주의보/경보
-    start_time  TIMESTAMPTZ NOT NULL,
-    end_time    TIMESTAMPTZ
+    alert_type TEXT NOT NULL,
+    alert_level TEXT NOT NULL,
+    start_time TIMESTAMPTZ NOT NULL,
+    end_time TIMESTAMPTZ,
+    CONSTRAINT uq_weather_alerts UNIQUE (region_code, alert_type, alert_level, start_time)
 );
-CREATE INDEX idx_alert_region ON weather_alerts (region_code, start_time DESC);
 
--- 4-4. 취약도 집계 (배치로 갱신되는 파생 테이블)
-CREATE TABLE station_vulnerability (
-    station_code TEXT, alert_type TEXT, alert_level TEXT,
-    avg_delay REAL, delay_rate REAL, stop_rate REAL, sample_n INTEGER,
-    base_avg_delay REAL, delta_delay REAL, updated_at TIMESTAMPTZ DEFAULT now(),
+CREATE INDEX IF NOT EXISTS idx_alert_region ON weather_alerts (region_code, start_time DESC);
+
+-- 역 ↔ 기상 특보구역 매핑 (1:N)
+--
+-- stations.region_code 한 칸으로는 부족해서 별도 테이블로 둔다. 이유 두 가지:
+--
+-- (1) 2026-05-31 특보구역 개편
+--     청주·김천·경주·대구 등은 이 날짜로 하위권역이 신설됐다(예: 김천 → 김천북부/남부).
+--     우리 분석 창(최근 3개월)이 개편일 전후로 갈리므로, 옛 코드와 새 코드를
+--     함께 매칭해야 이력이 끊기지 않는다.
+--
+-- (2) 권역 귀속 불확실
+--     역이 '경주동부'인지 '경주서부'인지 행정경계 없이는 단정할 수 없다.
+--     해당 시의 모든 하위권역 + 상위(광역시) 코드를 함께 넣어 과소매칭을 막는다.
+--     (과대매칭 위험은 있으나, 같은 시 안의 특보라 철도 영향 판단에는 무리가 없다.)
+--
+-- vulnerability.py 와 /alerts/active 가 이 테이블로 특보를 역에 귀속시킨다.
+CREATE TABLE IF NOT EXISTS station_regions (
+    station_code TEXT NOT NULL REFERENCES stations(station_code) ON DELETE CASCADE,
+    region_code  TEXT NOT NULL,   -- weather_alerts.region_code 와 매칭되는 L형식 특보구역
+    note         TEXT,            -- 구역명·비고 (사람이 읽기 위한 것)
+    PRIMARY KEY (station_code, region_code)
+);
+CREATE INDEX IF NOT EXISTS idx_station_regions_region ON station_regions (region_code);
+
+CREATE TABLE IF NOT EXISTS station_vulnerability (
+    station_code TEXT REFERENCES stations(station_code),
+    alert_type TEXT,
+    alert_level TEXT,
+    avg_delay REAL,
+    delay_rate REAL,
+    stop_rate REAL,
+    sample_n INTEGER,
+    base_avg_delay REAL,
+    delta_delay REAL,
+    updated_at TIMESTAMPTZ DEFAULT now(),
     PRIMARY KEY (station_code, alert_type, alert_level)
 );
-CREATE TABLE segment_vulnerability (
-    from_station TEXT, to_station TEXT, line TEXT,
-    alert_type TEXT, alert_level TEXT,
-    avg_delay_incr REAL, stop_rate REAL, sample_n INTEGER,
+
+CREATE TABLE IF NOT EXISTS segment_vulnerability (
+    from_station TEXT REFERENCES stations(station_code),
+    to_station TEXT REFERENCES stations(station_code),
+    line TEXT,
+    alert_type TEXT,
+    alert_level TEXT,
+    avg_delay_incr REAL,
+    stop_rate REAL,
+    sample_n INTEGER,
     updated_at TIMESTAMPTZ DEFAULT now(),
     PRIMARY KEY (from_station, to_station, alert_type, alert_level)
 );
 ```
 
-**구간 신규 지연 계산(참고, processor.py):**
-```sql
-SELECT a.station_code AS from_st, b.station_code AS to_st,
-       b.delay_min - a.delay_min AS delay_incr, b.event_time
-FROM train_stops a JOIN train_stops b
-  ON a.run_date=b.run_date AND a.train_no=b.train_no AND b.seq = a.seq + 1
-WHERE a.delay_min IS NOT NULL AND b.delay_min IS NOT NULL;
-```
+**핵심 설계 결정 3가지**
 
----
+1. **`train_stops` 의 자연키에서 `event_time` 을 뺐다.**
+   `event_time`(실제 도착시각)은 API 를 재조회할 때마다 분 단위로 달라진다.
+   이걸 UNIQUE 키에 넣었더니 같은 정차가 매번 새 행이 되어 `ON CONFLICT` 가 무력화됐고,
+   백필을 돌린 횟수만큼 중복이 쌓였다(실측 9.8배). 한 열차는 하루에 한 역에 한 번 선다.
+
+2. **`station_regions` (역 ↔ 특보구역 1:N).**
+   `stations.region_code` 한 칸으로는 부족하다.
+   (a) 2026-05-31 특보구역 개편으로 옛/새 코드가 3개월 창 안에 공존하고,
+   (b) 역이 '경주동부'인지 '경주서부'인지 행정경계 없이는 단정할 수 없다.
+   해당 시의 하위권역 + 상위(광역시) 코드를 모두 넣어 과소매칭을 막는다.
+
+3. **`region_code` 는 기상청 '특보구역'(L형식) 이다.**
+   `weather_alerts.region_code` 가 `wrn_met_data.php` 의 `REG_ID`(예: `L1030100`)이므로
+   `stations`/`station_regions` 도 같은 체계여야 매칭된다.
+   예보구역(`11C20401`)·지점번호(`133`)와 혼동하면 집계가 0행이 된다.
 
 ## 5. API 계약 (프론트 ↔ 백엔드)
 
 **C는 이 JSON 모양만 보고 화면을 만든다.** B는 이 모양대로만 응답한다.
 
-> 아래 예시는 `mock/*.json` 과 **바이트 단위로 동일**하다(값 포함). 실제 응답도 같은 models.py 를 거치므로 셋이 항상 일치한다.
+> 아래 예시는 `mock/*.json` 에서 그대로 뽑은 것이라 **값까지 동일**하다.
+> 실제 응답도 같은 `models.py` 를 거치므로 문서·mock·응답 셋이 항상 일치한다.
+
+> **스코프(현행):** 특보는 **호우·폭염 2종**, 등급은 **주의보·경보 2단계**.
+> 과거 사례(`cases[]`)·강수량(`rain_mm`)·예보(`forecast`)·강풍·대설은 응답에 **없다**.
+> 노선은 **경부고속선(KTX) 10개 역**: 서울·광명·천안아산·오송·대전·김천구미·동대구·경주·울산·부산.
 
 ### `GET /lines`
 ```json
-{ "lines": [ { "line": "경부선", "stations": ["서울", "영등포", "수원", "천안", "대전", "김천(구미)", "동대구", "밀양", "부산"] } ] }
+{
+  "lines": [
+    {
+      "line": "경부선",
+      "stations": [
+        "서울",
+        "광명",
+        "천안아산",
+        "오송",
+        "대전",
+        "김천구미",
+        "동대구",
+        "경주",
+        "울산",
+        "부산"
+      ]
+    }
+  ]
+}
 ```
 
 ### `GET /vulnerability/segments?line=경부선&alert_type=호우&alert_level=경보&train_type=all`
 ```json
 {
-  "line": "경부선", "alert_type": "호우", "alert_level": "경보",
+  "line": "경부선",
+  "alert_type": "호우",
+  "alert_level": "경보",
   "segments": [
-    { "from": "대전", "to": "김천(구미)", "avg_delay_incr": 14.6, "stop_rate": 0.08, "sample_n": 37 },
-    { "from": "천안", "to": "대전", "avg_delay_incr": 11.3, "stop_rate": 0.05, "sample_n": 42 },
-    { "from": "영등포", "to": "수원", "avg_delay_incr": 9.2, "stop_rate": 0.02, "sample_n": 51 },
-    { "from": "동대구", "to": "밀양", "avg_delay_incr": 7.8, "stop_rate": 0.03, "sample_n": 28 },
-    { "from": "김천(구미)", "to": "동대구", "avg_delay_incr": 6.1, "stop_rate": 0.01, "sample_n": 33 },
-    { "from": "밀양", "to": "부산", "avg_delay_incr": 5.4, "stop_rate": 0.00, "sample_n": 7 }
+    {
+      "segment_id": "daejeon-gimcheon_gumi",
+      "from": "대전",
+      "to": "김천구미",
+      "avg_delay_incr": 14.6,
+      "stop_rate": 0.08,
+      "sample_n": 37
+    },
+    {
+      "segment_id": "osong-daejeon",
+      "from": "오송",
+      "to": "대전",
+      "avg_delay_incr": 11.3,
+      "stop_rate": 0.05,
+      "sample_n": 42
+    },
+    {
+      "segment_id": "gwangmyeong-cheonan_asan",
+      "from": "광명",
+      "to": "천안아산",
+      "avg_delay_incr": 9.2,
+      "stop_rate": 0.02,
+      "sample_n": 51
+    },
+    {
+      "segment_id": "dongdaegu-ulsan",
+      "from": "동대구",
+      "to": "울산",
+      "avg_delay_incr": 7.8,
+      "stop_rate": 0.03,
+      "sample_n": 28
+    },
+    {
+      "segment_id": "gimcheon_gumi-dongdaegu",
+      "from": "김천구미",
+      "to": "동대구",
+      "avg_delay_incr": 6.1,
+      "stop_rate": 0.01,
+      "sample_n": 33
+    },
+    {
+      "segment_id": "ulsan-busan",
+      "from": "울산",
+      "to": "부산",
+      "avg_delay_incr": 5.4,
+      "stop_rate": 0.0,
+      "sample_n": 7
+    }
   ]
 }
 ```
+> `segment_id` = `{출발역슬러그}-{도착역슬러그}` (예: `daejeon-gimcheon_gumi`). C가 구간 상세 링크(`?segment_id=`)에 쓴다.
+> B가 역명에서 결정적으로 생성한다(DB 컬럼 아님).
+> ⚠️ `train_type` 필터는 아직 집계에 차원이 없어 무시된다(all 취급).
 
 ### `GET /vulnerability/stations?line=경부선&alert_type=폭염&alert_level=경보`
 ```json
 {
-  "line": "경부선", "alert_type": "폭염", "alert_level": "경보",
+  "line": "경부선",
+  "alert_type": "폭염",
+  "alert_level": "경보",
   "stations": [
-    { "station": "대전", "avg_delay": 12.7, "delay_rate": 0.44, "stop_rate": 0.01, "delta_delay": 8.9, "sample_n": 61 },
-    { "station": "동대구", "avg_delay": 10.2, "delay_rate": 0.38, "stop_rate": 0.00, "delta_delay": 6.5, "sample_n": 55 },
-    { "station": "김천(구미)", "avg_delay": 8.4, "delay_rate": 0.29, "stop_rate": 0.00, "delta_delay": 5.1, "sample_n": 40 },
-    { "station": "수원", "avg_delay": 6.1, "delay_rate": 0.21, "stop_rate": 0.00, "delta_delay": 3.3, "sample_n": 48 },
-    { "station": "밀양", "avg_delay": 4.8, "delay_rate": 0.15, "stop_rate": 0.00, "delta_delay": 2.0, "sample_n": 6 }
+    {
+      "station_id": "daejeon",
+      "station": "대전",
+      "avg_delay": 12.7,
+      "delay_rate": 0.44,
+      "stop_rate": 0.01,
+      "delta_delay": 8.9,
+      "sample_n": 61,
+      "delay_count": 27
+    },
+    {
+      "station_id": "dongdaegu",
+      "station": "동대구",
+      "avg_delay": 10.2,
+      "delay_rate": 0.38,
+      "stop_rate": 0.0,
+      "delta_delay": 6.5,
+      "sample_n": 55,
+      "delay_count": 21
+    },
+    {
+      "station_id": "gimcheon_gumi",
+      "station": "김천구미",
+      "avg_delay": 8.4,
+      "delay_rate": 0.29,
+      "stop_rate": 0.0,
+      "delta_delay": 5.1,
+      "sample_n": 40,
+      "delay_count": 12
+    },
+    {
+      "station_id": "cheonan_asan",
+      "station": "천안아산",
+      "avg_delay": 6.1,
+      "delay_rate": 0.21,
+      "stop_rate": 0.0,
+      "delta_delay": 3.3,
+      "sample_n": 48,
+      "delay_count": 10
+    },
+    {
+      "station_id": "ulsan",
+      "station": "울산",
+      "avg_delay": 4.8,
+      "delay_rate": 0.15,
+      "stop_rate": 0.0,
+      "delta_delay": 2.0,
+      "sample_n": 6,
+      "delay_count": 1
+    }
   ]
 }
 ```
+> `station_id` = 역명 슬러그(예: `김천구미` → `gimcheon_gumi`). C가 역 상세 링크(`?station_id=`)에 쓴다.
+> `delay_count` = 특보 시 지연 발생 건수. DB 컬럼이 아니라 `round(sample_n × delay_rate)` 로 유도한다.
 
 ### `GET /heatmap?line=경부선&alert_type=호우`
 ```json
 {
   "line": "경부선",
   "nodes": [
-    { "station": "서울", "lat": 37.554, "lon": 126.973, "vuln": 0.31 },
-    { "station": "영등포", "lat": 37.515, "lon": 126.907, "vuln": 0.44 },
-    { "station": "수원", "lat": 37.266, "lon": 126.999, "vuln": 0.52 },
-    { "station": "천안", "lat": 36.810, "lon": 127.147, "vuln": 0.60 },
-    { "station": "대전", "lat": 36.332, "lon": 127.434, "vuln": 0.82 },
-    { "station": "김천(구미)", "lat": 36.129, "lon": 128.114, "vuln": 0.71 },
-    { "station": "동대구", "lat": 35.879, "lon": 128.628, "vuln": 0.66 },
-    { "station": "밀양", "lat": 35.504, "lon": 128.746, "vuln": 0.48 },
-    { "station": "부산", "lat": 35.115, "lon": 129.041, "vuln": 0.37 }
+    {
+      "station": "서울",
+      "lat": 37.554,
+      "lon": 126.973,
+      "vuln": 0.31
+    },
+    {
+      "station": "광명",
+      "lat": 37.515,
+      "lon": 126.907,
+      "vuln": 0.44
+    },
+    {
+      "station": "천안아산",
+      "lat": 37.266,
+      "lon": 126.999,
+      "vuln": 0.52
+    },
+    {
+      "station": "오송",
+      "lat": 36.81,
+      "lon": 127.147,
+      "vuln": 0.6
+    },
+    {
+      "station": "대전",
+      "lat": 36.332,
+      "lon": 127.434,
+      "vuln": 0.82
+    },
+    {
+      "station": "김천구미",
+      "lat": 36.129,
+      "lon": 128.114,
+      "vuln": 0.71
+    },
+    {
+      "station": "동대구",
+      "lat": 35.879,
+      "lon": 128.628,
+      "vuln": 0.66
+    },
+    {
+      "station": "울산",
+      "lat": 35.504,
+      "lon": 128.746,
+      "vuln": 0.48
+    },
+    {
+      "station": "부산",
+      "lat": 35.115,
+      "lon": 129.041,
+      "vuln": 0.37
+    }
   ],
   "edges": [
-    { "from": "서울", "to": "영등포", "vuln": 0.35 },
-    { "from": "영등포", "to": "수원", "vuln": 0.55 },
-    { "from": "수원", "to": "천안", "vuln": 0.58 },
-    { "from": "천안", "to": "대전", "vuln": 0.69 },
-    { "from": "대전", "to": "김천(구미)", "vuln": 0.78 },
-    { "from": "김천(구미)", "to": "동대구", "vuln": 0.62 },
-    { "from": "동대구", "to": "밀양", "vuln": 0.57 },
-    { "from": "밀양", "to": "부산", "vuln": 0.41 }
+    {
+      "from": "서울",
+      "to": "광명",
+      "vuln": 0.35
+    },
+    {
+      "from": "광명",
+      "to": "천안아산",
+      "vuln": 0.55
+    },
+    {
+      "from": "천안아산",
+      "to": "오송",
+      "vuln": 0.58
+    },
+    {
+      "from": "오송",
+      "to": "대전",
+      "vuln": 0.69
+    },
+    {
+      "from": "대전",
+      "to": "김천구미",
+      "vuln": 0.78
+    },
+    {
+      "from": "김천구미",
+      "to": "동대구",
+      "vuln": 0.62
+    },
+    {
+      "from": "동대구",
+      "to": "울산",
+      "vuln": 0.57
+    },
+    {
+      "from": "울산",
+      "to": "부산",
+      "vuln": 0.41
+    }
   ]
 }
 ```
+> `vuln` 이 `null` 이면 **표본 없음**(데이터 없음). `0.0`(가장 덜 취약)과 구분해서 표시할 것.
+> `lat`/`lon` 이 `null` 인 역은 지도에서 건너뛴다.
 
-### `GET /station/{code}` — 역 상세
+### `GET /station/{station_id}` — 역 상세
+`station_id` 는 슬러그(`daejeon`) 또는 역명(`대전`) 둘 다 받는다.
 ```json
 {
+  "station_id": "daejeon",
   "station": "대전",
   "by_alert": [
-    { "alert_type": "호우", "alert_level": "경보", "avg_delay": 15.2, "sample_n": 34 },
-    { "alert_type": "폭염", "alert_level": "경보", "avg_delay": 12.7, "sample_n": 61 },
-    { "alert_type": "호우", "alert_level": "주의보", "avg_delay": 8.4, "sample_n": 52 },
-    { "alert_type": "폭염", "alert_level": "주의보", "avg_delay": 6.1, "sample_n": 70 }
+    {
+      "alert_type": "호우",
+      "alert_level": "경보",
+      "avg_delay": 15.2,
+      "sample_n": 34
+    },
+    {
+      "alert_type": "폭염",
+      "alert_level": "경보",
+      "avg_delay": 12.7,
+      "sample_n": 61
+    },
+    {
+      "alert_type": "호우",
+      "alert_level": "주의보",
+      "avg_delay": 8.4,
+      "sample_n": 52
+    },
+    {
+      "alert_type": "폭염",
+      "alert_level": "주의보",
+      "avg_delay": 6.1,
+      "sample_n": 70
+    }
   ],
-  "cases": [
-    { "date": "2026-06-28", "alert_type": "호우", "delay_min": 22 },
-    { "date": "2026-06-22", "alert_type": "폭염", "delay_min": 15 },
-    { "date": "2026-06-15", "alert_type": "호우", "delay_min": 11 },
-    { "date": "2026-06-09", "alert_type": null, "delay_min": 7 }
+  "hourly_delay": [
+    {
+      "time": "00:00",
+      "weekday_delay": 6.8,
+      "holiday_delay": 5.4
+    },
+    {
+      "time": "04:00",
+      "weekday_delay": 7.6,
+      "holiday_delay": 6.1
+    },
+    {
+      "time": "08:00",
+      "weekday_delay": 13.2,
+      "holiday_delay": 9.8
+    },
+    {
+      "time": "12:00",
+      "weekday_delay": 11.7,
+      "holiday_delay": 8.6
+    },
+    {
+      "time": "16:00",
+      "weekday_delay": 12.7,
+      "holiday_delay": 10.4
+    },
+    {
+      "time": "20:00",
+      "weekday_delay": 9.4,
+      "holiday_delay": 7.8
+    },
+    {
+      "time": "24:00",
+      "weekday_delay": 5.9,
+      "holiday_delay": 4.7
+    }
+  ],
+  "alert_delay_comparison": [
+    {
+      "alert_type": "호우",
+      "normal_avg_delay": 8.2,
+      "alert_avg_delay": 15.2
+    },
+    {
+      "alert_type": "폭염",
+      "normal_avg_delay": 7.1,
+      "alert_avg_delay": 12.7
+    }
   ]
 }
 ```
-> `cases[].alert_type` 는 **null 가능** — 지연 사례가 어느 특보 때문인지 매칭 안 된 경우. C는 null 처리 필요.
+> `hourly_delay` = 4시간 버킷 7포인트(`00:00`~`24:00`, KST). `holiday_delay` 는 **주말(토·일)** 을 뜻한다(공휴일 달력 없음).
+> `alert_delay_comparison` = 평시 vs 경보 때 평균 지연 비교, **호우·폭염 2행 고정**. 표본 없으면 `null`.
 
-### `GET /segment/{from}/{to}` — 구간 상세
+### `GET /segments/details?line=경부선` — 구간 상세 (전 구간 번들)
+한 노선의 모든 구간 상세를 배열로 준다. C는 `segment_id` 로 원하는 구간을 찾는다.
+(구 `GET /segment/{from}/{to}` 대체 — 단건 왕복 대신 번들 1회.)
 ```json
 {
-  "from": "대전", "to": "김천(구미)",
-  "by_alert": [
-    { "alert_type": "호우", "alert_level": "경보", "avg_delay": 14.6, "sample_n": 37 },
-    { "alert_type": "호우", "alert_level": "주의보", "avg_delay": 9.1, "sample_n": 44 },
-    { "alert_type": "폭염", "alert_level": "경보", "avg_delay": 7.2, "sample_n": 25 }
-  ],
-  "cases": [
-    { "date": "2026-06-28", "alert_type": "호우", "delay_min": 19 },
-    { "date": "2026-06-14", "alert_type": "호우", "delay_min": 12 },
-    { "date": "2026-06-03", "alert_type": null, "delay_min": 6 }
+  "line": "경부선",
+  "segments": [
+    {
+      "segment_id": "daejeon-gimcheon_gumi",
+      "from": "대전",
+      "to": "김천구미",
+      "hourly_delay": [
+        {
+          "time": "00:00",
+          "delay_min": 6.4,
+          "type": "actual"
+        },
+        {
+          "time": "04:00",
+          "delay_min": 7.1,
+          "type": "actual"
+        },
+        {
+          "time": "08:00",
+          "delay_min": 11.2,
+          "type": "actual"
+        },
+        {
+          "time": "12:00",
+          "delay_min": 14.6,
+          "type": "actual"
+        },
+        {
+          "time": "16:00",
+          "delay_min": 13.1,
+          "type": "actual"
+        },
+        {
+          "time": "20:00",
+          "delay_min": 15.8,
+          "type": "actual"
+        },
+        {
+          "time": "24:00",
+          "delay_min": 12.9,
+          "type": "actual"
+        }
+      ],
+      "delay_increase_trend": [
+        {
+          "date": "2026-07-01",
+          "delay_increase": 5.2
+        },
+        {
+          "date": "2026-07-02",
+          "delay_increase": 7.4
+        },
+        {
+          "date": "2026-07-03",
+          "delay_increase": 9.8
+        },
+        {
+          "date": "2026-07-04",
+          "delay_increase": 8.3
+        },
+        {
+          "date": "2026-07-05",
+          "delay_increase": 6.1
+        },
+        {
+          "date": "2026-07-06",
+          "delay_increase": 10.7
+        },
+        {
+          "date": "2026-07-07",
+          "delay_increase": 14.6
+        }
+      ],
+      "by_alert": [
+        {
+          "alert_type": "호우",
+          "alert_level": "경보",
+          "avg_delay": 14.6,
+          "delay_increase": 9.8,
+          "stop_rate": 0.08,
+          "sample_n": 37
+        },
+        {
+          "alert_type": "호우",
+          "alert_level": "주의보",
+          "avg_delay": 9.1,
+          "delay_increase": 5.4,
+          "stop_rate": 0.043,
+          "sample_n": 44
+        },
+        {
+          "alert_type": "폭염",
+          "alert_level": "경보",
+          "avg_delay": 7.2,
+          "delay_increase": 3.6,
+          "stop_rate": 0.025,
+          "sample_n": 25
+        }
+      ]
+    },
+    {
+      "segment_id": "osong-daejeon",
+      "from": "오송",
+      "to": "대전",
+      "hourly_delay": [
+        {
+          "time": "00:00",
+          "delay_min": 4.8,
+          "type": "actual"
+        },
+        {
+          "time": "04:00",
+          "delay_min": 5.5,
+          "type": "actual"
+        },
+        {
+          "time": "08:00",
+          "delay_min": 8.4,
+          "type": "actual"
+        },
+        {
+          "time": "12:00",
+          "delay_min": 11.3,
+          "type": "actual"
+        },
+        {
+          "time": "16:00",
+          "delay_min": 10.2,
+          "type": "actual"
+        },
+        {
+          "time": "20:00",
+          "delay_min": 12.4,
+          "type": "actual"
+        },
+        {
+          "time": "24:00",
+          "delay_min": 9.9,
+          "type": "actual"
+        }
+      ],
+      "delay_increase_trend": [
+        {
+          "date": "2026-07-01",
+          "delay_increase": 3.8
+        },
+        {
+          "date": "2026-07-02",
+          "delay_increase": 5.1
+        },
+        {
+          "date": "2026-07-03",
+          "delay_increase": 6.9
+        },
+        {
+          "date": "2026-07-04",
+          "delay_increase": 6.0
+        },
+        {
+          "date": "2026-07-05",
+          "delay_increase": 4.7
+        },
+        {
+          "date": "2026-07-06",
+          "delay_increase": 8.6
+        },
+        {
+          "date": "2026-07-07",
+          "delay_increase": 11.3
+        }
+      ],
+      "by_alert": [
+        {
+          "alert_type": "호우",
+          "alert_level": "경보",
+          "avg_delay": 11.3,
+          "delay_increase": 7.1,
+          "stop_rate": 0.05,
+          "sample_n": 42
+        },
+        {
+          "alert_type": "호우",
+          "alert_level": "주의보",
+          "avg_delay": 7.6,
+          "delay_increase": 4.0,
+          "stop_rate": 0.031,
+          "sample_n": 31
+        }
+      ]
+    },
+    {
+      "segment_id": "gwangmyeong-cheonan_asan",
+      "from": "광명",
+      "to": "천안아산",
+      "hourly_delay": [
+        {
+          "time": "00:00",
+          "delay_min": 3.9,
+          "type": "actual"
+        },
+        {
+          "time": "04:00",
+          "delay_min": 4.6,
+          "type": "actual"
+        },
+        {
+          "time": "08:00",
+          "delay_min": 6.8,
+          "type": "actual"
+        },
+        {
+          "time": "12:00",
+          "delay_min": 9.2,
+          "type": "actual"
+        },
+        {
+          "time": "16:00",
+          "delay_min": 8.7,
+          "type": "actual"
+        },
+        {
+          "time": "20:00",
+          "delay_min": 9.8,
+          "type": "actual"
+        },
+        {
+          "time": "24:00",
+          "delay_min": 7.6,
+          "type": "actual"
+        }
+      ],
+      "delay_increase_trend": [
+        {
+          "date": "2026-07-01",
+          "delay_increase": 3.1
+        },
+        {
+          "date": "2026-07-02",
+          "delay_increase": 4.5
+        },
+        {
+          "date": "2026-07-03",
+          "delay_increase": 5.9
+        },
+        {
+          "date": "2026-07-04",
+          "delay_increase": 4.8
+        },
+        {
+          "date": "2026-07-05",
+          "delay_increase": 3.7
+        },
+        {
+          "date": "2026-07-06",
+          "delay_increase": 6.9
+        },
+        {
+          "date": "2026-07-07",
+          "delay_increase": 9.2
+        }
+      ],
+      "by_alert": [
+        {
+          "alert_type": "호우",
+          "alert_level": "경보",
+          "avg_delay": 9.2,
+          "delay_increase": 5.6,
+          "stop_rate": 0.02,
+          "sample_n": 51
+        },
+        {
+          "alert_type": "호우",
+          "alert_level": "주의보",
+          "avg_delay": 6.4,
+          "delay_increase": 3.8,
+          "stop_rate": 0.014,
+          "sample_n": 39
+        },
+        {
+          "alert_type": "폭염",
+          "alert_level": "주의보",
+          "avg_delay": 4.7,
+          "delay_increase": 2.1,
+          "stop_rate": 0.009,
+          "sample_n": 22
+        }
+      ]
+    },
+    {
+      "segment_id": "dongdaegu-ulsan",
+      "from": "동대구",
+      "to": "울산",
+      "hourly_delay": [
+        {
+          "time": "00:00",
+          "delay_min": 3.2,
+          "type": "actual"
+        },
+        {
+          "time": "04:00",
+          "delay_min": 3.8,
+          "type": "actual"
+        },
+        {
+          "time": "08:00",
+          "delay_min": 5.7,
+          "type": "actual"
+        },
+        {
+          "time": "12:00",
+          "delay_min": 7.8,
+          "type": "actual"
+        },
+        {
+          "time": "16:00",
+          "delay_min": 7.0,
+          "type": "actual"
+        },
+        {
+          "time": "20:00",
+          "delay_min": 8.5,
+          "type": "actual"
+        },
+        {
+          "time": "24:00",
+          "delay_min": 6.8,
+          "type": "actual"
+        }
+      ],
+      "delay_increase_trend": [
+        {
+          "date": "2026-07-01",
+          "delay_increase": 2.6
+        },
+        {
+          "date": "2026-07-02",
+          "delay_increase": 3.7
+        },
+        {
+          "date": "2026-07-03",
+          "delay_increase": 5.1
+        },
+        {
+          "date": "2026-07-04",
+          "delay_increase": 4.3
+        },
+        {
+          "date": "2026-07-05",
+          "delay_increase": 3.2
+        },
+        {
+          "date": "2026-07-06",
+          "delay_increase": 5.9
+        },
+        {
+          "date": "2026-07-07",
+          "delay_increase": 7.8
+        }
+      ],
+      "by_alert": [
+        {
+          "alert_type": "호우",
+          "alert_level": "경보",
+          "avg_delay": 7.8,
+          "delay_increase": 4.7,
+          "stop_rate": 0.03,
+          "sample_n": 28
+        },
+        {
+          "alert_type": "폭염",
+          "alert_level": "주의보",
+          "avg_delay": 4.4,
+          "delay_increase": 1.9,
+          "stop_rate": 0.012,
+          "sample_n": 17
+        }
+      ]
+    },
+    {
+      "segment_id": "gimcheon_gumi-dongdaegu",
+      "from": "김천구미",
+      "to": "동대구",
+      "hourly_delay": [
+        {
+          "time": "00:00",
+          "delay_min": 2.8,
+          "type": "actual"
+        },
+        {
+          "time": "04:00",
+          "delay_min": 3.1,
+          "type": "actual"
+        },
+        {
+          "time": "08:00",
+          "delay_min": 4.4,
+          "type": "actual"
+        },
+        {
+          "time": "12:00",
+          "delay_min": 6.1,
+          "type": "actual"
+        },
+        {
+          "time": "16:00",
+          "delay_min": 5.9,
+          "type": "actual"
+        },
+        {
+          "time": "20:00",
+          "delay_min": 6.8,
+          "type": "actual"
+        },
+        {
+          "time": "24:00",
+          "delay_min": 5.6,
+          "type": "actual"
+        }
+      ],
+      "delay_increase_trend": [
+        {
+          "date": "2026-07-01",
+          "delay_increase": 2.1
+        },
+        {
+          "date": "2026-07-02",
+          "delay_increase": 2.9
+        },
+        {
+          "date": "2026-07-03",
+          "delay_increase": 4.0
+        },
+        {
+          "date": "2026-07-04",
+          "delay_increase": 3.5
+        },
+        {
+          "date": "2026-07-05",
+          "delay_increase": 2.7
+        },
+        {
+          "date": "2026-07-06",
+          "delay_increase": 4.6
+        },
+        {
+          "date": "2026-07-07",
+          "delay_increase": 6.1
+        }
+      ],
+      "by_alert": [
+        {
+          "alert_type": "호우",
+          "alert_level": "경보",
+          "avg_delay": 6.1,
+          "delay_increase": 3.5,
+          "stop_rate": 0.01,
+          "sample_n": 33
+        },
+        {
+          "alert_type": "호우",
+          "alert_level": "주의보",
+          "avg_delay": 4.8,
+          "delay_increase": 2.4,
+          "stop_rate": 0.008,
+          "sample_n": 26
+        },
+        {
+          "alert_type": "폭염",
+          "alert_level": "주의보",
+          "avg_delay": 4.1,
+          "delay_increase": 1.6,
+          "stop_rate": 0.006,
+          "sample_n": 21
+        }
+      ]
+    },
+    {
+      "segment_id": "ulsan-busan",
+      "from": "울산",
+      "to": "부산",
+      "hourly_delay": [
+        {
+          "time": "00:00",
+          "delay_min": 2.0,
+          "type": "actual"
+        },
+        {
+          "time": "04:00",
+          "delay_min": 2.4,
+          "type": "actual"
+        },
+        {
+          "time": "08:00",
+          "delay_min": 3.6,
+          "type": "actual"
+        },
+        {
+          "time": "12:00",
+          "delay_min": 5.4,
+          "type": "actual"
+        },
+        {
+          "time": "16:00",
+          "delay_min": 5.1,
+          "type": "actual"
+        },
+        {
+          "time": "20:00",
+          "delay_min": 5.9,
+          "type": "actual"
+        },
+        {
+          "time": "24:00",
+          "delay_min": 4.8,
+          "type": "actual"
+        }
+      ],
+      "delay_increase_trend": [
+        {
+          "date": "2026-07-01",
+          "delay_increase": 1.4
+        },
+        {
+          "date": "2026-07-02",
+          "delay_increase": 2.2
+        },
+        {
+          "date": "2026-07-03",
+          "delay_increase": 3.3
+        },
+        {
+          "date": "2026-07-04",
+          "delay_increase": 2.8
+        },
+        {
+          "date": "2026-07-05",
+          "delay_increase": 2.0
+        },
+        {
+          "date": "2026-07-06",
+          "delay_increase": 3.9
+        },
+        {
+          "date": "2026-07-07",
+          "delay_increase": 5.4
+        }
+      ],
+      "by_alert": [
+        {
+          "alert_type": "호우",
+          "alert_level": "경보",
+          "avg_delay": 5.4,
+          "delay_increase": 2.9,
+          "stop_rate": 0.0,
+          "sample_n": 7
+        },
+        {
+          "alert_type": "호우",
+          "alert_level": "주의보",
+          "avg_delay": 3.9,
+          "delay_increase": 1.7,
+          "stop_rate": 0.0,
+          "sample_n": 13
+        }
+      ]
+    }
   ]
 }
 ```
-> 역 상세는 `station`, 구간 상세는 `from`·`to` 로 최상위 키가 다르다. `by_alert`·`cases` 모양은 동일.
+> `hourly_delay[].type` 은 항상 `"actual"`(실적). 예보는 만들지 않는다(§1 "유지되는 선").
+> `by_alert[].avg_delay` 는 `segment_vulnerability` 에 컬럼 추가 전까지 `null` 가능. 키는 항상 존재.
+> `delay_increase` = 구간 신규 지연(`avg_delay_incr`).
 
 ### `GET /checklist?line=경부선` — 우선 점검 대상 Top-N
 ```json
 {
   "line": "경부선",
   "items": [
-    { "rank": 1, "target": "대전→김천(구미) 구간", "reason": "호우 경보 시 평균 +14.6분", "avg_delay_incr": 14.6, "sample_n": 37 },
-    { "rank": 2, "target": "천안→대전 구간", "reason": "호우 경보 시 평균 +11.3분", "avg_delay_incr": 11.3, "sample_n": 42 },
-    { "rank": 3, "target": "대전역", "reason": "폭염 경보 시 지연율 44%", "avg_delay_incr": 8.9, "sample_n": 61 },
-    { "rank": 4, "target": "영등포→수원 구간", "reason": "호우 경보 시 평균 +9.2분", "avg_delay_incr": 9.2, "sample_n": 51 }
+    {
+      "rank": 1,
+      "target_type": "segment",
+      "segment_id": "daejeon-gimcheon_gumi",
+      "target": "대전→김천구미 구간",
+      "reason": "호우 경보 시 평균 +14.6분",
+      "avg_delay_incr": 14.6,
+      "sample_n": 37
+    },
+    {
+      "rank": 2,
+      "target_type": "segment",
+      "segment_id": "osong-daejeon",
+      "target": "오송→대전 구간",
+      "reason": "호우 경보 시 평균 +11.3분",
+      "avg_delay_incr": 11.3,
+      "sample_n": 42
+    },
+    {
+      "rank": 3,
+      "target_type": "station",
+      "station_id": "daejeon",
+      "target": "대전역",
+      "reason": "폭염 경보 시 지연율 44%",
+      "avg_delay_incr": 8.9,
+      "sample_n": 61
+    },
+    {
+      "rank": 4,
+      "target_type": "segment",
+      "segment_id": "gwangmyeong-오송아산",
+      "target": "광명→오송아산 구간",
+      "reason": "호우 경보 시 평균 +9.2분",
+      "avg_delay_incr": 9.2,
+      "sample_n": 51
+    }
   ]
 }
 ```
+> `target_type` = `"station"` | `"segment"`. 그에 따라 `station_id` **또는** `segment_id` 중 하나가 채워진다
+> (해당 없는 키는 응답에서 빠진다). C가 상세 페이지 링크에 쓴다.
 
 ### `GET /alerts/active?line=경부선` — 현재 발효 특보 + 영향 구간 (실시간)
-현재 발효 중(`end_time IS NULL`)인 호우·폭염 특보와, 그 구역에 걸린 취약 역/구간을 결합.
 ```json
 {
   "line": "경부선",
   "updated_at": "2026-07-07T14:30:00+09:00",
   "active": [
     {
-      "region_name": "대전", "alert_type": "호우", "alert_level": "경보",
+      "region_name": "대전",
+      "alert_type": "호우",
+      "alert_level": "경보",
       "since": "2026-07-07T13:10:00+09:00",
       "affected": [
-        { "type": "segment", "from": "대전", "to": "김천(구미)", "vuln_rank": 1, "note": "호우 경보 시 평균 +14.6분" },
-        { "type": "station", "station": "대전", "vuln_rank": 1, "note": "호우 경보 시 지연율 44%" }
+        {
+          "type": "segment",
+          "from": "대전",
+          "to": "김천구미",
+          "vuln_rank": 1,
+          "note": "호우 경보 시 평균 +14.6분"
+        },
+        {
+          "type": "station",
+          "station": "대전",
+          "vuln_rank": 1,
+          "note": "호우 경보 시 지연율 44%"
+        }
       ]
     },
     {
-      "region_name": "동대구", "alert_type": "폭염", "alert_level": "주의보",
+      "region_name": "동대구",
+      "alert_type": "폭염",
+      "alert_level": "주의보",
       "since": "2026-07-07T11:00:00+09:00",
       "affected": [
-        { "type": "station", "station": "동대구", "vuln_rank": 2, "note": "폭염 경보 시 평균 +10.2분" }
+        {
+          "type": "station",
+          "station": "동대구",
+          "vuln_rank": 2,
+          "note": "폭염 경보 시 평균 +10.2분"
+        }
       ]
     }
   ]
 }
 ```
-> `affected[]` 는 `type` 에 따라 키가 다르다: `segment` 면 `from`·`to`, `station` 이면 `station`. 해당 없는 키는 응답에서 빠진다(`response_model_exclude_none`).
-> 발효 특보가 없으면 `"active": []` (정상). 이 값이 대시보드 상단 배너와 우선 점검 경보의 실시간 소스.
-> `/checklist` 는 이 현재 발효분을 반영해 "지금 우선 점검" 항목을 상단에 올린다.
-
----
+> `affected[].type` 이 `station` 이면 `station` 키, `segment` 면 `from`·`to` 키를 쓴다(해당 없는 키는 빠진다).
 
 ## 5-1. 백엔드 ↔ 프론트 계약
 
