@@ -192,30 +192,53 @@ def get_stations(line: str = "경부선", alert_type: str = "폭염", alert_leve
 
 # ── GET /heatmap ──────────────────────────────────────────────
 @app.get("/heatmap", response_model=HeatmapResponse)
-def get_heatmap(line: str = "경부선", alert_type: str = "호우"):
-    _check(alert_type)
+def get_heatmap(line: str = "경부선", alert_type: str | None = None):
+    """노선 히트맵.
+
+    alert_type 을 주면 그 특보만, **생략하면 호우·폭염을 합쳐서** 본다(기본).
+    합치는 이유: 어떤 역은 호우 이력만, 어떤 역은 폭염 이력만 있다.
+    한 종류로 고정하면 다른 종류만 겪은 역이 '데이터 없음'으로 빠져
+    노선 전체를 한눈에 본다는 히트맵의 목적이 깨진다.
+    """
+    if alert_type is not None:
+        _check(alert_type)
     if USE_MOCK:
         d = _mock("heatmap.json")
         d["line"] = line
         return d
     from db import fetch_all
-    # TODO(A와 확정): vuln(0~1) 의 정의. 아래는 avg_delay 를 min-max 정규화한 임시값.
-    #   실제 취약도 점수 산식은 A(processor)가 정하면 그 컬럼을 읽도록 교체.
+    # TODO(확정 필요): vuln(0~1) 의 정의. 아래는 avg_delay 를 min-max 정규화한 임시값.
+    #   실제 취약도 점수 산식이 정해지면 그 컬럼을 읽도록 교체.
+    #
+    # alert_type 이 없으면 스코프 전체(호우·폭염)를 대상으로 한다.
+    at_filter = "v.alert_type = %(at)s" if alert_type else "v.alert_type IN ('호우','폭염')"
+    params = {"line": line}
+    if alert_type:
+        params["at"] = alert_type
+
     nodes = fetch_all(
-        "SELECT s.station_name AS station, s.lat, s.lon, v.avg_delay "
+        # ⚠️ station_vulnerability 의 PK 는 (station_code, alert_type, alert_level) 다.
+        #    종류·등급 조건 없이 JOIN 하면 여러 행이 붙어 역이 '중복 노드'로 나온다.
+        #    히트맵은 역당 한 점이므로 MAX 로 합친다.
+        #    MAX = 그 조건에서 겪은 '최악'의 평균지연 → 취약도 표시 목적에 맞다.
+        "SELECT s.station_name AS station, s.lat, s.lon, MAX(v.avg_delay) AS avg_delay "
         "FROM stations s LEFT JOIN station_vulnerability v "
-        "  ON v.station_code=s.station_code AND v.alert_type=%(at)s "
-        "WHERE s.line=%(line)s ORDER BY s.seq_on_line NULLS LAST",
-        {"line": line, "at": alert_type},
+        f"  ON v.station_code=s.station_code AND {at_filter} "
+        "WHERE s.line=%(line)s "
+        "GROUP BY s.station_name, s.lat, s.lon, s.seq_on_line "
+        "ORDER BY s.seq_on_line NULLS LAST",
+        params,
     )
     edges = fetch_all(
-        # 히트맵 edge 도 역 이름으로 내보낸다(계약 §5). 코드 → 이름 JOIN.
-        'SELECT sf.station_name AS "from", st.station_name AS "to", v.avg_delay_incr '
+        # nodes 와 같은 이유로 중복이 생긴다 → MAX 로 합친다.
+        'SELECT sf.station_name AS "from", st.station_name AS "to", '
+        "  MAX(v.avg_delay_incr) AS avg_delay_incr "
         "FROM segment_vulnerability v "
         "  JOIN stations sf ON sf.station_code=v.from_station "
         "  JOIN stations st ON st.station_code=v.to_station "
-        "WHERE v.line=%(line)s AND v.alert_type=%(at)s",
-        {"line": line, "at": alert_type},
+        f"WHERE v.line=%(line)s AND {at_filter} "
+        "GROUP BY sf.station_name, st.station_name",
+        params,
     )
     def norm(vals):
         xs = [x for x in vals if x is not None]

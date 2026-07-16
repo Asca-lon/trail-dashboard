@@ -46,7 +46,7 @@ const GYEONGBU_HIGH_SPEED_STATIONS = Object.freeze([
   { stationId: "cheonan_asan", station: "천안아산" },
   { stationId: "osong", station: "오송" },
   { stationId: "daejeon", station: "대전" },
-  { stationId: "gimcheon_gumi", station: "김천(구미)" },
+  { stationId: "gimcheon_gumi", station: "김천구미" },
   { stationId: "dongdaegu", station: "동대구" },
   { stationId: "gyeongju", station: "경주" },
   { stationId: "ulsan", station: "울산" },

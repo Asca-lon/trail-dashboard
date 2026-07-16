@@ -241,3 +241,20 @@ def test_segments_details_shape():
         # avg_delay 는 A가 컬럼 추가 전까지 null 가능. 키는 항상 존재(§5-1(2)).
         assert set(b) >= {"alert_type", "alert_level", "avg_delay",
                           "delay_increase", "stop_rate", "sample_n"}
+
+
+def test_heatmap_without_alert_type_is_ok():
+    """alert_type 생략 = 호우·폭염 전체. 한 종류로 고정하면 다른 종류만 겪은 역이
+    '데이터 없음'으로 빠져 노선 전체를 보는 히트맵의 목적이 깨진다."""
+    r = client.get("/heatmap")
+    assert r.status_code == 200
+    assert set(r.json()) == {"line", "nodes", "edges"}
+
+
+def test_heatmap_node_per_station_is_unique():
+    """역당 노드는 하나여야 한다.
+    station_vulnerability 의 PK 가 (역, 종류, 등급)이라 조건 없이 JOIN 하면
+    등급·종류별로 중복 노드가 생긴다(SQL 에서 MAX 로 합침)."""
+    nodes = client.get("/heatmap").json()["nodes"]
+    names = [n["station"] for n in nodes]
+    assert len(names) == len(set(names)), f"중복 노드: {names}"
