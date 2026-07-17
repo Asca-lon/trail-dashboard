@@ -99,7 +99,9 @@ CREATE TABLE IF NOT EXISTS segment_vulnerability (
     line TEXT,
     alert_type TEXT,
     alert_level TEXT,
-    avg_delay_incr REAL,
+    avg_delay_incr REAL,   -- 구간 신규 지연: 도착역 지연 − 출발역 지연 (이 구간에서 '새로' 생긴 지연)
+    avg_delay REAL,        -- 도착역의 절대 지연 평균 (앞 구간에서 누적된 것 포함. 신규 지연과 다르다)
+    delay_rate REAL,       -- 도착역 지연 비율 (운영 기준 KTX 5분 이상)
     stop_rate REAL,
     sample_n INTEGER,
     updated_at TIMESTAMPTZ DEFAULT now(),
