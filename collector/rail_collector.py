@@ -292,10 +292,18 @@ def collect_rail_by_date(target_date=None):
                         actual_arr = parse_iso_time(run_ymd_param, item.get('trn_arvl_dt') or item.get('trnArvlDt'))
                         actual_dpt = parse_iso_time(run_ymd_param, item.get('trn_dptre_dt') or item.get('trnDptreDt'))
                         
+                        # ⚠️ 열차번호 정규화는 **조회 전에** 해야 한다.
+                        #    API 는 '00001' 처럼 0 을 채워 주는데 시각표 CSV 는 '1' 이다.
+                        #    저장할 때만 lstrip('0') 하고 조회는 원본으로 하면
+                        #    '00001' != '1' 이라 계획시각 매칭이 100% 실패한다.
+                        #    (그래서 수집기는 delay 를 못 만들고, DB 값(정규화됨)으로 도는
+                        #     recompute_delay.py 만 98% 매칭됐다.)
+                        trn_no_str = str(trn_no).lstrip('0')
+
                         # =====================================================================
                         # 2. CSV 파일에서 계획 시간 가져오도록 수정
                         # =====================================================================
-                        csv_planned_time = get_planned_time_from_csv(trn_no, stn_nm_str, run_ymd_param)
+                        csv_planned_time = get_planned_time_from_csv(trn_no_str, stn_nm_str, run_ymd_param)
                         
                         q['총'] += 1
                         if csv_planned_time:
@@ -373,7 +381,7 @@ def collect_rail_by_date(target_date=None):
 
                         batch_data.append((
                             target_date,
-                            str(trn_no).lstrip('0'),
+                            trn_no_str,          # 조회에 쓴 값과 동일해야 한다(위 주석 참고)
                             seq_val,
                             stn_cd_str,
                             str(line_nm),
@@ -415,6 +423,7 @@ def collect_rail_by_date(target_date=None):
 
                     total_count = body.get('totalCount', 0)
                     if page_no * num_of_rows >= total_count:
+                        _report_quality(target_date, q)
                         print(f"🏁 {target_date} 완료 — 총 {page_no}페이지 조회, 경부선 외 {skipped}건 제외")
                         break
 
@@ -432,10 +441,28 @@ def collect_rail_by_date(target_date=None):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--date", type=str)
+    parser = argparse.ArgumentParser(
+        description="경부고속선 KTX 운행 실적 수집. 인자 없으면 '어제' 하루를 수집한다."
+    )
+    parser.add_argument("--date", type=str, metavar="YYYY-MM-DD",
+                        help="특정 날짜만 수집")
+    parser.add_argument("--backfill", type=int, metavar="DAYS",
+                        help="최근 N일을 겹쳐 수집 (예: --backfill 3). "
+                             "철도 실적은 1일 지연으로 확정되므로, 어제 하루만 받으면 "
+                             "그때 미확정이던 실적이 영영 NULL 로 남는다. "
+                             "며칠 겹쳐 받으면 나중에 확정된 실적이 자동으로 메워진다"
+                             "(ON CONFLICT DO UPDATE 라 중복은 안전).")
     args = parser.parse_args()
+
     # 실패는 반드시 종료코드로 알린다(리뷰 3.12).
     # 조용히 0 으로 끝나면 daily_update.sh 가 성공으로 보고 불완전한 데이터로 집계한다.
+    if args.backfill:
+        ok_all = True
+        for i in range(1, args.backfill + 1):
+            d = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
+            # 한 날짜가 실패해도 나머지는 계속 받는다. 종료코드는 전체 성공일 때만 0.
+            ok_all = collect_rail_by_date(d) and ok_all
+        sys.exit(0 if ok_all else 1)
+
     ok = collect_rail_by_date(args.date)
     sys.exit(0 if ok else 1)

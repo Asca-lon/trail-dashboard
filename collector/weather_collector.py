@@ -172,30 +172,47 @@ def parse_events(raw):
 def build_intervals(events):
     """발표/해제 이벤트를 짝지어 발효 구간(start_time, end_time)으로 만든다.
 
-    같은 (구역, 종류, 등급) 안에서 시간순으로 훑으며
-      발표(CMD 1/2/5/6) → 구간 열기
-      해제(CMD 3/4/7)  → 구간 닫기
-    끝까지 안 닫힌 구간은 end_time=None (아직 발효 중).
+    ⚠️ 핵심: 특보는 **등급이 바뀌며 대치(CMD=2)** 된다.
+        호우 주의보 발표 → 호우 경보로 대치 → 다시 주의보로 대치 → 해제
+        이때 '경보 종료'는 해제(CMD=3)가 아니라 **주의보로 대치(CMD=2, LVL=2)** 로 온다.
+
+        그래서 (구역, 종류, 등급)으로 묶으면 안 된다. 그러면 대치 이벤트가
+        '주의보 시작'으로만 보이고 '경보 종료'로는 안 보여서 경보가 영영 안 닫힌다.
+        실측: 경보 11/124 만 닫히고 113 건이 '발효 중'(최장 58일)으로 남았다.
+        end_time 이 NULL 이면 집계가 '지금까지 발효 중'으로 보므로,
+        그 구역의 모든 열차가 특보 상태로 잡혀 표본이 부풀려진다.
+
+    → (구역, 종류)로 묶고 **현재 열린 등급**을 추적한다.
+      다른 등급의 발표가 오면 이전 등급 구간을 그 시각에 닫고 새로 연다.
     """
     grouped = defaultdict(list)
     for e in events:
-        grouped[(e['region_code'], e['alert_type'], e['alert_level'])].append(e)
+        grouped[(e['region_code'], e['alert_type'])].append(e)
 
     intervals = []
-    for (region, atype, alevel), evs in grouped.items():
+    for (region, atype), evs in grouped.items():
         evs.sort(key=lambda x: x['tm_ef'])
-        open_at = None
+        open_level = None      # 지금 열려 있는 등급
+        open_at = None         # 그 등급이 시작된 시각
+
         for e in evs:
-            if e['cmd'] in CMD_START:
-                if open_at is None:
-                    open_at = e['tm_ef']
-                # 이미 열려 있으면(연장·변경) 시작시각 유지
-            elif e['cmd'] in CMD_END:
-                if open_at is not None:
-                    intervals.append((region, atype, alevel, open_at, e['tm_ef']))
-                    open_at = None
-        if open_at is not None:
-            intervals.append((region, atype, alevel, open_at, None))   # 발효 중
+            if e['cmd'] in CMD_END:
+                if open_level is not None:
+                    intervals.append((region, atype, open_level, open_at, e['tm_ef']))
+                    open_level, open_at = None, None
+
+            elif e['cmd'] in CMD_START:
+                if open_level is None:
+                    open_level, open_at = e['alert_level'], e['tm_ef']
+                elif e['alert_level'] != open_level:
+                    # 등급 대치: 이전 등급을 여기서 닫고 새 등급을 연다.
+                    if e['tm_ef'] > open_at:
+                        intervals.append((region, atype, open_level, open_at, e['tm_ef']))
+                    open_level, open_at = e['alert_level'], e['tm_ef']
+                # 같은 등급이면 연장·변경 → 시작시각 유지
+
+        if open_level is not None:
+            intervals.append((region, atype, open_level, open_at, None))   # 아직 발효 중
     return intervals
 
 

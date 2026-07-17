@@ -476,13 +476,32 @@ def get_segments_details(line: str = "경부선"):
     from db import fetch_all
     # 구간 신규 지연(§4 참고 SQL). 인접 seq(A→B)의 delay_min 차.
     # 읽기 전용이라 매 요청 계산한다. 무거워지면 A에게 segment_daily 집계 테이블을 요청한다.
+    # ⚠️ 이 CTE 는 processor/vulnerability.py 의 구간 정의와 **반드시 같아야 한다.**
+    #    by_alert 은 segment_vulnerability(집계 테이블)에서 오고, hourly/trend 는 여기서 온다.
+    #    정의가 다르면 같은 응답 안에서 두 지표가 어긋나거나 키가 안 맞아 통째로 누락된다.
+    #
+    #    맞춰야 할 두 가지:
+    #    (1) 인접: seq(열차 정차순서)만 쓰면 KTX 가 역을 건너뛸 때(서울→오송 급행)
+    #        선로에 없는 구간이 생긴다. seq_on_line 차이가 1 인 것만 인정한다.
+    #    (2) 정규화: from/to 를 노선 순서(북→남)로 통일한다. 정규화하지 않으면
+    #        상행(부산→울산)이 집계의 '울산-부산' 과 키가 달라 매칭에 실패한다.
     INCR_CTE = (
         "WITH incr AS ( "
-        "  SELECT a.station_code AS f, b.station_code AS t, "
-        "         b.delay_min - a.delay_min AS delay_incr, b.event_time "
-        "  FROM train_stops a JOIN train_stops b "
+        "  SELECT "
+        "    CASE WHEN sa.seq_on_line < sb.seq_on_line THEN a.station_code "
+        "         ELSE b.station_code END AS f, "
+        "    CASE WHEN sa.seq_on_line < sb.seq_on_line THEN b.station_code "
+        "         ELSE a.station_code END AS t, "
+        "    b.delay_min - a.delay_min AS delay_incr, "
+        "    b.event_time "
+        "  FROM train_stops a "
+        "  JOIN train_stops b "
         "    ON a.run_date=b.run_date AND a.train_no=b.train_no AND b.seq=a.seq+1 "
-        "  WHERE a.line=%(line)s AND a.delay_min IS NOT NULL AND b.delay_min IS NOT NULL "
+        "  JOIN stations sa ON sa.station_code=a.station_code "
+        "  JOIN stations sb ON sb.station_code=b.station_code "
+        "  WHERE a.delay_min IS NOT NULL AND b.delay_min IS NOT NULL "
+        "    AND sa.line=%(line)s AND sb.line=%(line)s "
+        "    AND ABS(sa.seq_on_line - sb.seq_on_line) = 1 "
         ") "
     )
 

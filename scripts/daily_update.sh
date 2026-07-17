@@ -40,9 +40,29 @@ fi
 
 fail=0
 
+# ── 0) 계획시각 CSV 보장 ─────────────────────────────────────
+# CSV 는 엑셀에서 만드는 파생물이라 .gitignore 대상이고, 이미지를 재빌드하면
+# 호스트에 없을 경우 컨테이너에서도 사라진다. 그러면 rail_collector 가
+# "계획시각 CSV 로딩 실패"로 수집을 중단한다(지연이 전부 0 이 되는 걸 막는 안전장치).
+# 엑셀에서 몇 초면 만들어지므로, 없을 때만 만들어 배치를 자가복구시킨다.
+if ! docker compose exec -T api test -f collector/gyeongbu_plan_total.csv 2>/dev/null; then
+    log "⓪ 계획시각 CSV 없음 → 엑셀에서 생성"
+    if docker compose exec -T api python -u collector/excel_to_csv.py >>"$LOG" 2>&1; then
+        log "   ✅ 생성 완료"
+    else
+        log "   ❌ CSV 생성 실패 — 이대로 수집하면 지연이 전부 0 이 되므로 중단"
+        exit 1
+    fi
+fi
+
 # ── 1) 열차 실적 (인자 없으면 '어제'를 수집) ──────────────────
-log "① 열차 실적 수집"
-if docker compose exec -T api python -u collector/rail_collector.py >>"$LOG" 2>&1; then
+log "① 열차 실적 수집 (최근 3일 겹침)"
+# --backfill 3 인 이유: 철도 실적은 1일 지연으로 확정된다.
+# 어제 하루만 받으면, 그 시점에 실적이 미확정이던 날(actual_arrival 이 비어 있는 날)은
+# 다시 볼 기회가 없어 영영 delay_min=NULL 로 남는다. 실제로 7/16 이 그렇게 비었다.
+# 3일 겹쳐 받으면 나중에 확정된 실적이 자동으로 메워진다
+# (ON CONFLICT DO UPDATE 라 중복 수집은 안전).
+if docker compose exec -T api python -u collector/rail_collector.py --backfill 3 >>"$LOG" 2>&1; then
     log "   ✅ 완료"
 else
     log "   ❌ 실패"
