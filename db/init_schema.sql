@@ -1,3 +1,22 @@
+-- db/init_schema.sql — 경부고속선 기상 취약구간 대시보드 스키마
+--
+-- compose 의 db 서비스가 최초 기동 시 이 파일을 자동 실행한다(01_schema.sql).
+--
+-- ── TimescaleDB ──────────────────────────────────────────────
+-- 원시 시계열 두 테이블(train_stops, weather_alerts)만 하이퍼테이블로 둔다.
+-- 집계 결과(station/segment_vulnerability)와 참조 테이블(stations, station_regions)은
+-- 시계열이 아니라 일반 테이블로 남긴다.
+--
+-- ⚠️ 하이퍼테이블은 UNIQUE·PK 에 **파티션 컬럼이 반드시 포함**돼야 한다.
+--    그래서 파티션 키를 이렇게 골랐다:
+--      train_stops    → run_date    (자연키 run_date+train_no+station_code 에 이미 포함)
+--      weather_alerts → start_time  (PK 를 자연키로 바꿔 포함시킴. 아래 주석 참고)
+--    train_stops 를 event_time 으로 파티션하면 자연키를 다시 설계해야 하므로 쓰지 않는다.
+--
+-- 현재 규모(90일 · 8.4만 행)에서 성능 이득은 크지 않다. 다노선·다열차종·장기 데이터로
+-- 확장할 때를 위한 시계열 구조다.
+CREATE EXTENSION IF NOT EXISTS timescaledb;
+
 CREATE TABLE IF NOT EXISTS stations (
     station_code TEXT PRIMARY KEY,
     station_name TEXT NOT NULL,
@@ -45,13 +64,17 @@ CREATE INDEX IF NOT EXISTS idx_ts_line ON train_stops (line, event_time DESC);
 CREATE INDEX IF NOT EXISTS idx_ts_train ON train_stops (run_date, train_no, seq);
 
 CREATE TABLE IF NOT EXISTS weather_alerts (
-    alert_id BIGSERIAL PRIMARY KEY,
+    -- ⚠️ PK 를 자연키로 둔다(종전엔 alert_id BIGSERIAL PRIMARY KEY 였다).
+    --    하이퍼테이블은 UNIQUE·PK 에 **파티션 컬럼(start_time)이 반드시 포함**돼야 한다.
+    --    alert_id 는 start_time 을 안 담아 create_hypertable 이 거부한다.
+    --    alert_id 는 코드 어디에서도 참조하지 않아 없애도 안전하고,
+    --    ON CONFLICT 가 쓰던 uq_weather_alerts 와 키가 같아 동작도 그대로다.
     region_code TEXT NOT NULL,
     alert_type TEXT NOT NULL,
     alert_level TEXT NOT NULL,
     start_time TIMESTAMPTZ NOT NULL,
     end_time TIMESTAMPTZ,
-    CONSTRAINT uq_weather_alerts UNIQUE (region_code, alert_type, alert_level, start_time)
+    PRIMARY KEY (region_code, alert_type, alert_level, start_time)
 );
 
 CREATE INDEX IF NOT EXISTS idx_alert_region ON weather_alerts (region_code, start_time DESC);
@@ -107,3 +130,13 @@ CREATE TABLE IF NOT EXISTS segment_vulnerability (
     updated_at TIMESTAMPTZ DEFAULT now(),
     PRIMARY KEY (from_station, to_station, alert_type, alert_level)
 );
+
+
+-- ── 하이퍼테이블 전환 ─────────────────────────────────────────
+-- 반드시 CREATE TABLE 뒤에 온다. 이미 데이터가 있어도 migrate_data 로 옮긴다.
+-- if_not_exists 라 재실행해도 안전하다(compose 재기동 시 이 파일이 다시 돌 수 있다).
+SELECT create_hypertable('train_stops', by_range('run_date'),
+                         if_not_exists => TRUE, migrate_data => TRUE);
+
+SELECT create_hypertable('weather_alerts', by_range('start_time'),
+                         if_not_exists => TRUE, migrate_data => TRUE);

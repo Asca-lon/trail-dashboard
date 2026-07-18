@@ -47,9 +47,20 @@ services:
         required: false
 
   db:
-    # 순수 PostgreSQL 스키마(IF NOT EXISTS, timescale 확장 없음)라 표준 이미지로 충분.
-    # A가 Timescale 하이퍼테이블을 도입하면 image 를 timescale/timescaledb 로 바꾼다.
-    image: postgres:16-alpine
+    # TimescaleDB (PostgreSQL 16 기반). 일반 PostgreSQL 이미지와 달리 timescaledb 확장이
+    # 미리 설치돼 있어 init_schema.sql 의 CREATE EXTENSION 이 바로 동작한다.
+    # 순수 PostgreSQL 로 되돌리려면 postgres:16-alpine 로 바꾸고
+    # init_schema.sql 의 CREATE EXTENSION·create_hypertable 세 줄을 지우면 된다.
+    image: timescale/timescaledb:latest-pg16
+    # ⚠️ shared_preload_libraries 를 여기서 명시하는 이유:
+    #    timescaledb 는 공유 라이브러리를 '서버 기동 시' 미리 올려야 하는 확장이다.
+    #    이미지는 최초 initdb 때 postgresql.conf 에 이 설정을 넣어주는데,
+    #    **데이터 디렉터리가 이미 있으면 initdb 를 건너뛰어** 설정이 안 들어간다.
+    #    (postgres:16-alpine 으로 만든 볼륨을 그대로 쓰는 경우가 정확히 그렇다:
+    #     "FATAL: extension timescaledb must be preloaded")
+    #    command 로 주면 볼륨이 새것이든 기존 것이든 항상 적용된다.
+    command: ["postgres", "-c", "shared_preload_libraries=timescaledb"]
+    
     profiles: ["db"]           # 기본 up 에는 안 뜬다. --profile db 일 때만.
     environment:
       POSTGRES_DB: trail

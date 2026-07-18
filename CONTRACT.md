@@ -190,15 +190,34 @@ trail-dashboard/
 
 ## 4. DB 스키마 (`db/init_schema.sql`)
 
-> 아래는 **실제 `db/init_schema.sql` 전문**이다(복붙이 아니라 파일 그대로).
+> 아래는 **실제 `db/init_schema.sql` 전문**이다(요약이 아니라 파일 그대로).
 > compose 의 db 서비스가 최초 기동 시 이 파일을 자동 실행한다.
 
-> **하이퍼테이블(TimescaleDB)은 보류.** 데이터 규모(경부고속선 3개월, 약 9만 행)에서는
-> 순수 PostgreSQL 로 충분하고, 확장 설치·파티션 키 제약 등 복잡도만 늘기 때문이다.
-> 필요해지면 compose 의 `image` 를 `timescale/timescaledb` 로 바꾸고
-> `CREATE EXTENSION` + `create_hypertable` 두 줄을 추가하면 된다.
+> **TimescaleDB 적용.** 원시 시계열 두 테이블만 하이퍼테이블로 두고,
+> 집계 결과·참조 테이블은 일반 테이블로 남긴다.
+> 현재 규모(90일 · 8.4만 행)에서 성능 이득은 크지 않다 — 다노선·다열차종·장기 데이터
+> 확장을 위한 시계열 구조다.
 
 ```sql
+-- db/init_schema.sql — 경부고속선 기상 취약구간 대시보드 스키마
+--
+-- compose 의 db 서비스가 최초 기동 시 이 파일을 자동 실행한다(01_schema.sql).
+--
+-- ── TimescaleDB ──────────────────────────────────────────────
+-- 원시 시계열 두 테이블(train_stops, weather_alerts)만 하이퍼테이블로 둔다.
+-- 집계 결과(station/segment_vulnerability)와 참조 테이블(stations, station_regions)은
+-- 시계열이 아니라 일반 테이블로 남긴다.
+--
+-- ⚠️ 하이퍼테이블은 UNIQUE·PK 에 **파티션 컬럼이 반드시 포함**돼야 한다.
+--    그래서 파티션 키를 이렇게 골랐다:
+--      train_stops    → run_date    (자연키 run_date+train_no+station_code 에 이미 포함)
+--      weather_alerts → start_time  (PK 를 자연키로 바꿔 포함시킴. 아래 주석 참고)
+--    train_stops 를 event_time 으로 파티션하면 자연키를 다시 설계해야 하므로 쓰지 않는다.
+--
+-- 현재 규모(90일 · 8.4만 행)에서 성능 이득은 크지 않다. 다노선·다열차종·장기 데이터로
+-- 확장할 때를 위한 시계열 구조다.
+CREATE EXTENSION IF NOT EXISTS timescaledb;
+
 CREATE TABLE IF NOT EXISTS stations (
     station_code TEXT PRIMARY KEY,
     station_name TEXT NOT NULL,
@@ -222,7 +241,17 @@ CREATE TABLE IF NOT EXISTS train_stops (
     planned_departure TIMESTAMPTZ,
     actual_departure TIMESTAMPTZ,
     delay_min INTEGER,
-    status TEXT NOT NULL DEFAULT '정상' CHECK (status IN ('정상','지연','운행중단')),
+    -- 상태 구분:
+    --   정상/지연     : 계획·실제 시각이 모두 있어 지연을 계산한 결과
+    --   운행중단      : API 가 중단으로 표기
+    --   실적미확정    : 계획시각 또는 실제시각이 없어 지연을 계산할 수 없음
+    --                  ← 이 경우 delay_min 은 NULL. 0 으로 채우면 '정시'로 오인되어
+    --                    평균을 끌어내리고 정시율을 부풀린다(집계는 NULL 을 제외한다).
+    status TEXT NOT NULL DEFAULT '정상'
+        CHECK (status IN ('정상','지연','운행중단','실적미확정')),
+    -- 실제 기상 노출 시각 = COALESCE(실제도착, 실제출발, 계획도착, 계획출발).
+    -- 특보 매칭('그 열차가 실제로 그 시각에 그 기상에 노출됐나')과 시간대별 분석의 기준축.
+    -- ⚠️ 계획시각이 아니다. 계획 기준 축이 필요하면 planned_arrival 을 직접 쓴다.
     event_time TIMESTAMPTZ NOT NULL,
     ingested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     -- 자연키: 한 열차(train_no)는 하루(run_date)에 한 역(station_code)에 한 번 선다.
@@ -236,13 +265,17 @@ CREATE INDEX IF NOT EXISTS idx_ts_line ON train_stops (line, event_time DESC);
 CREATE INDEX IF NOT EXISTS idx_ts_train ON train_stops (run_date, train_no, seq);
 
 CREATE TABLE IF NOT EXISTS weather_alerts (
-    alert_id BIGSERIAL PRIMARY KEY,
+    -- ⚠️ PK 를 자연키로 둔다(종전엔 alert_id BIGSERIAL PRIMARY KEY 였다).
+    --    하이퍼테이블은 UNIQUE·PK 에 **파티션 컬럼(start_time)이 반드시 포함**돼야 한다.
+    --    alert_id 는 start_time 을 안 담아 create_hypertable 이 거부한다.
+    --    alert_id 는 코드 어디에서도 참조하지 않아 없애도 안전하고,
+    --    ON CONFLICT 가 쓰던 uq_weather_alerts 와 키가 같아 동작도 그대로다.
     region_code TEXT NOT NULL,
     alert_type TEXT NOT NULL,
     alert_level TEXT NOT NULL,
     start_time TIMESTAMPTZ NOT NULL,
     end_time TIMESTAMPTZ,
-    CONSTRAINT uq_weather_alerts UNIQUE (region_code, alert_type, alert_level, start_time)
+    PRIMARY KEY (region_code, alert_type, alert_level, start_time)
 );
 
 CREATE INDEX IF NOT EXISTS idx_alert_region ON weather_alerts (region_code, start_time DESC);
@@ -290,28 +323,48 @@ CREATE TABLE IF NOT EXISTS segment_vulnerability (
     line TEXT,
     alert_type TEXT,
     alert_level TEXT,
-    avg_delay_incr REAL,
+    avg_delay_incr REAL,   -- 구간 신규 지연: 도착역 지연 − 출발역 지연 (이 구간에서 '새로' 생긴 지연)
+    avg_delay REAL,        -- 도착역의 절대 지연 평균 (앞 구간에서 누적된 것 포함. 신규 지연과 다르다)
+    delay_rate REAL,       -- 도착역 지연 비율 (운영 기준 KTX 5분 이상)
     stop_rate REAL,
     sample_n INTEGER,
     updated_at TIMESTAMPTZ DEFAULT now(),
     PRIMARY KEY (from_station, to_station, alert_type, alert_level)
 );
+
+
+-- ── 하이퍼테이블 전환 ─────────────────────────────────────────
+-- 반드시 CREATE TABLE 뒤에 온다. 이미 데이터가 있어도 migrate_data 로 옮긴다.
+-- if_not_exists 라 재실행해도 안전하다(compose 재기동 시 이 파일이 다시 돌 수 있다).
+SELECT create_hypertable('train_stops', by_range('run_date'),
+                         if_not_exists => TRUE, migrate_data => TRUE);
+
+SELECT create_hypertable('weather_alerts', by_range('start_time'),
+                         if_not_exists => TRUE, migrate_data => TRUE);
 ```
 
-**핵심 설계 결정 3가지**
+**핵심 설계 결정 4가지**
 
-1. **`train_stops` 의 자연키에서 `event_time` 을 뺐다.**
+1. **하이퍼테이블 파티션 키는 UNIQUE·PK 에 포함돼야 한다.**
+   TimescaleDB 의 제약이다. 그래서 파티션 키를 이렇게 골랐다.
+   - `train_stops` → `run_date`. 자연키(`run_date+train_no+station_code`)에 이미 있어
+     중복 방지 정책을 그대로 유지한다. `event_time` 으로 파티션하면 자연키를 다시 설계해야 한다.
+   - `weather_alerts` → `start_time`. 종전 PK 였던 `alert_id`(BIGSERIAL)는 `start_time` 을
+     안 담아 `create_hypertable` 이 거부한다. `alert_id` 는 코드 어디서도 참조하지 않으므로
+     PK 를 자연키로 바꿨다. `ON CONFLICT` 는 컬럼 기반이라 동작이 그대로다.
+
+2. **`train_stops` 의 자연키에서 `event_time` 을 뺐다.**
    `event_time`(실제 도착시각)은 API 를 재조회할 때마다 분 단위로 달라진다.
    이걸 UNIQUE 키에 넣었더니 같은 정차가 매번 새 행이 되어 `ON CONFLICT` 가 무력화됐고,
    백필을 돌린 횟수만큼 중복이 쌓였다(실측 9.8배). 한 열차는 하루에 한 역에 한 번 선다.
 
-2. **`station_regions` (역 ↔ 특보구역 1:N).**
+3. **`station_regions` (역 ↔ 특보구역 1:N).**
    `stations.region_code` 한 칸으로는 부족하다.
    (a) 2026-05-31 특보구역 개편으로 옛/새 코드가 3개월 창 안에 공존하고,
    (b) 역이 '경주동부'인지 '경주서부'인지 행정경계 없이는 단정할 수 없다.
    해당 시의 하위권역 + 상위(광역시) 코드를 모두 넣어 과소매칭을 막는다.
 
-3. **`region_code` 는 기상청 '특보구역'(L형식) 이다.**
+4. **`region_code` 는 기상청 '특보구역'(L형식) 이다.**
    `weather_alerts.region_code` 가 `wrn_met_data.php` 의 `REG_ID`(예: `L1030100`)이므로
    `stations`/`station_regions` 도 같은 체계여야 매칭된다.
    예보구역(`11C20401`)·지점번호(`133`)와 혼동하면 집계가 0행이 된다.

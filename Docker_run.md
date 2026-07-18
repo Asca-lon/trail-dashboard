@@ -134,7 +134,7 @@ docker compose down
 USE_MOCK=0 docker compose --profile db up --build -d
 ```
 
-- `--profile db` 를 붙여야 **PostgreSQL 컨테이너**가 뜬다. 안 붙이면 API만 뜬다.
+- `--profile db` 를 붙여야 **DB 컨테이너(TimescaleDB)**가 뜬다. 안 붙이면 API만 뜬다.
   이후 모든 compose 명령에도 붙여야 한다(`docker compose --profile db ps` 등).
   매번 치기 번거로우면 `export COMPOSE_PROFILES=db` 로 고정할 수 있다.
 - 최초 기동 시 `db/init_schema.sql` + `db/seed_stations.sql` 이 자동 실행되어
@@ -152,6 +152,11 @@ $env:USE_MOCK=0; docker compose --profile db up --build -d
 ```bash
 docker compose --profile db exec db psql -U trail -d trail -c "SELECT count(*) FROM stations;"
 # → 10  (seed 정상)
+
+# 하이퍼테이블 전환 확인 (TimescaleDB)
+docker compose --profile db exec db psql -U trail -d trail -c "
+SELECT hypertable_name, num_chunks FROM timescaledb_information.hypertables;"
+# → train_stops, weather_alerts 두 줄
 curl http://localhost:8000/health
 # → {"status":"ok","mode":"db"}
 ```
@@ -206,7 +211,7 @@ docker compose cp api:/app/collector/gyeongbu_plan_total.csv collector/gyeongbu_
 ### ② 열차 실적 90일 백필
 
 ```bash
-docker compose exec api sh -c 'for i in $(seq 1 90); do python -u collector/rail_collector.py --date $(date -d "-$i day" +%Y-%m-%d); done' 2>&1 | tee ~/backfill.log
+docker compose exec api python -u collector/rail_collector.py --backfill 90 2>&1 | tee ~/backfill.log
 ```
 
 - **5시간 안팎** 걸린다(전국 데이터를 받아 경부선 KTX 만 걸러냄).
@@ -261,6 +266,9 @@ crontab -e
 ```
 
 > 05시인 이유: 철도 실적은 1일 지연으로 들어온다. 새벽에 전일자가 확정된 뒤 돌린다.
+> 열차는 `--backfill 3` 으로 최근 3일을 겹쳐 받는다 — 수집 시점에 실적이 미확정이던 날
+> (`actual_arrival` 이 비어 delay 를 못 만든 날)을 다음 배치가 자동으로 메우기 위해서다.
+> 기상도 같은 이유로 `--backfill 2` 다. 둘 다 `ON CONFLICT DO UPDATE` 라 중복은 안전하다.
 > 로그는 `logs/daily_YYYYMMDD.log` 에 남고 30일 뒤 자동 삭제된다.
 
 ---
@@ -275,6 +283,7 @@ crontab -e
 | 코드를 고쳤는데 반영 안 됨 | `--build` 없이 띄웠을 때. `docker compose up --build` 로 다시. |
 | 빌드가 느리거나 멈춤 | 첫 빌드는 원래 느리다(이미지 다운로드). 네트워크 확인하고 기다린다. |
 | `docker: command not found` | Docker 미설치 또는 PATH 문제. 위 "Docker 설치" 참고. Windows면 Docker Desktop 재설치. |
+| `FATAL: extension "timescaledb" must be preloaded` | 기존 볼륨(순수 PostgreSQL 로 만든 것)을 쓰는 중. timescaledb 는 기동 시 미리 올려야 하는데, 데이터 디렉터리가 이미 있으면 이미지가 initdb 를 건너뛰어 설정을 못 넣는다. `docker-compose.yml` 의 db 서비스에 `command: ["postgres", "-c", "shared_preload_libraries=timescaledb"]` 가 있는지 확인하고 `docker compose down && docker compose --profile db up -d` (⚠️ `-v` 금지 — 데이터가 날아간다). |
 | `service "db" is not running` | `--profile db` 를 빠뜨림. db 는 프로파일로 격리돼 있어 모든 compose 명령에 붙여야 한다. |
 | 지연(`avg_delay`)이 전부 **0** | 계획시각 CSV 를 안 만듦. §6-① `excel_to_csv.py` 실행. |
 | `❌ 계획시각 CSV 로딩 실패: No columns to parse` | CSV 가 0바이트. `docker compose exec ... > file` 리다이렉트로 만들면 이렇게 된다. `docker compose cp` 를 쓸 것. |
@@ -301,7 +310,7 @@ docker compose down            # 종료·정리
 # .env 에 API 키 2개 + USE_MOCK=0 넣은 뒤
 USE_MOCK=0 docker compose --profile db up --build -d
 docker compose exec api python -u collector/excel_to_csv.py                  # ① 계획시각 (필수!)
-docker compose exec api sh -c 'for i in $(seq 1 90); do python -u collector/rail_collector.py --date $(date -d "-$i day" +%Y-%m-%d); done'   # ② 열차 5시간
+docker compose exec api python -u collector/rail_collector.py --backfill 90        # ② 열차 5시간
 docker compose exec api python -u collector/weather_collector.py --backfill 90  # ③ 기상 수초
 docker compose exec api python -u processor/vulnerability.py                 # ④ 집계
 ```
