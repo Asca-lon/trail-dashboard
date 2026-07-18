@@ -28,8 +28,6 @@ const GYEONGBU_HIGH_SPEED_STATIONS = [
   { station_id: "busan", station: "부산" },
 ];
 
-const HIGH_DELAY_RATE_THRESHOLD = 0.4;
-const WARNING_DELAY_RATE_THRESHOLD = 0.25;
 const LINE_CHART_MAX_VALUE = 40;
 const LINE_CHART_MIN_X = 42;
 const LINE_CHART_MAX_X = 590;
@@ -43,6 +41,7 @@ const RISK_LABELS = {
   high: "높음",
   warning: "주의",
   interest: "관심",
+  insufficient: "표본 부족",
   none: "정보 없음",
 };
 const STATION_RISK_STATUS_MODIFIER_CLASSES = Object.keys(RISK_LABELS).map(
@@ -110,22 +109,6 @@ function renderStationUpdatedTime(updatedAt) {
     stationInfoElements.updatedTime.textContent = formatUpdatedDateTime(updatedAt);
     stationInfoElements.updatedTime.dateTime = updatedAt || "";
   }
-}
-
-function getRiskLevelByDelayRate(delayRate) {
-  if (!Number.isFinite(delayRate)) {
-    return "none";
-  }
-
-  if (delayRate >= HIGH_DELAY_RATE_THRESHOLD) {
-    return "high";
-  }
-
-  if (delayRate >= WARNING_DELAY_RATE_THRESHOLD) {
-    return "warning";
-  }
-
-  return "interest";
 }
 
 function formatStationName(stationName) {
@@ -338,8 +321,8 @@ function createSelectedStationDetail(stationDetailData, selectedStationName) {
 function renderStationInfo(stationDetailData, vulnerabilityStationsData, stationMetrics) {
   const stationName = formatStationName(stationDetailData.station);
   const lineName = vulnerabilityStationsData.line || "노선 정보 없음";
-  const riskLevel = getRiskLevelByDelayRate(stationMetrics?.delay_rate);
-  const riskLabel = RISK_LABELS[riskLevel];
+  const riskLevel = stationMetrics?.risk_level || "none";
+  const riskLabel = RISK_LABELS[riskLevel] || RISK_LABELS.none;
   const alertType = vulnerabilityStationsData.alert_type || "특보";
   const alertLevel = vulnerabilityStationsData.alert_level || "";
 

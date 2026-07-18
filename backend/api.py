@@ -36,6 +36,10 @@ from models import (
     StationDetail, SegmentsDetailsResponse, ChecklistResponse, AlertsActiveResponse,
     station_slug, segment_slug, resolve_station,
 )
+from risk_rules import (
+    classify_station_risk, classify_segment_risk, get_confidence,
+    station_risk_reason, segment_risk_reason,
+)
 
 # ── 설정 ──────────────────────────────────────────────────────
 USE_MOCK = os.getenv("USE_MOCK", "1") == "1"
@@ -108,6 +112,44 @@ def _bucket_rows_to_points(rows: list[dict], *keys: str) -> list[dict]:
     return points
 
 
+# ── 등급 부착 ────────────────────────────────────────────────
+# 원시 지표 dict 에 risk_level/confidence/risk_reason 을 채운다(mock·DB 공용).
+# 프론트가 자체 임계값을 계산하지 않도록 백엔드가 단일 기준으로 등급을 확정한다.
+def _attach_station_risk(item: dict) -> dict:
+    n = item.get("sample_n") or 0
+    lvl = classify_station_risk(item.get("delta_delay"), item.get("delay_rate"), n)
+    item["risk_level"] = lvl
+    item["confidence"] = get_confidence(n)
+    item["risk_reason"] = station_risk_reason(
+        lvl, item.get("delta_delay"), item.get("delay_rate"), n)
+    return item
+
+
+def _attach_segment_risk(item: dict) -> dict:
+    n = item.get("sample_n") or 0
+    lvl = classify_segment_risk(item.get("avg_delay_incr"), n)
+    item["risk_level"] = lvl
+    item["confidence"] = get_confidence(n)
+    item["risk_reason"] = segment_risk_reason(lvl, item.get("avg_delay_incr"), n)
+    return item
+
+
+# 히트맵 vuln(0~1) ↔ 등급. 등급이 권위값, vuln 은 하위호환 색상 힌트.
+_VULN_BY_RISK = {"high": 0.85, "warning": 0.6, "interest": 0.2, "insufficient": None}
+
+
+def _vuln_to_risk(vuln) -> str:
+    """mock 노드가 risk_level 없이 vuln 만 있을 때의 역산(설명용 fallback)."""
+    if vuln is None:
+        return "insufficient"
+    v = float(vuln)
+    if v >= 0.7:
+        return "high"
+    if v >= 0.5:
+        return "warning"
+    return "interest"
+
+
 @app.get("/health")
 def health():
     return {"status": "ok", "mode": "mock" if USE_MOCK else "db"}
@@ -148,6 +190,7 @@ def get_segments(line: str = "경부선", alert_type: str | None = None,
         d["alert_level"] = alert_level or "전체"
         for s in d["segments"]:
             s.setdefault("segment_id", segment_slug(s["from"], s["to"]))
+            _attach_segment_risk(s)
         return d
     from db import fetch_all
 
@@ -182,13 +225,13 @@ def get_segments(line: str = "경부선", alert_type: str | None = None,
         "ORDER BY 3 DESC NULLS LAST",
         params,
     )
-    segments = [{
+    segments = [_attach_segment_risk({
         "segment_id": segment_slug(r["from"], r["to"]),
         "from": r["from"], "to": r["to"],
         "avg_delay_incr": _r1(r["avg_delay_incr"]),
         "stop_rate": round(r["stop_rate"], 2) if r["stop_rate"] is not None else None,
         "sample_n": r["sample_n"],
-    } for r in rows]
+    }) for r in rows]
     return {
         "line": line,
         "alert_type": alert_type or "전체",
@@ -218,6 +261,7 @@ def get_stations(line: str = "경부선", alert_type: str | None = None, alert_l
             if s.get("delay_count") is None and s.get("sample_n") is not None \
                     and s.get("delay_rate") is not None:
                 s["delay_count"] = round(s["sample_n"] * s["delay_rate"])
+            _attach_station_risk(s)
         return d
     from db import fetch_all
 
@@ -256,7 +300,7 @@ def get_stations(line: str = "경부선", alert_type: str | None = None, alert_l
         base = _r1(r["base_avg_delay"])
         n = r["sample_n"]
         rate = r["delay_rate"]
-        stations.append({
+        stations.append(_attach_station_risk({
             "station_id": station_slug(r["station"]),
             "station": r["station"],
             "avg_delay": avg,
@@ -266,7 +310,7 @@ def get_stations(line: str = "경부선", alert_type: str | None = None, alert_l
             "sample_n": n,
             # delay_count 는 DB 컬럼이 아니라 유도값(프론트 추정식과 동일)
             "delay_count": round(n * rate) if (n is not None and rate is not None) else None,
-        })
+        }))
     return {
         "line": line,
         "alert_type": alert_type or "전체",
@@ -290,11 +334,10 @@ def get_heatmap(line: str = "경부선", alert_type: str | None = None):
     if USE_MOCK:
         d = _mock("heatmap.json")
         d["line"] = line
+        for it in d.get("nodes", []) + d.get("edges", []):
+            it.setdefault("risk_level", _vuln_to_risk(it.get("vuln")))
         return d
     from db import fetch_all
-    # TODO(확정 필요): vuln(0~1) 의 정의. 아래는 avg_delay 를 min-max 정규화한 임시값.
-    #   실제 취약도 점수 산식이 정해지면 그 컬럼을 읽도록 교체.
-    #
     # alert_type 이 없으면 스코프 전체(호우·폭염)를 대상으로 한다.
     at_filter = "v.alert_type = %(at)s" if alert_type else "v.alert_type IN ('호우','폭염')"
     params = {"line": line}
@@ -304,11 +347,18 @@ def get_heatmap(line: str = "경부선", alert_type: str | None = None):
     nodes = fetch_all(
         # ⚠️ station_vulnerability 의 PK 는 (station_code, alert_type, alert_level) 다.
         #    종류·등급 조건 없이 JOIN 하면 여러 행이 붙어 역이 '중복 노드'로 나온다.
-        #    히트맵은 역당 한 점이므로 MAX 로 합친다 = 그 조건에서 겪은 '최악'.
+        #    히트맵은 역당 한 점이므로 합친다. 예전엔 MAX(최악값)를 썼으나, 순위표는
+        #    표본수 가중평균을 써서 같은 역이 노선도 '높음' / 순위표 '관심'으로 어긋났다.
+        #    → 순위표와 동일하게 표본수 가중평균으로 합쳐 등급을 일치시킨다.
         #
-        # vuln 은 delay_rate(지연율)로 만든다 — 취약 역 순위표가 쓰는 지표와 같아야
-        # 노선도 배지와 순위표 배지가 어긋나지 않는다.
-        "SELECT s.station_name AS station, s.lat, s.lon, MAX(v.delay_rate) AS delay_rate "
+        # 역 등급은 delta_delay(평시 대비 증가) + delay_rate 2지표를 함께 본다.
+        # 그래서 delay_rate 뿐 아니라 avg_delay·base_avg_delay·sample_n 도 가져온다.
+        # base_avg_delay 는 역 단위 기준선이라 조합과 무관하게 같은 값 → MAX 로 집어온다.
+        "SELECT s.station_name AS station, s.lat, s.lon, "
+        "  SUM(v.delay_rate * v.sample_n) / NULLIF(SUM(v.sample_n),0) AS delay_rate, "
+        "  SUM(v.avg_delay  * v.sample_n) / NULLIF(SUM(v.sample_n),0) AS avg_delay, "
+        "  MAX(v.base_avg_delay) AS base_avg_delay, "
+        "  SUM(v.sample_n) AS sample_n "
         "FROM stations s LEFT JOIN station_vulnerability v "
         f"  ON v.station_code=s.station_code AND {at_filter} "
         "WHERE s.line=%(line)s "
@@ -317,9 +367,10 @@ def get_heatmap(line: str = "경부선", alert_type: str | None = None):
         params,
     )
     edges = fetch_all(
-        # nodes 와 같은 이유로 중복이 생긴다 → MAX 로 합친다.
+        # nodes 와 같은 이유로 중복이 생긴다 → 순위표와 같은 표본수 가중평균으로 합친다.
         'SELECT sf.station_name AS "from", st.station_name AS "to", '
-        "  MAX(v.avg_delay_incr) AS avg_delay_incr "
+        "  SUM(v.avg_delay_incr * v.sample_n) / NULLIF(SUM(v.sample_n),0) AS avg_delay_incr, "
+        "  SUM(v.sample_n) AS sample_n "
         "FROM segment_vulnerability v "
         "  JOIN stations sf ON sf.station_code=v.from_station "
         "  JOIN stations st ON st.station_code=v.to_station "
@@ -327,42 +378,31 @@ def get_heatmap(line: str = "경부선", alert_type: str | None = None):
         "GROUP BY sf.station_name, st.station_name",
         params,
     )
-    # ── vuln(0~1) 산식 ────────────────────────────────────────────
-    # ⚠️ 예전엔 min-max 정규화를 썼다. 그러면 '조회된 것 중 최댓값'이 항상 1.0 이 되어,
-    #    전 구간 지연이 0.7~2.8분처럼 미미해도 최댓값 구간이 '높음'으로 표시됐다.
-    #    실제로 노선도는 '높음', 같은 구간의 TOP5 표는 '관심'으로 어긋났다
-    #    (TOP5 는 절대 분 기준 {높음 12분, 주의 7분}을 쓴다).
-    #
-    # → 프론트의 절대 임계값에 앵커를 맞춘 고정 산식으로 바꾼다.
-    #   프론트: vuln >= 0.7 → 높음, >= 0.5 → 주의
-    #   그래서 (주의 임계, 0.5) 와 (높음 임계, 0.7) 을 지나는 구간별 선형 매핑을 쓴다.
-    #   이러면 노선도와 순위표가 같은 판정을 내린다.
-    def _abs_vuln(v, warn_at, high_at):
-        """절대값 → 0~1. warn_at 에서 0.5, high_at 에서 0.7, 그 위는 완만히 1.0 까지."""
-        if v is None:
-            return None            # 표본 없음. 0.0(가장 덜 취약)과 구분해야 한다.
-        v = float(v)
-        if v <= 0:
-            return 0.0
-        if v < warn_at:
-            return round(v / warn_at * 0.5, 3)
-        if v < high_at:
-            return round(0.5 + (v - warn_at) / (high_at - warn_at) * 0.2, 3)
-        return round(min(1.0, 0.7 + (v - high_at) / high_at * 0.3), 3)
 
-    # 역: 지연율(delay_rate) 기준 — 취약 역 순위표가 쓰는 지표와 같게 맞춘다
-    #     (프론트 stationDelayRate: 높음 0.4, 주의 0.25).
-    # 구간: 평균 신규 지연(분) 기준 — 위험 구간 순위표와 같게
-    #     (프론트 delayIncreaseMinutes: 높음 12, 주의 7).
-    STATION_WARN, STATION_HIGH = 0.25, 0.4
-    SEGMENT_WARN, SEGMENT_HIGH = 7.0, 12.0
+    # ── 등급 → vuln(0~1) ─────────────────────────────────────────
+    # 등급 산정을 risk_rules 로 단일화했으므로, 예전의 임의 0~1 선형 변환(_abs_vuln)은 버린다.
+    # vuln 은 하위호환 색상 힌트로만 남기고 risk_level 에서 파생시켜 둘이 항상 일치하게 한다.
+    #   높음 0.85 / 주의 0.6 / 관심 0.2 / 표본부족 → null(표본 없음과 동일 취급).
+    # (프론트 현행 임계값 0.7·0.5 로도 색이 올바르게 나온다.)
+    def _node(r):
+        n = r["sample_n"] or 0
+        delta = None
+        if r["avg_delay"] is not None and r["base_avg_delay"] is not None:
+            delta = round(float(r["avg_delay"]) - float(r["base_avg_delay"]), 1)
+        lvl = classify_station_risk(delta, r["delay_rate"], n)
+        return {"station": r["station"], "lat": r["lat"], "lon": r["lon"],
+                "vuln": _VULN_BY_RISK[lvl], "risk_level": lvl}
+
+    def _edge(r):
+        n = r["sample_n"] or 0
+        lvl = classify_segment_risk(r["avg_delay_incr"], n)
+        return {"from": r["from"], "to": r["to"],
+                "vuln": _VULN_BY_RISK[lvl], "risk_level": lvl}
 
     return {
         "line": line,
-        "nodes": [{"station": r["station"], "lat": r["lat"], "lon": r["lon"],
-                   "vuln": _abs_vuln(r["delay_rate"], STATION_WARN, STATION_HIGH)} for r in nodes],
-        "edges": [{"from": r["from"], "to": r["to"],
-                   "vuln": _abs_vuln(r["avg_delay_incr"], SEGMENT_WARN, SEGMENT_HIGH)} for r in edges],
+        "nodes": [_node(r) for r in nodes],
+        "edges": [_edge(r) for r in edges],
     }
 
 
@@ -587,28 +627,48 @@ def get_checklist(line: str = "경부선"):
     if USE_MOCK:
         d = _mock("checklist.json")
         d["line"] = line
+        for it in d.get("items", []):
+            it.setdefault("risk_level",
+                          classify_segment_risk(it.get("avg_delay_incr"), it.get("sample_n") or 0))
         return d
     from db import fetch_all
-    # 우선 점검 Top-N: 구간 취약도 상위. TODO(A와 확정): 현재 발효 특보 반영해 상단 가중.
+    # 우선 점검 Top-N. 등급이 순위표·히트맵과 어긋나지 않도록 **같은 집계 단위**를 쓴다:
+    #   특보 조합별 행이 아니라 '구간 단위'로 표본수 가중평균을 낸 뒤 등급을 매긴다.
+    #   (조합별로 매기면 한 특보에서만 심한 구간이 checklist 에서만 주의로 뜬다.)
+    # TODO(A와 확정): 현재 발효 특보 반영해 상단 가중.
     rows = fetch_all(
-        # 코드 → 이름 JOIN. 이름이라야 target("대전→김천(구미) 구간")과 segment_id 가 맞다.
-        "SELECT sf.station_name AS from_station, st.station_name AS to_station, "
-        "  v.alert_type, v.alert_level, v.avg_delay_incr, v.sample_n "
+        # 코드 → 이름 JOIN. 이름이라야 target("대전→김천구미 구간")과 segment_id 가 맞다.
+        # get_segments 와 동일한 가중평균. 표본 적은 조합이 과대평가되지 않는다.
+        'SELECT sf.station_name AS from_station, st.station_name AS to_station, '
+        "  SUM(v.avg_delay_incr * v.sample_n) / NULLIF(SUM(v.sample_n),0) AS avg_delay_incr, "
+        "  SUM(v.sample_n) AS sample_n "
         "FROM segment_vulnerability v "
         "  JOIN stations sf ON sf.station_code=v.from_station "
         "  JOIN stations st ON st.station_code=v.to_station "
         "WHERE v.line=%(line)s AND v.alert_type IN ('호우','폭염') "
-        "ORDER BY v.avg_delay_incr DESC NULLS LAST LIMIT 10",
+        "GROUP BY sf.station_name, st.station_name",
         {"line": line},
     )
+    # 1) 표본 10건 미만 제외  2) 등급(높음→주의→관심) 우선  3) 같은 등급이면 신규지연 내림차순  4) 상위 10
+    _RISK_ORDER = {"high": 0, "warning": 1, "interest": 2, "insufficient": 3}
+    cands = []
+    for r in rows:
+        n = r["sample_n"] or 0
+        if n < 10:
+            continue
+        lvl = classify_segment_risk(r["avg_delay_incr"], n)
+        cands.append((lvl, r))
+    cands.sort(key=lambda t: (_RISK_ORDER[t[0]], -(t[1]["avg_delay_incr"] or 0)))
     items = [{
         "rank": i + 1,
         "target_type": "segment",
         "segment_id": segment_slug(r["from_station"], r["to_station"]),
         "target": f"{r['from_station']}→{r['to_station']} 구간",
-        "reason": f"{r['alert_type']} {r['alert_level']} 시 평균 +{r['avg_delay_incr']:.1f}분",
-        "avg_delay_incr": r["avg_delay_incr"], "sample_n": r["sample_n"],
-    } for i, r in enumerate(rows)]
+        # 조합이 아니라 구간 전체 기준 사유(등급과 같은 근거).
+        "reason": segment_risk_reason(lvl, r["avg_delay_incr"], r["sample_n"]),
+        "avg_delay_incr": _r1(r["avg_delay_incr"]), "sample_n": r["sample_n"],
+        "risk_level": lvl,
+    } for i, (lvl, r) in enumerate(cands[:10])]
     return {"line": line, "items": items}
 
 

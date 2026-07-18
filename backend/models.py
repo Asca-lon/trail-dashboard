@@ -25,6 +25,9 @@ from __future__ import annotations
 from typing import Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
+# 등급 리터럴은 risk_rules 가 단일 기준. 여기선 응답 필드 타입으로만 재사용한다.
+from risk_rules import RiskLevel  # "interest" | "warning" | "high" | "insufficient"
+
 # 필터 허용값 고정 (§5-1 (4)). 자유 입력 금지.
 AlertType = Literal["호우", "폭염"]   # 스코프 한정(CONTRACT §1)
 AlertLevel = Literal["주의보", "경보"]
@@ -87,6 +90,10 @@ class Segment(BaseModel):
     avg_delay_incr: float
     stop_rate: float
     sample_n: int
+    # 등급은 백엔드가 산정한다(risk_rules). 프론트는 표시만. §5-1 필드 추가 허용.
+    risk_level: RiskLevel
+    confidence: str          # "normal" | "low" | "insufficient" — 표본 신뢰도
+    risk_reason: str
 
 class SegmentsResponse(BaseModel):
     line: str
@@ -107,6 +114,10 @@ class StationVuln(BaseModel):
     # 특보 시 지연 발생 건수. DB 에는 컬럼이 없어 round(sample_n * delay_rate) 로 유도한다
     # (프론트의 추정식과 동일 → 값 일치). 유도 불가 시 null → 프론트가 "약 N건"으로 대체.
     delay_count: Optional[int] = None
+    # 등급은 백엔드가 산정한다(risk_rules). 역은 delta_delay + delay_rate 2지표를 함께 본다.
+    risk_level: RiskLevel
+    confidence: str          # "normal" | "low" | "insufficient" — 표본 신뢰도
+    risk_reason: str
 
 class StationsResponse(BaseModel):
     line: str
@@ -123,13 +134,16 @@ class HeatmapNode(BaseModel):
     lat: Optional[float] = None
     lon: Optional[float] = None
     # null = 해당 특보 표본 없음(데이터 없음). 0.0(가장 덜 취약)과 구분한다.
+    # vuln(0~1)은 하위호환용 색상 힌트. 권위 있는 등급은 risk_level 이며 둘은 항상 일치한다.
     vuln: Optional[float] = None
+    risk_level: RiskLevel
 
 class HeatmapEdge(BaseModel):
     model_config = _ALIAS
     from_: str = Field(alias="from")
     to: str
     vuln: Optional[float] = None
+    risk_level: RiskLevel
 
 class HeatmapResponse(BaseModel):
     line: str
@@ -224,6 +238,8 @@ class ChecklistItem(BaseModel):
     reason: str
     avg_delay_incr: float
     sample_n: int
+    # 점검표 등급도 백엔드가 확정한다(프론트 임계값 제거). 표본 10건 미만은 애초에 목록에서 빠진다.
+    risk_level: RiskLevel
 
 class ChecklistResponse(BaseModel):
     line: str

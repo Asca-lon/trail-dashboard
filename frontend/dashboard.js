@@ -34,12 +34,6 @@ const FILTER_QUERY_PARAM_NAMES = Object.freeze({
 const ALERT_LEVEL_ORDER = Object.freeze(["주의보", "경보"]);
 const TRAIN_TYPE_ORDER = Object.freeze(["KTX", "새마을", "무궁화"]);
 
-const RISK_THRESHOLDS = Object.freeze({
-  vulnerabilityScore: Object.freeze({ high: 0.7, warning: 0.5 }),
-  delayIncreaseMinutes: Object.freeze({ high: 12, warning: 7 }),
-  stationDelayRate: Object.freeze({ high: 0.4, warning: 0.25 }),
-});
-
 const GYEONGBU_HIGH_SPEED_STATIONS = Object.freeze([
   { stationId: "seoul", station: "서울" },
   { stationId: "gwangmyeong", station: "광명" },
@@ -57,6 +51,7 @@ const RISK_LEVELS = {
   high: { label: "높음", color: "#EF4444" },
   warning: { label: "주의", color: "#F59E0B" },
   interest: { label: "관심", color: "#22C55E" },
+  insufficient: { label: "표본 부족", color: "#9CA3AF" },
   none: { label: "-", color: "#D1D5DB" },
 };
 
@@ -95,6 +90,7 @@ const heatmapElements = {
     high: document.querySelector('[data-dashboard-heatmap-summary="high"]'),
     warning: document.querySelector('[data-dashboard-heatmap-summary="warning"]'),
     interest: document.querySelector('[data-dashboard-heatmap-summary="interest"]'),
+    insufficient: document.querySelector('[data-dashboard-heatmap-summary="insufficient"]'),
     none: document.querySelector('[data-dashboard-heatmap-summary="none"]'),
   },
   referenceTime: document.querySelector("[data-dashboard-heatmap-reference-time]"),
@@ -329,24 +325,8 @@ function getHighRiskHighSpeedSegmentCount(heatmapData) {
 
   return edges.filter((edge) =>
     isHighSpeedSegment(edge.from, edge.to)
-    && getRiskLevel(edge.vuln, RISK_THRESHOLDS.vulnerabilityScore) === "high",
+    && edge.risk_level === "high",
   ).length;
-}
-
-function getRiskLevel(value, thresholds) {
-  if (!Number.isFinite(value)) {
-    return "none";
-  }
-
-  if (value >= thresholds.high) {
-    return "high";
-  }
-
-  if (value >= thresholds.warning) {
-    return "warning";
-  }
-
-  return "interest";
 }
 
 function updateRecentUpdatedTime(updatedAt) {
@@ -773,9 +753,9 @@ function renderSummaryCards(
 }
 
 function createRouteMapItem(node, segment, stations = []) {
-  const riskLevel = getRiskLevel(node.vuln, RISK_THRESHOLDS.vulnerabilityScore);
-  const risk = RISK_LEVELS[riskLevel];
-  const segmentRiskLevel = getRiskLevel(segment?.vuln, RISK_THRESHOLDS.vulnerabilityScore);
+  const riskLevel = node.risk_level || "none";
+  const risk = RISK_LEVELS[riskLevel] || RISK_LEVELS.none;
+  const segmentRiskLevel = segment?.risk_level || "none";
   const stationInfo = getStationByName(node.station, stations);
   const stationId = stationInfo?.station_id || node.stationId;
   const item = document.createElement("li");
@@ -821,12 +801,12 @@ function createRouteMapItem(node, segment, stations = []) {
 function countHeatmapEdgesByRiskLevel(edges) {
   return edges.reduce(
     (counts, edge) => {
-      const riskLevel = getRiskLevel(edge.vuln, RISK_THRESHOLDS.vulnerabilityScore);
-      counts[riskLevel] += 1;
+      const riskLevel = edge.risk_level || "none";
+      counts[riskLevel] = (counts[riskLevel] ?? 0) + 1;
 
       return counts;
     },
-    { high: 0, warning: 0, interest: 0, none: 0 },
+    { high: 0, warning: 0, interest: 0, insufficient: 0, none: 0 },
   );
 }
 
@@ -855,10 +835,10 @@ function buildHighSpeedRoute(nodes, edges) {
       node: {
         stationId: stationReference.stationId,
         station: stationName,
-        vuln: node?.vuln ?? null,
+        risk_level: node?.risk_level ?? "none",
       },
       segment: nextStationName
-        ? { from: stationName, to: nextStationName, vuln: segment?.vuln ?? null }
+        ? { from: stationName, to: nextStationName, risk_level: segment?.risk_level ?? "none" }
         : null,
     };
   });
@@ -1097,10 +1077,7 @@ function renderEmptyRankings() {
 
 function createSegmentRankingRow(segment, index, lineName) {
   const row = document.createElement("tr");
-  const riskLevel = getRiskLevel(
-    segment.avg_delay_incr,
-    RISK_THRESHOLDS.delayIncreaseMinutes,
-  );
+  const riskLevel = segment.risk_level || "none";
   const riskCell = document.createElement("td");
 
   if (segment.segment_id) {
@@ -1121,7 +1098,7 @@ function createSegmentRankingRow(segment, index, lineName) {
 
 function createStationRankingRow(station, index, lineName) {
   const row = document.createElement("tr");
-  const riskLevel = getRiskLevel(station.delay_rate, RISK_THRESHOLDS.stationDelayRate);
+  const riskLevel = station.risk_level || "none";
   const riskCell = document.createElement("td");
   const hasExactDelayCount = Number.isFinite(station.delay_count);
   const estimatedDelayCount = Number.isFinite(station.sample_n) && Number.isFinite(station.delay_rate)
@@ -1193,10 +1170,7 @@ function renderInspectionDetail(item, stations = []) {
     return;
   }
 
-  const riskLevel = getRiskLevel(
-    item.avg_delay_incr,
-    RISK_THRESHOLDS.delayIncreaseMinutes,
-  );
+  const riskLevel = item.risk_level || "none";
   const stationName = getStationNameFromInspectionItem(item, stations);
   const stationId = getStationByName(stationName, stations)?.station_id;
   const segmentId = item.target_type === "segment" ? item.segment_id : null;
@@ -1204,7 +1178,7 @@ function renderInspectionDetail(item, stations = []) {
   const list = document.createElement("dl");
   const fields = [
     ["대상", item.target || "-"],
-    ["위험도", RISK_LEVELS[riskLevel].label],
+    ["위험도", (RISK_LEVELS[riskLevel] || RISK_LEVELS.none).label],
     ["기상특보", getAlertLabelFromReason(item.reason)],
     ["주요 위험", item.reason || "-"],
     ["평균 지연 증가", Number.isFinite(item.avg_delay_incr) ? `+${item.avg_delay_incr.toFixed(1)}분` : "-"],
@@ -1273,10 +1247,7 @@ function createInspectionTargetCell(item, stations) {
 
 function createInspectionRow(item, stations) {
   const row = document.createElement("tr");
-  const riskLevel = getRiskLevel(
-    item.avg_delay_incr,
-    RISK_THRESHOLDS.delayIncreaseMinutes,
-  );
+  const riskLevel = item.risk_level || "none";
   const riskCell = document.createElement("td");
   const detailCell = document.createElement("td");
   const detailButton = document.createElement("button");

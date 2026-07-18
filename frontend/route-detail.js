@@ -10,10 +10,6 @@ const ACTIVE_ALERTS_MOCK_URL = "/alerts/active";
 
 const SEGMENT_ID_QUERY_PARAM = "segment_id";
 
-const HIGH_EXPECTED_DELAY_THRESHOLD = 15;
-const WARNING_EXPECTED_DELAY_THRESHOLD = 5;
-const HIGH_STOP_RATE_THRESHOLD = 0.05;
-const WARNING_STOP_RATE_THRESHOLD = 0.02;
 const LINE_CHART_MAX_VALUE = 40;
 const LINE_CHART_MIN_X = 38;
 const LINE_CHART_MAX_X = 438;
@@ -31,6 +27,7 @@ const RISK_LABELS = {
   high: "높음",
   warning: "주의",
   interest: "관심",
+  insufficient: "표본 부족",
   none: "정보 없음",
 };
 const RISK_CARD_MODIFIER_CLASSES = Object.keys(RISK_LABELS).map(
@@ -248,7 +245,7 @@ function renderActiveAlerts(alertsData, selectedSegment) {
     isAlertMatchingSegment(alert, selectedSegment?.from, selectedSegment?.to)
   ));
   const riskLevel = matchingAlerts.length > 0
-    ? getRiskLevel(selectedSegment?.avg_delay_incr, selectedSegment?.stop_rate)
+    ? (selectedSegment?.risk_level || "none")
     : "none";
 
   activeAlertCardElements.forEach((card) => {
@@ -349,31 +346,6 @@ function formatCompactCaseDate(dateString) {
   );
 
   return `${parts.year}.${parts.month}.${parts.day}`;
-}
-
-function getRiskLevel(expectedDelay, stopRate) {
-  const hasExpectedDelay = Number.isFinite(expectedDelay);
-  const hasStopRate = Number.isFinite(stopRate);
-
-  if (!hasExpectedDelay && !hasStopRate) {
-    return "none";
-  }
-
-  if (
-    (hasExpectedDelay && expectedDelay >= HIGH_EXPECTED_DELAY_THRESHOLD)
-    || (hasStopRate && stopRate >= HIGH_STOP_RATE_THRESHOLD)
-  ) {
-    return "high";
-  }
-
-  if (
-    (hasExpectedDelay && expectedDelay >= WARNING_EXPECTED_DELAY_THRESHOLD)
-    || (hasStopRate && stopRate >= WARNING_STOP_RATE_THRESHOLD)
-  ) {
-    return "warning";
-  }
-
-  return "interest";
 }
 
 function getStatusBadgeClass(alertLevel) {
@@ -1172,7 +1144,7 @@ function renderRoutePageMeta(segmentDetailData, selectedSegment) {
 function renderRouteSummary(segmentDetailData, vulnerabilitySegmentsData, selectedSegment, alertsData) {
   const fromStation = selectedSegment?.from || segmentDetailData.from;
   const toStation = selectedSegment?.to || segmentDetailData.to;
-  const riskLevel = getRiskLevel(selectedSegment?.avg_delay_incr, selectedSegment?.stop_rate);
+  const riskLevel = selectedSegment?.risk_level || "none";
   const alertText = `${vulnerabilitySegmentsData.alert_type || "특보"} ${vulnerabilitySegmentsData.alert_level || ""}`.trim();
   const updatedAt = alertsData.updated_at;
   const formattedUpdatedAt = formatUpdatedDateTime(updatedAt);
