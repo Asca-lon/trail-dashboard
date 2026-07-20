@@ -560,9 +560,9 @@ function createDelayTrendBar(trendItem, index, itemCount) {
     BAR_CHART_MIN_HEIGHT,
     Math.min((trendItem.delay_increase / BAR_CHART_MAX_VALUE) * BAR_CHART_MAX_HEIGHT, BAR_CHART_MAX_HEIGHT),
   );
-  const isToday = index === itemCount - 1;
+  const isYesterday = index === itemCount - 1;
 
-  bar.className = `route-bar-chart__item${isToday ? " route-bar-chart__item--today" : ""}`;
+  bar.className = `route-bar-chart__item${isYesterday ? " route-bar-chart__item--yesterday" : ""}`;
   bar.style.height = `${height.toFixed(0)}px`;
   value.textContent = Number.isFinite(trendItem.delay_increase) ? trendItem.delay_increase.toFixed(1) : "-";
   label.textContent = formatChartDateLabel(trendItem.date);

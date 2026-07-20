@@ -2575,7 +2575,7 @@ select {
   background: #BFDBFE;
 }
 
-.route-chart-legend__bar--today {
+.route-chart-legend__bar--yesterday {
   background: var(--color-danger-red);
 }
 
@@ -2672,12 +2672,12 @@ select {
   height: 88px;
 }
 
-.route-bar-chart__item--today {
+.route-bar-chart__item--yesterday {
   height: 124px;
   background: var(--color-danger-red);
 }
 
-.route-bar-chart__item--today span {
+.route-bar-chart__item--yesterday span {
   color: var(--color-danger-red);
   font-weight: 600;
 }
