@@ -9,8 +9,8 @@ curl / frontend
         ├─ 기존 get_stations/get_segments: 대시보드와 동일한 현재 지표
         ├─ /data/rag_index.json: 프로젝트 문서·코드 검색
         └─ LiteLLM Proxy
-             ├─ rag-chat      → OpenAI 채팅 모델
-             └─ rag-embedding → OpenAI 임베딩 모델
+             ├─ rag-chat      → AI 채팅 모델
+             └─ rag-embedding → AI 임베딩 모델
 ```
 
 MVP 인덱스는 Docker named volume `ragdata`의 JSON 파일로 저장한다. 철도 시계열 DB와 분리되어 있어 기존 TimescaleDB 이미지와 스키마를 변경하지 않는다.
@@ -180,7 +180,7 @@ const data = await response.json();
 ## 7. 운영 주의사항
 
 - 서버 방화벽에서 4000번 포트를 외부에 공개하지 않는다. Compose는 기본적으로 `127.0.0.1`에만 바인딩한다.
-- `.env`와 OpenAI API 키를 커밋하지 않는다.
+- `.env`와 API 키를 커밋하지 않는다.
 - `LITELLM_MASTER_KEY` 기본값은 개발 전용이므로 서버에서 반드시 교체한다.
 - LiteLLM 이미지는 검증 후 특정 버전 또는 digest로 고정하는 것이 좋다.
 - 현재 인덱스는 파일 기반 MVP다. 문서 규모와 동시 사용자가 증가하면 pgvector 저장소로 교체한다.
