@@ -58,7 +58,7 @@ HOUR_BUCKETS = [0, 4, 8, 12, 16, 20]
 app = FastAPI(title="경부선 기상 취약구간 API", version="0.2.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS, allow_methods=["GET"], allow_headers=["*"],
+    allow_origins=CORS_ORIGINS, allow_methods=["GET", "POST", "OPTIONS"], allow_headers=["*"],
 )
 
 
@@ -753,3 +753,8 @@ def get_alerts_active(line: str = "경부선"):
             "affected": affected,
         })
     return {"line": line, "updated_at": now, "active": active}
+
+
+# RAG 라우터는 기존 API 함수 정의가 끝난 뒤 등록한다.
+from rag.router import router as rag_router
+app.include_router(rag_router)

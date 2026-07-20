@@ -65,11 +65,14 @@ services:
     image: docker.litellm.ai/berriai/litellm:main-latest
     profiles: ["rag"]
     command: ["--config", "/app/config.yaml", "--port", "4000"]
+    env_file:
+      - path: .env
+        required: false
     environment:
-      GEMINI_API_KEY: "${GEMINI_API_KEY}"
-      LITELLM_MASTER_KEY: "${LITELLM_MASTER_KEY}"
-      LITELLM_CHAT_MODEL: "${LITELLM_CHAT_MODEL:-GEMINI/gemini-3.5-flash}"
-      LITELLM_EMBED_MODEL: "${LITELLM_EMBED_MODEL:-gemini/gemini-embedding-001}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      LITELLM_MASTER_KEY: "${LITELLM_MASTER_KEY:-sk-local-dev}"
+      LITELLM_CHAT_MODEL: "${LITELLM_CHAT_MODEL:-openai/gpt-5-mini}"
+      LITELLM_EMBED_MODEL: "${LITELLM_EMBED_MODEL:-openai/text-embedding-3-small}"
     volumes:
       - ./litellm/config.yaml:/app/config.yaml:ro
     ports:

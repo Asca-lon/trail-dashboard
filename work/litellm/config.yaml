@@ -1,0 +1,14 @@
+model_list:
+  - model_name: rag-chat
+    litellm_params:
+      model: os.environ/LITELLM_CHAT_MODEL
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: rag-embedding
+    litellm_params:
+      model: os.environ/LITELLM_EMBED_MODEL
+      api_key: os.environ/OPENAI_API_KEY
+
+litellm_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  drop_params: true

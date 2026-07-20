@@ -1,0 +1,1949 @@
+diff --git a/.docs/RAG_LiteLLM.md b/.docs/RAG_LiteLLM.md
+new file mode 100644
+index 0000000..8a10ee3
+--- /dev/null
++++ b/.docs/RAG_LiteLLM.md
+@@ -0,0 +1,186 @@
++# RAG + LiteLLM 서버 실행
++
++## 구성
++
++```text
++curl / frontend
++    → FastAPI POST /rag/ask
++        ├─ target_resolver: 질문의 역·구간 판별
++        ├─ 기존 get_stations/get_segments: 대시보드와 동일한 현재 지표
++        ├─ /data/rag_index.json: 프로젝트 문서·코드 검색
++        └─ LiteLLM Proxy
++             ├─ rag-chat      → OpenAI 채팅 모델
++             └─ rag-embedding → OpenAI 임베딩 모델
++```
++
++MVP 인덱스는 Docker named volume `ragdata`의 JSON 파일로 저장한다. 철도 시계열 DB와 분리되어 있어 기존 TimescaleDB 이미지와 스키마를 변경하지 않는다.
++
++## 1. 환경 파일
++
++```bash
++cp .env.example .env
++```
++
++최소 수정 항목:
++
++```dotenv
++RAG_ENABLED=1
++OPENAI_API_KEY=sk-...
++LITELLM_MASTER_KEY=충분히_긴_임의의_키
++LITELLM_API_KEY=위와_같은_값
++```
++
++기본 모델:
++
++```dotenv
++LITELLM_CHAT_MODEL=openai/gpt-5-mini
++LITELLM_EMBED_MODEL=openai/text-embedding-3-small
++```
++
++모델을 변경하면 `rag-ingest`를 다시 실행해야 한다. 문서와 질문은 반드시 같은 임베딩 모델을 사용한다.
++
++## 2. 이미지 빌드와 서비스 시작
++
++mock 지표로 먼저 확인:
++
++```bash
++USE_MOCK=1 docker compose --profile rag up -d --build api litellm
++```
++
++실제 TimescaleDB까지 함께 시작:
++
++```bash
++USE_MOCK=0 docker compose --profile rag --profile db up -d --build api litellm db
++```
++
++상태 확인:
++
++```bash
++docker compose ps
++docker compose logs --tail=100 litellm
++docker compose logs --tail=100 api
++```
++
++## 3. LiteLLM 자체 연결 확인
++
++```bash
++curl -sS http://127.0.0.1:4000/v1/chat/completions \
++  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
++  -H "Content-Type: application/json" \
++  -d '{
++    "model":"rag-chat",
++    "messages":[{"role":"user","content":"연결 확인이라고 한 문장으로 답해줘"}]
++  }'
++```
++
++임베딩 확인:
++
++```bash
++curl -sS http://127.0.0.1:4000/v1/embeddings \
++  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
++  -H "Content-Type: application/json" \
++  -d '{"model":"rag-embedding","input":["역 취약도 계산 기준"]}'
++```
++
++## 4. 프로젝트 인제스트
++
++LiteLLM이 정상인 상태에서 1회 실행한다.
++
++```bash
++docker compose --profile rag run --rm rag-ingest
++```
++
++소스 코드나 계약 문서가 바뀌면 같은 명령을 다시 실행한다. 파일은 원자적으로 교체되며 API는 수정 시각을 감지해 자동으로 새 인덱스를 읽는다.
++
++RAG 상태 확인:
++
++```bash
++curl -sS http://127.0.0.1:8000/rag/health
++```
++
++정상 예:
++
++```json
++{
++  "enabled": true,
++  "index_ready": true,
++  "collection": "project",
++  "chat_model": "rag-chat",
++  "embedding_model": "rag-embedding",
++  "document_count": 60,
++  "chunk_count": 1200,
++  "git_commit": "abc1234"
++}
++```
++
++## 5. 채팅 curl 테스트
++
++문서 설명:
++
++```bash
++curl -sS -X POST http://127.0.0.1:8000/rag/ask \
++  -H "Content-Type: application/json" \
++  -d '{"question":"역 취약도는 어떤 기준으로 계산돼?"}'
++```
++
++역 지표와 문서 결합:
++
++```bash
++curl -sS -X POST http://127.0.0.1:8000/rag/ask \
++  -H "Content-Type: application/json" \
++  -d '{"question":"대전역은 왜 이 등급이야?"}'
++```
++
++상세 화면 context 우선:
++
++```bash
++curl -sS -X POST http://127.0.0.1:8000/rag/ask \
++  -H "Content-Type: application/json" \
++  -d '{
++    "question":"이 구간이 왜 취약한지 설명해줘",
++    "context": {
++      "target_type":"segment",
++      "target_id":"daejeon-gimcheon_gumi"
++    }
++  }'
++```
++
++## 6. 프론트엔드 연결 계약
++
++프론트엔드는 같은 origin의 `/rag/ask`만 호출하면 된다.
++
++```javascript
++const response = await fetch("/rag/ask", {
++  method: "POST",
++  headers: { "Content-Type": "application/json" },
++  body: JSON.stringify({
++    question,
++    context: selectedTarget
++      ? {
++          target_type: selectedTarget.type,
++          target_id: selectedTarget.id,
++        }
++      : null,
++  }),
++});
++
++const data = await response.json();
++```
++
++렌더링 기준:
++
++- `answer`: 채팅 본문
++- `targets`: 대시보드 원값과 등급 표시
++- `sources`: 파일·섹션·PDF 페이지 출처
++- `limitations`: 표본 부족, 비인접 구간 등 안내
++- `resolution`: context/text_match/none 디버깅 정보
++
++프론트는 LLM 본문에 있는 숫자를 다시 파싱하지 않고 `targets[].metrics`를 직접 표시한다.
++
++## 7. 운영 주의사항
++
++- 서버 방화벽에서 4000번 포트를 외부에 공개하지 않는다. Compose는 기본적으로 `127.0.0.1`에만 바인딩한다.
++- `.env`와 OpenAI API 키를 커밋하지 않는다.
++- `LITELLM_MASTER_KEY` 기본값은 개발 전용이므로 서버에서 반드시 교체한다.
++- LiteLLM 이미지는 검증 후 특정 버전 또는 digest로 고정하는 것이 좋다.
++- 현재 인덱스는 파일 기반 MVP다. 문서 규모와 동시 사용자가 증가하면 pgvector 저장소로 교체한다.
+diff --git a/.env.example b/.env.example
+index 7611c61..fac255a 100644
+--- a/.env.example
++++ b/.env.example
+@@ -46,3 +46,24 @@ KMA_WRN_REG_URL=https://apihub.kma.go.kr/api/typ01/url/wrn_reg.php
+ KMA_WRN_DATA_URL=https://apihub.kma.go.kr/api/typ01/url/wrn_met_data.php
+ KMA_WRN_INF_URL=https://apihub.kma.go.kr/api/typ01/url/wrn_inf_rpt.php
+ KMA_WTHR_CMT_URL=https://apihub.kma.go.kr/api/typ01/url/wthr_cmt_rpt.php
++
++# =====================================================================
++# RAG + LiteLLM
++# =====================================================================
++# 1이면 /rag/ask 활성화. 서버에서는 강한 LITELLM_MASTER_KEY로 교체한다.
++RAG_ENABLED=1
++RAG_COLLECTION=project
++RAG_INDEX_FILE=/data/rag_index.json
++RAG_TOP_K=5
++RAG_CHAT_MODEL=rag-chat
++RAG_EMBED_MODEL=rag-embedding
++RAG_REQUEST_TIMEOUT=90
++
++# LiteLLM Proxy 인증키. API 컨테이너와 curl 테스트에서 같은 값을 사용한다.
++LITELLM_MASTER_KEY=sk-local-dev-change-me
++LITELLM_API_KEY=sk-local-dev-change-me
++LITELLM_CHAT_MODEL=openai/gpt-5-mini
++LITELLM_EMBED_MODEL=openai/text-embedding-3-small
++
++# ChatGPT Plus와 별도인 OpenAI API 키.
++OPENAI_API_KEY=여기에_OpenAI_API_키_입력
+diff --git a/backend/rag/__init__.py b/backend/rag/__init__.py
+new file mode 100644
+index 0000000..5072584
+--- /dev/null
++++ b/backend/rag/__init__.py
+@@ -0,0 +1 @@
++"""철도 대시보드 프로젝트 지식 RAG 패키지."""
+diff --git a/backend/rag/chunker.py b/backend/rag/chunker.py
+new file mode 100644
+index 0000000..2af3d39
+--- /dev/null
++++ b/backend/rag/chunker.py
+@@ -0,0 +1,186 @@
++"""파일 유형별 텍스트 추출과 구조 보존 청킹."""
++from __future__ import annotations
++
++import re
++from dataclasses import dataclass
++from pathlib import Path
++
++from . import config
++
++
++@dataclass
++class Chunk:
++    content: str
++    section: str | None
++    chunk_index: int
++    page_number: int | None = None
++
++
++def _window(text: str, max_chars: int, overlap: int) -> list[str]:
++    """너무 긴 단일 블록도 반드시 max_chars 이하로 자른다."""
++    text = text.strip()
++    if not text:
++        return []
++    if len(text) <= max_chars:
++        return [text]
++    step = max(1, max_chars - overlap)
++    return [text[i : i + max_chars].strip() for i in range(0, len(text), step) if text[i : i + max_chars].strip()]
++
++
++def _pack_paragraphs(text: str) -> list[str]:
++    out: list[str] = []
++    buf = ""
++    for para in re.split(r"\n\s*\n", text.strip()):
++        para = para.strip()
++        if not para:
++            continue
++        if len(para) > config.CHUNK_MAX_CHARS:
++            if buf:
++                out.append(buf)
++                buf = ""
++            out.extend(_window(para, config.CHUNK_MAX_CHARS, config.CHUNK_OVERLAP_CHARS))
++            continue
++        candidate = f"{buf}\n\n{para}" if buf else para
++        if len(candidate) > config.CHUNK_MAX_CHARS:
++            out.append(buf)
++            buf = para
++        else:
++            buf = candidate
++    if buf:
++        out.append(buf)
++    return out
++
++
++def _chunk_markdown(text: str) -> list[tuple[str, str | None, int | None]]:
++    sections: list[tuple[str | None, str]] = []
++    current_heading: str | None = None
++    body: list[str] = []
++    for line in text.splitlines():
++        if re.match(r"^#{1,6}\s+", line):
++            if body:
++                sections.append((current_heading, "\n".join(body).strip()))
++            current_heading = re.sub(r"^#{1,6}\s+", "", line).strip()
++            body = [line]
++        else:
++            body.append(line)
++    if body:
++        sections.append((current_heading, "\n".join(body).strip()))
++
++    out: list[tuple[str, str | None, int | None]] = []
++    for heading, section_text in sections:
++        for piece in _pack_paragraphs(section_text):
++            out.append((piece, heading, None))
++    return out
++
++
++def _python_blocks(text: str) -> list[tuple[str, str | None, int | None]]:
++    """top-level def/class와 바로 앞 decorator를 한 블록으로 유지한다."""
++    lines = text.splitlines(keepends=True)
++    starts: list[int] = []
++    for i, line in enumerate(lines):
++        if re.match(r"^(?:async\s+def|def|class)\s+", line):
++            start = i
++            while start > 0 and re.match(r"^@", lines[start - 1]):
++                start -= 1
++            starts.append(start)
++    starts = sorted(set(starts))
++    if not starts:
++        return [(p, None, None) for p in _pack_paragraphs(text)]
++    if starts[0] != 0:
++        starts.insert(0, 0)
++
++    out: list[tuple[str, str | None, int | None]] = []
++    for index, start in enumerate(starts):
++        end = starts[index + 1] if index + 1 < len(starts) else len(lines)
++        block = "".join(lines[start:end]).strip()
++        if not block:
++            continue
++        match = re.search(r"(?:async\s+def|def|class)\s+([A-Za-z0-9_]+)", block)
++        section = match.group(1) if match else None
++        for piece in _pack_paragraphs(block):
++            out.append((piece, section, None))
++    return out
++
++
++def _javascript_blocks(text: str) -> list[tuple[str, str | None, int | None]]:
++    pattern = r"^(?:export\s+)?(?:async\s+)?(?:function\s+|class\s+|const\s+|let\s+)"
++    lines = text.splitlines(keepends=True)
++    starts = [i for i, line in enumerate(lines) if re.match(pattern, line)]
++    if not starts:
++        return [(p, None, None) for p in _pack_paragraphs(text)]
++    if starts[0] != 0:
++        starts.insert(0, 0)
++    out: list[tuple[str, str | None, int | None]] = []
++    for index, start in enumerate(starts):
++        end = starts[index + 1] if index + 1 < len(starts) else len(lines)
++        block = "".join(lines[start:end]).strip()
++        match = re.search(r"(?:function|class|const|let)\s+([A-Za-z0-9_]+)", block)
++        section = match.group(1) if match else None
++        for piece in _pack_paragraphs(block):
++            out.append((piece, section, None))
++    return out
++
++
++def _sql_blocks(text: str) -> list[tuple[str, str | None, int | None]]:
++    out: list[tuple[str, str | None, int | None]] = []
++    for statement in re.split(r";\s*(?:\n|$)", text):
++        statement = statement.strip()
++        if not statement:
++            continue
++        match = re.search(
++            r"CREATE\s+(?:TABLE|EXTENSION|INDEX)\s+(?:IF\s+NOT\s+EXISTS\s+)?([A-Za-z0-9_.\"]+)",
++            statement,
++            re.IGNORECASE,
++        )
++        section = match.group(1).strip('"') if match else None
++        for piece in _pack_paragraphs(statement + ";"):
++            out.append((piece, section, None))
++    return out
++
++
++def _pdf_chunks(path: Path) -> list[tuple[str, str | None, int | None]]:
++    from pypdf import PdfReader
++
++    out: list[tuple[str, str | None, int | None]] = []
++    reader = PdfReader(str(path))
++    for page_index, page in enumerate(reader.pages, start=1):
++        text = (page.extract_text() or "").strip()
++        for piece in _pack_paragraphs(text):
++            out.append((piece, f"page {page_index}", page_index))
++    return out
++
++
++def load_and_chunk(path: str, text: str | None = None, absolute_path: Path | None = None) -> list[Chunk]:
++    source_type = config.source_type_for(path)
++    if source_type == "pdf":
++        if absolute_path is None:
++            raise ValueError("PDF 청킹에는 absolute_path가 필요합니다")
++        triples = _pdf_chunks(absolute_path)
++    else:
++        text = text or ""
++        if source_type == "markdown":
++            triples = _chunk_markdown(text)
++        elif source_type == "source_code":
++            triples = _python_blocks(text)
++        elif source_type == "javascript":
++            triples = _javascript_blocks(text)
++        elif source_type == "sql":
++            triples = _sql_blocks(text)
++        elif source_type == "json":
++            triples = [(p, Path(path).name, None) for p in _pack_paragraphs(text)]
++        else:
++            triples = [(p, None, None) for p in _pack_paragraphs(text)]
++
++    chunks: list[Chunk] = []
++    for index, (content, section, page_number) in enumerate(triples):
++        if len(content.strip()) < config.CHUNK_MIN_CHARS:
++            continue
++        chunks.append(
++            Chunk(
++                content=content.strip(),
++                section=section,
++                chunk_index=index,
++                page_number=page_number,
++            )
++        )
++    return chunks
+diff --git a/backend/rag/config.py b/backend/rag/config.py
+new file mode 100644
+index 0000000..f8925c9
+--- /dev/null
++++ b/backend/rag/config.py
+@@ -0,0 +1,85 @@
++"""RAG 런타임 설정.
++
++LiteLLM Proxy를 단일 모델 게이트웨이로 사용한다. 실제 공급자 모델은
++litellm/config.yaml과 .env에서 바꾸고, 애플리케이션은 alias만 사용한다.
++"""
++from __future__ import annotations
++
++import os
++from pathlib import Path
++
++COLLECTION = os.getenv("RAG_COLLECTION", "project")
++ENABLED = os.getenv("RAG_ENABLED", "0") == "1"
++INDEX_FILE = Path(os.getenv("RAG_INDEX_FILE", "/data/rag_index.json"))
++
++# LiteLLM OpenAI-compatible proxy
++LITELLM_BASE_URL = os.getenv("LITELLM_BASE_URL", "http://litellm:4000/v1").rstrip("/")
++LITELLM_API_KEY = os.getenv("LITELLM_API_KEY", os.getenv("LITELLM_MASTER_KEY", "sk-local-dev"))
++CHAT_MODEL = os.getenv("RAG_CHAT_MODEL", "rag-chat")
++EMBED_MODEL = os.getenv("RAG_EMBED_MODEL", "rag-embedding")
++EMBED_PROVIDER_MODEL = os.getenv("RAG_EMBED_PROVIDER_MODEL", "unknown")
++REQUEST_TIMEOUT = float(os.getenv("RAG_REQUEST_TIMEOUT", "90"))
++EMBED_BATCH_SIZE = int(os.getenv("RAG_EMBED_BATCH_SIZE", "32"))
++
++# 검색
++TOP_K = int(os.getenv("RAG_TOP_K", "5"))
++CANDIDATE_K = int(os.getenv("RAG_CANDIDATE_K", "20"))
++W_VEC = float(os.getenv("RAG_W_VEC", "0.7"))
++W_KW = float(os.getenv("RAG_W_KW", "0.3"))
++MAX_CONTEXT_CHARS = int(os.getenv("RAG_MAX_CONTEXT_CHARS", "9000"))
++AUTHORITY_WEIGHT = {
++    "current_implementation": 1.00,
++    "approved_document": 0.92,
++    "reference_document": 0.78,
++}
++
++# 청킹
++CHUNK_MAX_CHARS = int(os.getenv("RAG_CHUNK_MAX", "1200"))
++CHUNK_OVERLAP_CHARS = int(os.getenv("RAG_CHUNK_OVERLAP", "160"))
++CHUNK_MIN_CHARS = int(os.getenv("RAG_CHUNK_MIN", "50"))
++
++_SRC_BY_EXT = {
++    ".py": "source_code",
++    ".sql": "sql",
++    ".js": "javascript",
++    ".ts": "javascript",
++    ".tsx": "javascript",
++    ".jsx": "javascript",
++    ".md": "markdown",
++    ".json": "json",
++    ".html": "html",
++    ".css": "css",
++    ".txt": "text",
++    ".pdf": "pdf",
++}
++_LANG_BY_EXT = {
++    ".py": "python",
++    ".js": "javascript",
++    ".ts": "typescript",
++    ".tsx": "typescript",
++    ".jsx": "javascript",
++    ".sql": "sql",
++    ".html": "html",
++    ".css": "css",
++}
++
++
++def authority_for(path: str) -> str:
++    """최신 실행 코드가 과거 설계 문서보다 우선하도록 권위 등급을 지정한다."""
++    p = path.replace("\\", "/").lstrip("./")
++    if (
++        p.startswith(("backend/", "processor/", "collector/", "db/"))
++        or p.endswith(".sql")
++    ):
++        return "current_implementation"
++    if p in {"CONTRACT.md", "README.md", "RAG_Ask_Contract.md"}:
++        return "approved_document"
++    return "reference_document"
++
++
++def source_type_for(path: str) -> str:
++    return _SRC_BY_EXT.get(Path(path).suffix.lower(), "text")
++
++
++def language_for(path: str) -> str | None:
++    return _LANG_BY_EXT.get(Path(path).suffix.lower())
+diff --git a/backend/rag/embedder.py b/backend/rag/embedder.py
+new file mode 100644
+index 0000000..2019ce2
+--- /dev/null
++++ b/backend/rag/embedder.py
+@@ -0,0 +1,124 @@
++"""문서·질문 임베딩.
++
++실배포는 LiteLLM Proxy의 OpenAI 호환 /embeddings를 사용한다.
++HashEmbedder는 API 키 없이 단위 테스트와 배관 확인에만 사용한다.
++"""
++from __future__ import annotations
++
++import hashlib
++import math
++import re
++import time
++from typing import Protocol
++
++import httpx
++
++from . import config
++
++_TOKEN = re.compile(r"[A-Za-z0-9_]+|[가-힣]+")
++
++
++def tokenize(text: str) -> list[str]:
++    return [token.lower() for token in _TOKEN.findall(text or "")]
++
++
++class Embedder(Protocol):
++    name: str
++    dim: int | None
++
++    def embed_documents(self, texts: list[str]) -> list[list[float]]: ...
++    def embed_query(self, text: str) -> list[float]: ...
++
++
++def _l2(vector: list[float]) -> list[float]:
++    norm = math.sqrt(sum(value * value for value in vector))
++    return [value / norm for value in vector] if norm else vector
++
++
++class HashEmbedder:
++    def __init__(self, dim: int = 256):
++        self.dim = dim
++        self.name = f"hash:{dim}"
++
++    def _one(self, text: str) -> list[float]:
++        vector = [0.0] * self.dim
++        for token in tokenize(text):
++            bucket = int(hashlib.md5(token.encode("utf-8")).hexdigest(), 16) % self.dim
++            vector[bucket] += 1.0
++        return _l2(vector)
++
++    def embed_documents(self, texts: list[str]) -> list[list[float]]:
++        return [self._one(text) for text in texts]
++
++    def embed_query(self, text: str) -> list[float]:
++        return self._one(text)
++
++
++class LiteLLMEmbedder:
++    def __init__(
++        self,
++        model: str | None = None,
++        base_url: str | None = None,
++        api_key: str | None = None,
++    ):
++        self.model = model or config.EMBED_MODEL
++        self.base_url = (base_url or config.LITELLM_BASE_URL).rstrip("/")
++        self.api_key = api_key or config.LITELLM_API_KEY
++        self.name = f"litellm:{self.model}"
++        self.dim: int | None = None
++
++    def _request(self, inputs: list[str]) -> list[list[float]]:
++        headers = {
++            "Authorization": f"Bearer {self.api_key}",
++            "Content-Type": "application/json",
++        }
++        payload = {"model": self.model, "input": inputs}
++        last_error: Exception | None = None
++        for attempt in range(7):
++            try:
++                with httpx.Client(timeout=config.REQUEST_TIMEOUT) as client:
++                    response = client.post(
++                        f"{self.base_url}/embeddings",
++                        headers=headers,
++                        json=payload,
++                    )
++                response.raise_for_status()
++                data = sorted(response.json()["data"], key=lambda item: item.get("index", 0))
++                vectors = [[float(value) for value in item["embedding"]] for item in data]
++                if len(vectors) != len(inputs):
++                    raise RuntimeError(
++                        f"임베딩 개수 불일치: input={len(inputs)}, output={len(vectors)}"
++                    )
++                dimensions = {len(vector) for vector in vectors}
++                if len(dimensions) != 1:
++                    raise RuntimeError(f"임베딩 차원이 일정하지 않습니다: {dimensions}")
++                dimension = dimensions.pop()
++                if self.dim is not None and self.dim != dimension:
++                    raise RuntimeError(
++                        f"임베딩 차원이 변경됐습니다: expected={self.dim}, actual={dimension}"
++                    )
++                self.dim = dimension
++                return [_l2(vector) for vector in vectors]
++            except (httpx.HTTPError, KeyError, ValueError, RuntimeError) as exc:
++                last_error = exc
++                if attempt == 6:
++                    break
++                time.sleep(min(5, 2**attempt))
++        raise RuntimeError(f"LiteLLM 임베딩 호출 실패: {last_error}") from last_error
++
++    def embed_documents(self, texts: list[str]) -> list[list[float]]:
++        vectors: list[list[float]] = []
++        for start in range(0, len(texts), config.EMBED_BATCH_SIZE):
++            vectors.extend(self._request(texts[start : start + config.EMBED_BATCH_SIZE]))
++        return vectors
++
++    def embed_query(self, text: str) -> list[float]:
++        return self._request([text])[0]
++
++
++def make_embedder(kind: str = "litellm", model: str | None = None) -> Embedder:
++    if kind == "litellm":
++        return LiteLLMEmbedder(model=model)
++    if kind == "hash":
++        return HashEmbedder()
++    raise ValueError(f"알 수 없는 임베더: {kind}")
+diff --git a/backend/rag/ingest.py b/backend/rag/ingest.py
+new file mode 100644
+index 0000000..e88344f
+--- /dev/null
++++ b/backend/rag/ingest.py
+@@ -0,0 +1,165 @@
++"""프로젝트 문서와 소스 코드를 청킹·임베딩해 파일 인덱스로 저장한다.
++
++컨테이너 실행 예:
++    cd /app/backend
++    python -m rag.ingest --repo /app --embedder litellm
++"""
++from __future__ import annotations
++
++import argparse
++import hashlib
++import subprocess
++from datetime import datetime, timezone
++from pathlib import Path
++
++from . import config
++from .chunker import load_and_chunk
++from .embedder import make_embedder
++from .repository import ChunkRecord, InMemoryRepository
++
++TEXT_EXTENSIONS = {
++    ".md",
++    ".py",
++    ".sql",
++    ".js",
++    ".ts",
++    ".tsx",
++    ".jsx",
++    ".json",
++    ".html",
++    ".css",
++    ".txt",
++    ".pdf",
++}
++EXCLUDE_PARTS = {
++    ".git",
++    "__pycache__",
++    "node_modules",
++    "venv",
++    ".venv",
++    ".pytest_cache",
++    "assets",
++    "data",
++    "logs",
++    "results",
++    "uploads",
++    "tests",
++}
++EXCLUDE_NAMES = {"conftest.py"}
++
++
++def _git_commit(repo: Path) -> str:
++    try:
++        return subprocess.check_output(
++            ["git", "-C", str(repo), "rev-parse", "--short", "HEAD"],
++            text=True,
++            stderr=subprocess.DEVNULL,
++        ).strip()
++    except Exception:
++        return "unknown"
++
++
++def _iter_files(repo: Path):
++    for path in sorted(repo.rglob("*")):
++        if not path.is_file() or path.suffix.lower() not in TEXT_EXTENSIONS:
++            continue
++        relative = path.relative_to(repo)
++        if any(part in EXCLUDE_PARTS for part in relative.parts):
++            continue
++        if path.name in EXCLUDE_NAMES:
++            continue
++        yield relative, path
++
++
++def _read_text(path: Path) -> str | None:
++    if path.suffix.lower() == ".pdf":
++        return None
++    return path.read_text(encoding="utf-8", errors="replace")
++
++
++def ingest(repo: Path, embedder_kind: str, output: Path) -> dict:
++    commit = _git_commit(repo)
++    embedder = make_embedder(embedder_kind)
++    records: list[ChunkRecord] = []
++    document_count = 0
++    next_id = 1
++    started_at = datetime.now(timezone.utc).isoformat()
++
++    for relative, absolute in _iter_files(repo):
++        path = str(relative).replace("\\", "/")
++        text = _read_text(absolute)
++        chunks = load_and_chunk(path, text=text, absolute_path=absolute)
++        if not chunks:
++            continue
++        vectors = embedder.embed_documents([chunk.content for chunk in chunks])
++        if len(vectors) != len(chunks):
++            raise RuntimeError(f"청크와 임베딩 수가 다릅니다: {path}")
++        for chunk, vector in zip(chunks, vectors):
++            records.append(
++                ChunkRecord(
++                    chunk_id=next_id,
++                    path=path,
++                    section=chunk.section,
++                    content=chunk.content,
++                    embedding=vector,
++                    authority=config.authority_for(path),
++                    source_type=config.source_type_for(path),
++                    language=config.language_for(path),
++                    git_commit=commit,
++                    collection=config.COLLECTION,
++                    page_number=chunk.page_number,
++                )
++            )
++            next_id += 1
++        document_count += 1
++        print(
++            f"  {path:55} {len(chunks):3d} chunks "
++            f"[{config.authority_for(path)}]"
++        )
++
++    if not records:
++        raise RuntimeError("인제스트 대상 문서가 없습니다")
++
++    # 동일 인덱스인지 확인할 수 있는 가벼운 콘텐츠 지문.
++    digest = hashlib.sha256()
++    for record in records:
++        digest.update(record.path.encode("utf-8"))
++        digest.update(record.content.encode("utf-8"))
++
++    meta = {
++        "collection": config.COLLECTION,
++        "git_commit": commit,
++        "embedder": embedder.name,
++        "embedding_provider_model": config.EMBED_PROVIDER_MODEL,
++        "embedding_dim": len(records[0].embedding),
++        "started_at": started_at,
++        "completed_at": datetime.now(timezone.utc).isoformat(),
++        "document_count": document_count,
++        "chunk_count": len(records),
++        "content_sha256": digest.hexdigest(),
++    }
++    InMemoryRepository(records=records, meta=meta).save(output, meta)
++    print(
++        f"완료 — 문서 {document_count}, 청크 {len(records)}, "
++        f"commit {commit}, {embedder.name}, {output}"
++    )
++    return meta
++
++
++def main() -> None:
++    parser = argparse.ArgumentParser()
++    parser.add_argument("--repo", default="..", help="프로젝트 루트")
++    parser.add_argument(
++        "--embedder", choices=["litellm", "hash"], default="litellm"
++    )
++    parser.add_argument("--output", default=str(config.INDEX_FILE))
++    args = parser.parse_args()
++    ingest(
++        repo=Path(args.repo).resolve(),
++        embedder_kind=args.embedder,
++        output=Path(args.output),
++    )
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/backend/rag/litellm_client.py b/backend/rag/litellm_client.py
+new file mode 100644
+index 0000000..fd0a16d
+--- /dev/null
++++ b/backend/rag/litellm_client.py
+@@ -0,0 +1,40 @@
++"""LiteLLM Proxy OpenAI-compatible chat client."""
++from __future__ import annotations
++
++import httpx
++
++from . import config
++
++
++class LiteLLMClientError(RuntimeError):
++    pass
++
++
++def chat(system_prompt: str, user_prompt: str) -> str:
++    headers = {
++        "Authorization": f"Bearer {config.LITELLM_API_KEY}",
++        "Content-Type": "application/json",
++    }
++    payload = {
++        "model": config.CHAT_MODEL,
++        "messages": [
++            {"role": "system", "content": system_prompt},
++            {"role": "user", "content": user_prompt},
++        ],
++        "temperature": 0.1,
++    }
++    try:
++        with httpx.Client(timeout=config.REQUEST_TIMEOUT) as client:
++            response = client.post(
++                f"{config.LITELLM_BASE_URL}/chat/completions",
++                headers=headers,
++                json=payload,
++            )
++        response.raise_for_status()
++        data = response.json()
++        answer = data["choices"][0]["message"]["content"]
++        if not isinstance(answer, str) or not answer.strip():
++            raise LiteLLMClientError("LiteLLM 응답에 답변 본문이 없습니다")
++        return answer.strip()
++    except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError) as exc:
++        raise LiteLLMClientError(f"LiteLLM 채팅 호출 실패: {exc}") from exc
+diff --git a/backend/rag/query.py b/backend/rag/query.py
+new file mode 100644
+index 0000000..28f1e94
+--- /dev/null
++++ b/backend/rag/query.py
+@@ -0,0 +1,61 @@
++"""RAG 검색 결과를 LLM 호출 없이 터미널에서 확인한다."""
++from __future__ import annotations
++
++import argparse
++import textwrap
++from pathlib import Path
++
++from . import config
++from .embedder import make_embedder
++from .repository import InMemoryRepository
++from .retriever import search
++from .target_resolver import resolve
++
++
++def main() -> None:
++    parser = argparse.ArgumentParser()
++    parser.add_argument("question")
++    parser.add_argument("--k", type=int, default=config.TOP_K)
++    parser.add_argument("--index", default=str(config.INDEX_FILE))
++    args = parser.parse_args()
++
++    repository = InMemoryRepository.load(Path(args.index))
++    descriptor = str(repository.meta.get("embedder", ""))
++    if descriptor.startswith("litellm:"):
++        embedder = make_embedder("litellm", model=descriptor.split(":", 1)[1])
++    elif descriptor.startswith("hash:"):
++        embedder = make_embedder("hash")
++    else:
++        raise RuntimeError(f"알 수 없는 인덱스 임베더: {descriptor}")
++
++    resolution = resolve(args.question)
++    target_text = ", ".join(
++        f"{target.target_type}:{target.target_id}" for target in resolution.targets
++    ) or "-"
++    print(f"질문: {args.question}")
++    print(
++        f"대상: kind={resolution.kind}, resolution={resolution.resolution}, "
++        f"targets=[{target_text}]"
++    )
++    print(
++        f"인덱스: commit={repository.meta.get('git_commit')}, "
++        f"embedder={descriptor}, chunks={repository.meta.get('chunk_count')}\n"
++    )
++
++    for index, hit in enumerate(
++        search(args.question, embedder, repository, top_k=args.k), start=1
++    ):
++        record = hit.record
++        section = f" > {record.section}" if record.section else ""
++        print(
++            f"[{index}] score={hit.score:.3f} "
++            f"(vec={hit.vector_score:.2f}, kw={hit.keyword_score:.2f}) "
++            f"[{record.authority}]"
++        )
++        print(f"    {record.path}{section}")
++        snippet = " ".join(record.content.split())[:220]
++        print(textwrap.indent(textwrap.fill(snippet, 92), "    ") + "\n")
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/backend/rag/repository.py b/backend/rag/repository.py
+new file mode 100644
+index 0000000..354c569
+--- /dev/null
++++ b/backend/rag/repository.py
+@@ -0,0 +1,78 @@
++"""파일 기반 RAG 인덱스 저장소.
++
++MVP는 서버의 Docker volume에 JSON 인덱스를 저장한다. API는 파일 수정 시각이
++바뀌면 자동으로 다시 읽으므로 인제스트 후 API를 재시작할 필요가 없다.
++"""
++from __future__ import annotations
++
++import json
++import os
++import threading
++from dataclasses import asdict, dataclass
++from pathlib import Path
++
++
++@dataclass
++class ChunkRecord:
++    chunk_id: int
++    path: str
++    section: str | None
++    content: str
++    embedding: list[float]
++    authority: str
++    source_type: str
++    language: str | None
++    git_commit: str
++    collection: str
++    page_number: int | None = None
++
++
++class InMemoryRepository:
++    def __init__(self, records: list[ChunkRecord] | None = None, meta: dict | None = None):
++        self.records = records or []
++        self.meta = meta or {}
++
++    def all(self, collection: str) -> list[ChunkRecord]:
++        return [record for record in self.records if record.collection == collection]
++
++    def save(self, path: Path, meta: dict) -> None:
++        path.parent.mkdir(parents=True, exist_ok=True)
++        payload = {"meta": meta, "records": [asdict(record) for record in self.records]}
++        temporary = path.with_suffix(path.suffix + ".tmp")
++        with temporary.open("w", encoding="utf-8") as file:
++            json.dump(payload, file, ensure_ascii=False)
++            file.flush()
++            os.fsync(file.fileno())
++        temporary.replace(path)
++
++    @classmethod
++    def load(cls, path: Path) -> "InMemoryRepository":
++        with path.open(encoding="utf-8") as file:
++            payload = json.load(file)
++        return cls(
++            records=[ChunkRecord(**record) for record in payload.get("records", [])],
++            meta=payload.get("meta", {}),
++        )
++
++
++class IndexCache:
++    """인덱스 파일을 프로세스 메모리에 캐시하고 mtime 변경 시 다시 읽는다."""
++
++    def __init__(self, path: Path):
++        self.path = path
++        self._mtime_ns: int | None = None
++        self._repository: InMemoryRepository | None = None
++        self._lock = threading.Lock()
++
++    def get(self) -> InMemoryRepository:
++        if not self.path.exists():
++            raise FileNotFoundError(self.path)
++        mtime_ns = self.path.stat().st_mtime_ns
++        if self._repository is not None and self._mtime_ns == mtime_ns:
++            return self._repository
++        with self._lock:
++            mtime_ns = self.path.stat().st_mtime_ns
++            if self._repository is None or self._mtime_ns != mtime_ns:
++                self._repository = InMemoryRepository.load(self.path)
++                self._mtime_ns = mtime_ns
++        return self._repository
+diff --git a/backend/rag/retriever.py b/backend/rag/retriever.py
+new file mode 100644
+index 0000000..ea68a47
+--- /dev/null
++++ b/backend/rag/retriever.py
+@@ -0,0 +1,95 @@
++"""벡터 + 키워드 + 문서 권위 가중치를 합친 하이브리드 검색."""
++from __future__ import annotations
++
++import math
++from dataclasses import dataclass
++
++from . import config
++from .embedder import Embedder, tokenize
++from .repository import ChunkRecord, InMemoryRepository
++
++
++@dataclass
++class Hit:
++    record: ChunkRecord
++    score: float
++    vector_score: float
++    keyword_score: float
++
++
++def _cosine(left: list[float], right: list[float]) -> float:
++    if len(left) != len(right):
++        raise ValueError(
++            f"임베딩 차원 불일치: query={len(left)}, document={len(right)}. "
++            "같은 임베딩 모델로 다시 인제스트하세요."
++        )
++    left_norm = math.sqrt(sum(value * value for value in left))
++    right_norm = math.sqrt(sum(value * value for value in right))
++    if not left_norm or not right_norm:
++        return 0.0
++    value = sum(a * b for a, b in zip(left, right)) / (left_norm * right_norm)
++    return max(0.0, min(1.0, value))
++
++
++def _is_identifier(token: str) -> bool:
++    return "_" in token or (
++        any(character.isalpha() for character in token)
++        and any(character.isdigit() for character in token)
++    )
++
++
++def _keyword_score(query_tokens: list[str], content: str) -> float:
++    if not query_tokens:
++        return 0.0
++    content_tokens = set(tokenize(content))
++    hit = 0.0
++    total = 0.0
++    for token in query_tokens:
++        weight = 2.0 if _is_identifier(token) else 1.0
++        total += weight
++        if token in content_tokens:
++            hit += weight
++    return hit / total if total else 0.0
++
++
++def search(
++    query: str,
++    embedder: Embedder,
++    repository: InMemoryRepository,
++    collection: str | None = None,
++    top_k: int | None = None,
++) -> list[Hit]:
++    collection = collection or config.COLLECTION
++    top_k = top_k or config.TOP_K
++    query_vector = embedder.embed_query(query)
++    query_tokens = tokenize(query)
++
++    hits: list[Hit] = []
++    for record in repository.all(collection):
++        vector_score = _cosine(query_vector, record.embedding)
++        keyword_score = _keyword_score(query_tokens, record.content)
++        base = config.W_VEC * vector_score + config.W_KW * keyword_score
++        authority = config.AUTHORITY_WEIGHT.get(record.authority, 0.70)
++        hits.append(
++            Hit(
++                record=record,
++                score=base * authority,
++                vector_score=vector_score,
++                keyword_score=keyword_score,
++            )
++        )
++
++    hits.sort(key=lambda hit: hit.score, reverse=True)
++
++    # 같은 파일·섹션·페이지의 유사 청크가 결과를 독점하지 않도록 중복 제거한다.
++    seen: set[tuple[str, str | None, int | None]] = set()
++    result: list[Hit] = []
++    for hit in hits:
++        key = (hit.record.path, hit.record.section, hit.record.page_number)
++        if key in seen:
++            continue
++        seen.add(key)
++        result.append(hit)
++        if len(result) >= top_k:
++            break
++    return result
+diff --git a/backend/rag/router.py b/backend/rag/router.py
+new file mode 100644
+index 0000000..9247608
+--- /dev/null
++++ b/backend/rag/router.py
+@@ -0,0 +1,333 @@
++"""POST /rag/ask — 프로젝트 문서 검색 + 라이브 취약도 지표 + LiteLLM 설명."""
++from __future__ import annotations
++
++import json
++from pathlib import Path
++from typing import Any, Literal
++
++from fastapi import APIRouter
++from pydantic import BaseModel, Field
++
++from . import config
++from .embedder import make_embedder
++from .litellm_client import LiteLLMClientError, chat
++from .repository import IndexCache
++from .retriever import Hit, search
++from .target_resolver import Resolution, Target, resolve
++
++router = APIRouter(prefix="/rag", tags=["RAG"])
++_index_cache = IndexCache(config.INDEX_FILE)
++
++
++class RagContext(BaseModel):
++    target_type: Literal["station", "segment"]
++    target_id: str
++
++
++class RagAskRequest(BaseModel):
++    question: str = Field(min_length=2, max_length=1000)
++    collection: str = "project"
++    context: RagContext | None = None
++
++
++class RagSource(BaseModel):
++    path: str
++    section: str | None = None
++    page_number: int | None = None
++    score: float
++
++
++class RagTarget(BaseModel):
++    target_type: Literal["station", "segment"]
++    target_id: str
++    name: str
++    metrics: dict[str, Any]
++    risk_level: str | None = None
++    confidence: str | None = None
++    risk_reason: str | None = None
++
++
++class RagAskResponse(BaseModel):
++    answer: str
++    targets: list[RagTarget]
++    resolution: Literal["context", "text_match", "none"]
++    sources: list[RagSource]
++    limitations: list[str]
++
++
++class RagHealthResponse(BaseModel):
++    enabled: bool
++    index_ready: bool
++    index_file: str
++    collection: str
++    chat_model: str
++    embedding_model: str
++    document_count: int = 0
++    chunk_count: int = 0
++    git_commit: str | None = None
++
++
++def _app_error(status: int, code: str, message: str) -> Exception:
++    # serve.py가 api import를 끝낸 뒤 이 router를 등록하므로 요청 시점에는 안전하다.
++    from api import AppError
++
++    return AppError(status, code, message)
++
++
++def _load_repository():
++    try:
++        repository = _index_cache.get()
++    except FileNotFoundError as exc:
++        raise _app_error(
++            503,
++            "RAG_INDEX_NOT_READY",
++            "RAG 인덱스가 없습니다. rag-ingest를 먼저 실행하세요.",
++        ) from exc
++    if repository.meta.get("collection") != config.COLLECTION:
++        raise _app_error(500, "RAG_INDEX_INVALID", "RAG 컬렉션이 설정과 다릅니다")
++    return repository
++
++
++def _embedder_for_index(meta: dict):
++    descriptor = str(meta.get("embedder", ""))
++    if descriptor.startswith("litellm:"):
++        indexed_model = descriptor.split(":", 1)[1]
++        if indexed_model != config.EMBED_MODEL:
++            raise _app_error(
++                503,
++                "RAG_MODEL_MISMATCH",
++                (
++                    f"인덱스 임베딩 alias({indexed_model})와 현재 설정"
++                    f"({config.EMBED_MODEL})이 다릅니다. 다시 인제스트하세요."
++                ),
++            )
++        indexed_provider = str(meta.get("embedding_provider_model", "unknown"))
++        if (
++            indexed_provider != "unknown"
++            and config.EMBED_PROVIDER_MODEL != "unknown"
++            and indexed_provider != config.EMBED_PROVIDER_MODEL
++        ):
++            raise _app_error(
++                503,
++                "RAG_MODEL_MISMATCH",
++                (
++                    f"인덱스 공급자 임베딩 모델({indexed_provider})과 현재 설정"
++                    f"({config.EMBED_PROVIDER_MODEL})이 다릅니다. 다시 인제스트하세요."
++                ),
++            )
++        return make_embedder("litellm", model=indexed_model)
++    if descriptor.startswith("hash:"):
++        return make_embedder("hash")
++    raise _app_error(500, "RAG_INDEX_INVALID", "알 수 없는 인덱스 임베더입니다")
++
++
++def _station_metrics(targets: list[Target]) -> list[RagTarget]:
++    from api import get_stations
++
++    payload = get_stations(line="경부선")
++    rows = {row.get("station_id"): row for row in payload.get("stations", [])}
++    result: list[RagTarget] = []
++    for target in targets:
++        row = rows.get(target.target_id)
++        if not row:
++            continue
++        metrics = {
++            key: row.get(key)
++            for key in (
++                "avg_delay",
++                "delta_delay",
++                "delay_rate",
++                "stop_rate",
++                "sample_n",
++                "delay_count",
++            )
++        }
++        result.append(
++            RagTarget(
++                target_type="station",
++                target_id=target.target_id,
++                name=target.name,
++                metrics=metrics,
++                risk_level=row.get("risk_level"),
++                confidence=row.get("confidence"),
++                risk_reason=row.get("risk_reason"),
++            )
++        )
++    return result
++
++
++def _segment_metrics(target: Target) -> list[RagTarget]:
++    from api import get_segments
++
++    payload = get_segments(line="경부선")
++    row = next(
++        (
++            item
++            for item in payload.get("segments", [])
++            if item.get("segment_id") == target.target_id
++        ),
++        None,
++    )
++    if not row:
++        return []
++    metrics = {
++        key: row.get(key)
++        for key in ("avg_delay_incr", "stop_rate", "sample_n")
++    }
++    return [
++        RagTarget(
++            target_type="segment",
++            target_id=target.target_id,
++            name=target.name,
++            metrics=metrics,
++            risk_level=row.get("risk_level"),
++            confidence=row.get("confidence"),
++            risk_reason=row.get("risk_reason"),
++        )
++    ]
++
++
++def _collect_live_targets(resolution: Resolution) -> list[RagTarget]:
++    if resolution.kind in {"station", "stations"}:
++        return _station_metrics(resolution.targets)
++    if resolution.kind == "segment" and resolution.targets:
++        return _segment_metrics(resolution.targets[0])
++    return []
++
++
++def _source_payload(hits: list[Hit]) -> list[RagSource]:
++    return [
++        RagSource(
++            path=hit.record.path,
++            section=hit.record.section,
++            page_number=hit.record.page_number,
++            score=round(hit.score, 4),
++        )
++        for hit in hits
++    ]
++
++
++def _context_block(hits: list[Hit]) -> str:
++    blocks: list[str] = []
++    used = 0
++    for index, hit in enumerate(hits, start=1):
++        location = hit.record.path
++        if hit.record.section:
++            location += f" > {hit.record.section}"
++        if hit.record.page_number:
++            location += f" (p.{hit.record.page_number})"
++        block = f"[SOURCE {index}] {location}\n{hit.record.content.strip()}"
++        remaining = config.MAX_CONTEXT_CHARS - used
++        if remaining <= 0:
++            break
++        if len(block) > remaining:
++            block = block[:remaining]
++        blocks.append(block)
++        used += len(block)
++    return "\n\n".join(blocks)
++
++
++def _limitations(resolution: Resolution, targets: list[RagTarget]) -> list[str]:
++    result = [
++        "답변은 프로젝트 문서·소스 코드와 대시보드가 제공한 지표만 사용합니다.",
++        "사고·차량고장·실시간 운행 통제 원인은 추론하지 않습니다.",
++    ]
++    if resolution.note:
++        result.append(resolution.note)
++    if any(target.confidence == "insufficient" for target in targets):
++        result.append("표본이 부족한 대상은 위험 등급을 단정할 수 없습니다.")
++    return result
++
++
++def _build_prompts(
++    question: str,
++    targets: list[RagTarget],
++    hits: list[Hit],
++    resolution: Resolution,
++) -> tuple[str, str]:
++    system_prompt = """당신은 철도 기상 취약구간 대시보드의 프로젝트 지식 도우미다.
++반드시 제공된 프로젝트 근거와 라이브 지표만 사용해 한국어로 답한다.
++수치와 risk_reason은 그대로 설명하고 재계산하거나 새로운 원인을 추론하지 않는다.
++현재 구현과 과거 설계가 다르면 현재 구현을 우선하고 차이를 밝힌다.
++confidence가 insufficient이면 등급을 단정하지 않는다.
++근거가 없으면 확인할 수 없다고 말한다.
++답변은 2~5문단으로 작성하고 출처 파일 경로를 마지막에 간단히 언급한다."""
++    user_prompt = (
++        f"질문:\n{question}\n\n"
++        f"대상 해석:\n{json.dumps({'kind': resolution.kind, 'note': resolution.note}, ensure_ascii=False)}\n\n"
++        f"라이브 지표:\n{json.dumps([target.model_dump() for target in targets], ensure_ascii=False, indent=2)}\n\n"
++        f"검색 근거:\n{_context_block(hits)}"
++    )
++    return system_prompt, user_prompt
++
++
++@router.get("/health", response_model=RagHealthResponse)
++def rag_health() -> RagHealthResponse:
++    meta: dict = {}
++    ready = config.INDEX_FILE.exists()
++    if ready:
++        try:
++            meta = _index_cache.get().meta
++        except Exception:
++            ready = False
++    return RagHealthResponse(
++        enabled=config.ENABLED,
++        index_ready=ready,
++        index_file=str(config.INDEX_FILE),
++        collection=config.COLLECTION,
++        chat_model=config.CHAT_MODEL,
++        embedding_model=config.EMBED_MODEL,
++        document_count=int(meta.get("document_count", 0)),
++        chunk_count=int(meta.get("chunk_count", 0)),
++        git_commit=meta.get("git_commit"),
++    )
++
++
++@router.post("/ask", response_model=RagAskResponse)
++def rag_ask(request: RagAskRequest) -> RagAskResponse:
++    if not config.ENABLED:
++        raise _app_error(503, "RAG_DISABLED", "RAG_ENABLED=1로 설정해야 합니다")
++    if request.collection != config.COLLECTION:
++        raise _app_error(400, "INVALID_COLLECTION", "현재 collection은 project만 지원합니다")
++
++    repository = _load_repository()
++    embedder = _embedder_for_index(repository.meta)
++    context = request.context.model_dump() if request.context else None
++    resolution = resolve(request.question, context=context)
++
++    try:
++        hits = search(
++            query=request.question,
++            embedder=embedder,
++            repository=repository,
++            collection=request.collection,
++            top_k=config.TOP_K,
++        )
++    except Exception as exc:
++        raise _app_error(502, "RAG_RETRIEVAL_FAILED", str(exc)) from exc
++
++    targets = _collect_live_targets(resolution)
++    if not hits and not targets:
++        return RagAskResponse(
++            answer="프로젝트 문서와 현재 지표에서 질문의 근거를 확인할 수 없습니다.",
++            targets=[],
++            resolution=resolution.resolution,
++            sources=[],
++            limitations=_limitations(resolution, targets),
++        )
++
++    system_prompt, user_prompt = _build_prompts(
++        request.question, targets, hits, resolution
++    )
++    try:
++        answer = chat(system_prompt, user_prompt)
++    except LiteLLMClientError as exc:
++        raise _app_error(502, "LITELLM_ERROR", str(exc)) from exc
++
++    return RagAskResponse(
++        answer=answer,
++        targets=targets,
++        resolution=resolution.resolution,
++        sources=_source_payload(hits),
++        limitations=_limitations(resolution, targets),
++    )
+diff --git a/backend/rag/target_resolver.py b/backend/rag/target_resolver.py
+new file mode 100644
+index 0000000..badf8b8
+--- /dev/null
++++ b/backend/rag/target_resolver.py
+@@ -0,0 +1,218 @@
++"""자유 질문과 화면 context에서 역·구간 조회 대상을 규칙으로 결정한다."""
++from __future__ import annotations
++
++from dataclasses import dataclass
++from typing import Literal
++
++from models import SLUG_TO_STATION, STATION_SLUGS, segment_slug, station_slug
++
++LINE_ORDER: list[str] = [
++    "서울",
++    "광명",
++    "천안아산",
++    "오송",
++    "대전",
++    "김천구미",
++    "동대구",
++    "경주",
++    "울산",
++    "부산",
++]
++
++STATION_ALIASES: dict[str, str] = {
++    "서울": "서울",
++    "광명": "광명",
++    "천안아산": "천안아산",
++    "천안": "천안아산",
++    "아산": "천안아산",
++    "오송": "오송",
++    "대전": "대전",
++    "김천구미": "김천구미",
++    "김천(구미)": "김천구미",
++    "김천": "김천구미",
++    "구미": "김천구미",
++    "동대구": "동대구",
++    "대구": "동대구",
++    "경주": "경주",
++    "울산": "울산",
++    "부산": "부산",
++}
++
++_STRONG_SEGMENT = ("구간", "사이")
++_WEAK_SEGMENT = ("~", "→", "-")
++_COMPARISON = ("비교", "vs", "보다", "어디가", " 중 ", "중에", "중 어")
++
++_unknown = {name for name in STATION_ALIASES.values() if name not in STATION_SLUGS}
++if _unknown:
++    raise RuntimeError(f"STATION_SLUGS에 없는 정식 역명: {_unknown}")
++if set(LINE_ORDER) != set(STATION_SLUGS):
++    raise RuntimeError("LINE_ORDER와 STATION_SLUGS의 역 집합이 다릅니다")
++
++Kind = Literal["station", "segment", "stations", "none"]
++ResolutionMethod = Literal["context", "text_match", "none"]
++
++
++@dataclass
++class Target:
++    target_type: Literal["station", "segment"]
++    target_id: str
++    name: str
++
++
++@dataclass
++class Resolution:
++    kind: Kind
++    targets: list[Target]
++    resolution: ResolutionMethod
++    note: str | None = None
++
++
++def resolve(question: str, context: dict | None = None, max_stations: int = 3) -> Resolution:
++    if context:
++        context_result = _from_context(context)
++        if context_result is not None:
++            return context_result
++    return _from_text(question or "", max_stations=max_stations)
++
++
++def _from_context(context: dict) -> Resolution | None:
++    target_type = context.get("target_type")
++    target_id = context.get("target_id")
++    if not isinstance(target_id, str) or not target_id:
++        return None
++
++    if target_type == "station":
++        if target_id in SLUG_TO_STATION:
++            name = SLUG_TO_STATION[target_id]
++        elif target_id in STATION_SLUGS:
++            name = target_id
++        else:
++            return None
++        return Resolution(
++            kind="station",
++            targets=[Target("station", station_slug(name), name)],
++            resolution="context",
++        )
++
++    if target_type == "segment":
++        pair = _split_segment_id(target_id)
++        if pair is None:
++            return None
++        return Resolution(
++            kind="segment",
++            targets=[_segment_target(*pair)],
++            resolution="context",
++        )
++    return None
++
++
++def _split_segment_id(segment_id: str) -> tuple[str, str] | None:
++    parts = segment_id.split("-")
++    if len(parts) != 2:
++        return None
++    from_name = SLUG_TO_STATION.get(parts[0])
++    to_name = SLUG_TO_STATION.get(parts[1])
++    if from_name is None or to_name is None or not _adjacent(from_name, to_name):
++        return None
++    return from_name, to_name
++
++
++def _from_text(question: str, max_stations: int) -> Resolution:
++    names = _extract_stations(question)
++    if not names:
++        return Resolution("none", [], "none")
++    if len(names) == 1:
++        name = names[0]
++        return Resolution(
++            "station",
++            [Target("station", station_slug(name), name)],
++            "text_match",
++        )
++
++    if _segment_intent(question):
++        pair = _first_adjacent_pair(names)
++        if pair is not None:
++            note = None
++            if len(names) > 2:
++                note = "여러 역이 언급되어 인접한 두 역을 구간으로 해석했습니다."
++            return Resolution(
++                "segment",
++                [_segment_target(*pair)],
++                "text_match",
++                note=note,
++            )
++        targets = [
++            Target("station", station_slug(name), name)
++            for name in names[:max_stations]
++        ]
++        return Resolution(
++            "stations",
++            targets,
++            "text_match",
++            note=(
++                "언급된 역들이 노선상 인접하지 않아 단일 구간이 아닙니다. "
++                "각 역 기준으로 설명합니다."
++            ),
++        )
++
++    targets = [
++        Target("station", station_slug(name), name)
++        for name in names[:max_stations]
++    ]
++    return Resolution("stations", targets, "text_match")
++
++
++def _extract_stations(text: str) -> list[str]:
++    consumed = [False] * len(text)
++    hits: list[tuple[int, str]] = []
++    for alias in sorted(STATION_ALIASES, key=len, reverse=True):
++        start = 0
++        while True:
++            index = text.find(alias, start)
++            if index < 0:
++                break
++            span = range(index, index + len(alias))
++            if not any(consumed[position] for position in span):
++                for position in span:
++                    consumed[position] = True
++                hits.append((index, STATION_ALIASES[alias]))
++            start = index + 1
++
++    hits.sort(key=lambda item: item[0])
++    result: list[str] = []
++    seen: set[str] = set()
++    for _, name in hits:
++        if name not in seen:
++            seen.add(name)
++            result.append(name)
++    return result
++
++
++def _segment_intent(text: str) -> bool:
++    if any(marker in text for marker in _STRONG_SEGMENT):
++        return True
++    comparison = any(marker in text for marker in _COMPARISON)
++    weak = (
++        any(marker in text for marker in _WEAK_SEGMENT)
++        or ("에서" in text and "까지" in text)
++        or "가는" in text
++    )
++    return weak and not comparison
++
++
++def _adjacent(left: str, right: str) -> bool:
++    return abs(LINE_ORDER.index(left) - LINE_ORDER.index(right)) == 1
++
++
++def _first_adjacent_pair(names: list[str]) -> tuple[str, str] | None:
++    for left_index in range(len(names)):
++        for right_index in range(left_index + 1, len(names)):
++            if _adjacent(names[left_index], names[right_index]):
++                return names[left_index], names[right_index]
++    return None
++
++
++def _segment_target(left: str, right: str) -> Target:
++    if LINE_ORDER.index(left) > LINE_ORDER.index(right):
++        left, right = right, left
++    return Target("segment", segment_slug(left, right), f"{left}–{right}")
+diff --git a/backend/requirements.txt b/backend/requirements.txt
+index 95d2330..57215f7 100644
+--- a/backend/requirements.txt
++++ b/backend/requirements.txt
+@@ -4,3 +4,5 @@ pydantic>=2
+ psycopg[binary]>=3
+ python-dotenv
+ pytest
++httpx>=0.27
++pypdf>=5
+diff --git a/backend/tests/test_rag_retriever.py b/backend/tests/test_rag_retriever.py
+new file mode 100644
+index 0000000..06f80f2
+--- /dev/null
++++ b/backend/tests/test_rag_retriever.py
+@@ -0,0 +1,39 @@
++from __future__ import annotations
++
++import pytest
++
++from rag.embedder import HashEmbedder
++from rag.repository import ChunkRecord, InMemoryRepository
++from rag.retriever import _cosine, search
++
++
++def _record(chunk_id: int, content: str, authority: str = "reference_document"):
++    embedder = HashEmbedder()
++    return ChunkRecord(
++        chunk_id=chunk_id,
++        path=f"doc{chunk_id}.md",
++        section=f"s{chunk_id}",
++        content=content,
++        embedding=embedder.embed_query(content),
++        authority=authority,
++        source_type="markdown",
++        language=None,
++        git_commit="test",
++        collection="project",
++    )
++
++
++def test_identifier_keyword_is_retrieved():
++    repository = InMemoryRepository(
++        records=[
++            _record(1, "avg_delay_incr는 도착역 지연에서 출발역 지연을 뺀 값이다", "current_implementation"),
++            _record(2, "지도 화면의 색상과 레이아웃을 설명한다"),
++        ]
++    )
++    hits = search("avg_delay_incr 계산", HashEmbedder(), repository, top_k=1)
++    assert hits[0].record.chunk_id == 1
++
++
++def test_dimension_mismatch_raises():
++    with pytest.raises(ValueError, match="차원 불일치"):
++        _cosine([1.0, 0.0], [1.0])
+diff --git a/backend/tests/test_rag_target_resolver.py b/backend/tests/test_rag_target_resolver.py
+new file mode 100644
+index 0000000..c8c9d33
+--- /dev/null
++++ b/backend/tests/test_rag_target_resolver.py
+@@ -0,0 +1,70 @@
++from __future__ import annotations
++
++import pytest
++
++from rag.target_resolver import resolve
++
++
++@pytest.mark.parametrize(
++    "question,target_id",
++    [
++        ("대전역은 왜 주의로 분류됐어?", "daejeon"),
++        ("김천 지연 어때?", "gimcheon_gumi"),
++        ("대구역 취약도", "dongdaegu"),
++    ],
++)
++def test_station_aliases(question: str, target_id: str):
++    result = resolve(question)
++    assert result.kind == "station"
++    assert result.targets[0].target_id == target_id
++
++
++@pytest.mark.parametrize(
++    "question",
++    [
++        "대전에서 김천 구간 취약도",
++        "대전~김천 어때",
++        "김천에서 대전 가는 구간",
++    ],
++)
++def test_segment_direction_is_normalized(question: str):
++    result = resolve(question)
++    assert result.kind == "segment"
++    assert result.targets[0].target_id == "daejeon-gimcheon_gumi"
++
++
++def test_comparison_is_not_segment():
++    result = resolve("대전이랑 오송 중 어디가 더 취약해?")
++    assert result.kind == "stations"
++    assert {target.target_id for target in result.targets} == {"daejeon", "osong"}
++
++
++def test_non_adjacent_segment_falls_back_to_stations():
++    result = resolve("서울에서 부산 구간이 궁금해")
++    assert result.kind == "stations"
++    assert result.note is not None
++
++
++def test_no_target_uses_none_resolution():
++    result = resolve("event_time은 어떤 시각이야?")
++    assert result.kind == "none"
++    assert result.resolution == "none"
++    assert result.targets == []
++
++
++def test_context_overrides_question():
++    result = resolve(
++        "대전은 왜 이래?",
++        context={"target_type": "station", "target_id": "osong"},
++    )
++    assert result.resolution == "context"
++    assert result.targets[0].target_id == "osong"
++
++
++def test_invalid_context_falls_back_to_text():
++    result = resolve(
++        "부산역은 어때?",
++        context={"target_type": "station", "target_id": "unknown"},
++    )
++    assert result.resolution == "text_match"
++    assert result.targets[0].target_id == "busan"
+diff --git a/docker-compose.yml b/docker-compose.yml
+index 0d33a8a..cdc979d 100644
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -39,6 +39,19 @@ services:
+       #    그 값을 그대로 쓰면 컨테이너가 자기 자신을 DB로 찾아 실패한다.
+       #    그래서 여기서 host=db 로 '고정'해 env_file 값을 덮어쓴다.
+       DATABASE_URL: "postgresql://trail:${POSTGRES_PASSWORD:-trail}@db:5432/trail"
++      # RAG는 LiteLLM Proxy를 통해 채팅·임베딩 모델을 호출한다.
++      RAG_ENABLED: "${RAG_ENABLED:-0}"
++      RAG_COLLECTION: "${RAG_COLLECTION:-project}"
++      RAG_INDEX_FILE: "${RAG_INDEX_FILE:-/data/rag_index.json}"
++      RAG_TOP_K: "${RAG_TOP_K:-5}"
++      RAG_CHAT_MODEL: "${RAG_CHAT_MODEL:-rag-chat}"
++      RAG_EMBED_MODEL: "${RAG_EMBED_MODEL:-rag-embedding}"
++      RAG_EMBED_PROVIDER_MODEL: "${LITELLM_EMBED_MODEL:-openai/text-embedding-3-small}"
++      RAG_REQUEST_TIMEOUT: "${RAG_REQUEST_TIMEOUT:-90}"
++      LITELLM_BASE_URL: "http://litellm:4000/v1"
++      LITELLM_API_KEY: "${LITELLM_API_KEY:-sk-local-dev}"
++    volumes:
++      - ragdata:/data
+     restart: unless-stopped
+     # db 프로파일로 함께 뜰 때만 DB를 기다린다. mock 단독 실행엔 영향 없음.
+     depends_on:
+@@ -46,6 +59,51 @@ services:
+         condition: service_healthy
+         required: false
+ 
++  # OpenAI/다른 공급자를 한 OpenAI 호환 API로 통일하는 모델 게이트웨이.
++  # 외부 공개를 막기 위해 호스트 127.0.0.1에만 바인딩한다.
++  litellm:
++    image: docker.litellm.ai/berriai/litellm:main-latest
++    profiles: ["rag"]
++    command: ["--config", "/app/config.yaml", "--port", "4000"]
++    env_file:
++      - path: .env
++        required: false
++    environment:
++      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
++      LITELLM_MASTER_KEY: "${LITELLM_MASTER_KEY:-sk-local-dev}"
++      LITELLM_CHAT_MODEL: "${LITELLM_CHAT_MODEL:-openai/gpt-5-mini}"
++      LITELLM_EMBED_MODEL: "${LITELLM_EMBED_MODEL:-openai/text-embedding-3-small}"
++    volumes:
++      - ./litellm/config.yaml:/app/config.yaml:ro
++    ports:
++      - "127.0.0.1:4000:4000"
++    restart: unless-stopped
++
++  # 프로젝트 문서·코드를 1회 인제스트하는 작업 컨테이너.
++  # 실행: docker compose --profile rag run --rm rag-ingest
++  rag-ingest:
++    build: .
++    image: trail-dashboard-api
++    profiles: ["rag"]
++    working_dir: /app/backend
++    command: ["python", "-m", "rag.ingest", "--repo", "/app", "--embedder", "litellm"]
++    env_file:
++      - path: .env
++        required: false
++    environment:
++      RAG_COLLECTION: "${RAG_COLLECTION:-project}"
++      RAG_INDEX_FILE: "${RAG_INDEX_FILE:-/data/rag_index.json}"
++      RAG_EMBED_MODEL: "${RAG_EMBED_MODEL:-rag-embedding}"
++      RAG_EMBED_PROVIDER_MODEL: "${LITELLM_EMBED_MODEL:-openai/text-embedding-3-small}"
++      RAG_REQUEST_TIMEOUT: "${RAG_REQUEST_TIMEOUT:-90}"
++      LITELLM_BASE_URL: "http://litellm:4000/v1"
++      LITELLM_API_KEY: "${LITELLM_API_KEY:-sk-local-dev}"
++    volumes:
++      - ragdata:/data
++    depends_on:
++      - litellm
++    restart: "no"
++
+   db:
+     # TimescaleDB (PostgreSQL 16 기반). 일반 PostgreSQL 이미지와 달리 timescaledb 확장이
+     # 미리 설치돼 있어 init_schema.sql 의 CREATE EXTENSION 이 바로 동작한다.
+@@ -82,3 +140,4 @@ services:
+ 
+ volumes:
+   pgdata:
++  ragdata:
+diff --git a/litellm/config.yaml b/litellm/config.yaml
+new file mode 100644
+index 0000000..d8b479d
+--- /dev/null
++++ b/litellm/config.yaml
+@@ -0,0 +1,14 @@
++model_list:
++  - model_name: rag-chat
++    litellm_params:
++      model: os.environ/LITELLM_CHAT_MODEL
++      api_key: os.environ/OPENAI_API_KEY
++
++  - model_name: rag-embedding
++    litellm_params:
++      model: os.environ/LITELLM_EMBED_MODEL
++      api_key: os.environ/OPENAI_API_KEY
++
++litellm_settings:
++  master_key: os.environ/LITELLM_MASTER_KEY
++  drop_params: true
+diff --git a/scripts/rag_smoke_test.sh b/scripts/rag_smoke_test.sh
+new file mode 100755
+index 0000000..bd21a26
+--- /dev/null
++++ b/scripts/rag_smoke_test.sh
+@@ -0,0 +1,20 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++API_BASE_URL="${API_BASE_URL:-http://127.0.0.1:8000}"
++
++echo "[1/3] RAG health"
++curl -fsS "${API_BASE_URL}/rag/health"
++echo
++
++echo "[2/3] project document question"
++curl -fsS -X POST "${API_BASE_URL}/rag/ask" \
++  -H "Content-Type: application/json" \
++  -d '{"question":"역 취약도는 어떤 기준으로 계산돼?"}'
++echo
++
++echo "[3/3] station metric + RAG question"
++curl -fsS -X POST "${API_BASE_URL}/rag/ask" \
++  -H "Content-Type: application/json" \
++  -d '{"question":"대전역은 왜 이 등급이야?"}'
++echo
+diff --git a/backend/api.py b/backend/api.py
+--- a/backend/api.py
++++ b/backend/api.py
+@@ -61,4 +61,4 @@ app = FastAPI(title="경부선 기상 취약구간 API", version="0.2.0")
+ app.add_middleware(
+     CORSMiddleware,
+-    allow_origins=CORS_ORIGINS, allow_methods=["GET"], allow_headers=["*"],
++    allow_origins=CORS_ORIGINS, allow_methods=["GET", "POST", "OPTIONS"], allow_headers=["*"],
+ )
+@@ -755,3 +755,8 @@ def get_alerts_active(line: str = "경부선"):
+             "affected": affected,
+         })
+     return {"line": line, "updated_at": now, "active": active}
++
++
++# RAG 라우터는 기존 API 함수 정의가 끝난 뒤 등록한다.
++from rag.router import router as rag_router
++app.include_router(rag_router)
