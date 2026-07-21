@@ -117,85 +117,6 @@ function createAIChatTrigger() {
   return button;
 }
 
-function getCurrentScreenSummary() {
-  const main = document.querySelector("main");
-
-  if (!main) {
-    return "";
-  }
-
-  const selectedControls = [
-    ...main.querySelectorAll("select"),
-  ]
-    .filter((element) => !element.disabled)
-    .map((element) => {
-      const selectedText =
-        element.selectedOptions?.[0]
-          ?.textContent
-          ?.trim()
-        || element.value
-        || "선택 없음";
-
-      const name =
-        element.name
-        || element.id
-        || "선택 항목";
-
-      return `${name}: ${selectedText}`;
-    });
-
-  const screenText = main.innerText
-    .replace(/\r/g, "")
-    .replace(/[ \t]+/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-
-  return [
-    `페이지 제목: ${document.title}`,
-    `현재 주소: ${window.location.pathname}${window.location.search}`,
-    selectedControls.length > 0
-      ? `현재 선택값: ${selectedControls.join(", ")}`
-      : null,
-    screenText,
-  ]
-    .filter(Boolean)
-    .join("\n");
-}
-
-function buildScreenAwareQuestion(userQuestion) {
-  const maxQuestionLength = 1000;
-  const screenHeader = "[현재 화면 정보]\n";
-  const questionHeader = "\n\n[사용자 질문]\n";
-  const screenSummary = getCurrentScreenSummary();
-
-  if (!screenSummary) {
-    return userQuestion.slice(
-      0,
-      maxQuestionLength,
-    );
-  }
-
-  const availableScreenLength = Math.max(
-    0,
-    maxQuestionLength
-      - screenHeader.length
-      - questionHeader.length
-      - userQuestion.length,
-  );
-
-  const truncatedScreen = screenSummary.slice(
-    0,
-    availableScreenLength,
-  );
-
-  return [
-    screenHeader,
-    truncatedScreen,
-    questionHeader,
-    userQuestion,
-  ].join("");
-}
-
 function initializeAIChat() {
   const headerInner = document.querySelector(".site-header__inner, .station-global-header__inner");
   if (!headerInner) return;
@@ -331,7 +252,7 @@ function initializeAIChat() {
 
     try {
       const payload = {
-        question: buildScreenAwareQuestion(normalizedQuestion),
+        question: normalizedQuestion,
         collection: "project",
       };
 
