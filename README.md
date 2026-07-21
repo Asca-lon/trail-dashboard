@@ -41,15 +41,15 @@
 
 ## 🖥️ 화면 구성
 
-| 화면 | 내용 |
-|---|---|
-| **메인 대시보드** | 현재 발효 특보 · 위험 역/구간 순위 · 경부선 취약도 히트맵 · 우선 점검 대상 |
-| **역 상세** | 특보 종류별 지연 현황, 평상시 대비 특보 시 지연 차이, 시간대별 지연 |
-| **구간 상세** | 인접 역 사이 지연 증가량, 과거 특보별 분석, 구간 관련 발효 특보 |
+**메인 대시보드** — 영향 가능 구간·평균 신규 지연 등 요약 카드, 경부선 기상 위험도 히트맵, 위험 구간·위험 역 TOP 5, 구간 요약(높음/주의/관심/데이터 없음).
 
-<!-- 스크린샷을 docs/ 또는 assets/ 에 추가한 뒤 아래에 넣으세요.
-![메인 대시보드](docs/screenshot-dashboard.png)
--->
+![메인 대시보드](docs/screenshots/dashboard.png)
+
+**역 상세** — 현재 위험도 등급, 평균 지연 시간·지연 증가량·지연률·운행 중단률, 시간대별 평균 지연, 특보 발생 시 vs 평상시 지연 비교(호우·폭염).
+
+![역 상세](docs/screenshots/station-detail.png)
+
+**구간 상세** — 인접 역 사이 지연 증가량, 과거 특보별 분석, 구간 관련 발효 특보.
 
 ---
 
@@ -58,11 +58,13 @@
 | 영역 | 사용 기술 |
 |---|---|
 | 백엔드 | FastAPI (읽기 전용 API), Pydantic (계약 검증), psycopg3 |
-| 데이터베이스 | PostgreSQL 16 + **TimescaleDB** (시계열) + **pgvector** (RAG 임베딩) |
-| 프론트엔드 | vanilla JavaScript · HTML · CSS |
-| RAG / LLM | LiteLLM 프록시(모델 게이트웨이) 위의 RAG 설명 레이어 |
+| 데이터베이스 | PostgreSQL 16 + **TimescaleDB** (시계열 하이퍼테이블) |
+| 프론트엔드 | vanilla JavaScript · HTML · CSS (외부 차트/지도 라이브러리 없음, Lucide SVG 아이콘) |
+| RAG / LLM | LiteLLM 프록시(모델 게이트웨이) + 파일 기반 JSON 인덱스 |
 | 인프라 | Docker Compose (단일 포트 8000, 프로파일로 DB·RAG 분리) |
 | 데이터 출처 | 기상청 API 허브(기상특보), 공공데이터포털(여객열차 운행계획·운행실적) |
+
+> 전체 의존성·버전은 [`TECH_STACK.md`](./TECH_STACK.md) 참고.
 
 ---
 
@@ -113,6 +115,25 @@ docker compose up
 
 ---
 
+## 🔐 환경 변수 (.env)
+
+`docker compose up`(mock) 만 쓸 땐 `.env` 가 필요 없습니다. **실제 DB·데이터 수집·RAG** 를 쓰려면 `cp .env.example .env` 후 아래 값을 채웁니다.
+
+| 변수 | 필요 시점 | 설명 |
+|---|---|---|
+| `USE_MOCK` | 항상 | `1`=mock(기본), `0`=실제 DB 조회 |
+| `DATABASE_URL` · `POSTGRES_PASSWORD` | DB 모드 | Postgres 접속 정보 (compose 기본 계정 `trail`) |
+| `PUBLIC_DATA_API_KEY` | 데이터 수집 | 공공데이터포털(코레일 운행) 키 |
+| `KMA_API_KEY` | 데이터 수집 | 기상청 API 허브(특보) 키 |
+| `RAG_ENABLED` | RAG | `1`이면 `/rag/ask` 활성화 |
+| `GEMINI_API_KEY` | RAG | LiteLLM 이 호출할 LLM 공급자 키 |
+| `LITELLM_MASTER_KEY` · `LITELLM_API_KEY` | RAG | LiteLLM 프록시 인증키 (같은 값 사용) |
+| `LITELLM_CHAT_MODEL` · `LITELLM_EMBED_MODEL` | RAG | 채팅·임베딩 모델명 (공급자 교체 지점) |
+
+> `KORail_*`·`MOLIT_*`·`KMA_*_URL` 같은 엔드포인트 URL 은 기본값이 있어 보통 손대지 않습니다. `.env` 는 `.gitignore` 라 커밋되지 않습니다(키 유출 방지).
+
+---
+
 ## 🔌 API 개요
 
 읽기 전용 REST API. 응답은 모두 CONTRACT §5 형식을 따릅니다.
@@ -149,7 +170,7 @@ trail-dashboard/
 ├─ serve.py               # api.app + frontend/·mock/ 정적 마운트(단일 포트 8000)
 ├─ .env.example
 ├─ db/                    # A — 스키마·시드
-│  ├─ init_schema.sql       # 스키마(§4). TimescaleDB 하이퍼테이블·pgvector 포함
+│  ├─ init_schema.sql       # 스키마(§4). TimescaleDB 하이퍼테이블 포함
 │  ├─ seed_stations.sql     # 경부선 역·특보구역 매핑(station_regions 1:N)
 │  └─ migrate_*.sql
 ├─ collector/             # A — 수집·적재 (운행계획·운행실적·특보 → DB)
@@ -177,6 +198,19 @@ trail-dashboard/
 
 ---
 
+## 📚 문서
+
+| 문서 | 내용 |
+|---|---|
+| [`CONTRACT.md`](./CONTRACT.md) | **단일 진실 원천** — API 데이터 계약(키·단위·정렬·오류 형식) |
+| [`QUICKSTART.md`](./QUICKSTART.md) | clone 후 실행 (mock·RAG·DB 모드, 트러블슈팅) |
+| [`Docker_run.md`](./Docker_run.md) | 도커 설치·실행 상세 (OS별) |
+| [`TECH_STACK.md`](./TECH_STACK.md) | 사용 기술·버전 목록 |
+| [`server_RUN.md`](./server_RUN.md) | 서버(SSH·uvicorn) 직접 실행 |
+| `.docs/` | 화면 설계·RAG·리팩터링 등 상세 설계 문서 |
+
+---
+
 ## 👥 팀 구성
 
 | 담당 | 영역 | 폴더 |
@@ -187,14 +221,24 @@ trail-dashboard/
 
 ---
 
-## 🧪 개발 메모
+## 🧪 테스트
 
-- **테스트**: `cd backend && USE_MOCK=1 python -m pytest -q` — 응답 모델·허용 특보·정렬·표본 부족 처리·식별자·RAG 대상 해석 등을 검증
-- **가상 데이터 우선**: 실제 DB/공공데이터 연결 전에도 프론트·API를 개발·검증할 수 있도록 mock 모드 제공
+```bash
+cd backend
+USE_MOCK=1 python -m pytest -q
+```
+
+응답 모델 ↔ mock 동기화, 허용 특보·필터 방어, 취약도 정렬, 표본 부족 처리, 역·구간 식별자, RAG 대상 해석 등을 검증합니다.
+
+---
+
+## 📝 개발 메모
+
+- **가상 데이터 우선**: 실제 DB/공공데이터 연결 전에도 프론트·API를 개발·검증할 수 있도록 mock 모드 제공.
 - **GitHub Pages(mock 호스팅)**: Settings → Pages → `main` `/(root)` 배포 시 `https://<계정>.github.io/<레포>/`로 화면을, `/mock/*.json`으로 mock을 노출. C는 이 URL로 화면을 만들고 백엔드 완성 후 base URL만 교체.
 
 ---
 
 ## 📄 라이선스
 
-현장실습 팀 프로젝트(캡스톤) 결과물입니다. 별도 라이선스가 필요하면 `LICENSE` 파일을 추가하세요.
+학습·연구 목적의 현장실습 팀 프로젝트(캡스톤) 결과물입니다. 사용한 오픈소스 라이브러리는 각자의 라이선스를 따르며, 참고·재사용한 외부 코드의 저작권은 각 원저작자에게 있습니다. 상업적 이용·재배포 전에는 사용된 구성요소의 라이선스를 확인하세요.
