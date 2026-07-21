@@ -50,7 +50,7 @@
 ![역 상세](.docs/screenshots/station-detail.png)
 
 **구간 상세** — 인접 역 사이 지연 증가량, 과거 특보별 분석, 구간 관련 발효 특보.
-![구간 상세](.docs/screenshots/segment-detail.png)
+![구간 상세](.docs/screenshots/segment_detail.png)
 ---
 
 ## 🧱 기술 스택
