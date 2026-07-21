@@ -132,7 +132,7 @@ function formatSignedNumber(value) {
     return "-";
   }
 
-  return `+${value.toFixed(1)}`;
+  return `${value > 0 ? "+" : ""}${value.toFixed(1)}`;
 }
 
 function getLineChartPoint(item, index, itemCount, valueKey) {

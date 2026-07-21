@@ -292,7 +292,7 @@ function formatSignedNumber(value) {
     return "-";
   }
 
-  return `+${value.toFixed(1)}`;
+  return `${value > 0 ? "+" : ""}${value.toFixed(1)}`;
 }
 
 function formatChartDateLabel(dateString) {
