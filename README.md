@@ -43,11 +43,11 @@
 
 **메인 대시보드** — 영향 가능 구간·평균 신규 지연 등 요약 카드, 경부선 기상 위험도 히트맵, 위험 구간·위험 역 TOP 5, 구간 요약(높음/주의/관심/데이터 없음).
 
-![메인 대시보드](docs/screenshots/dashboard.png)
+![메인 대시보드](.docs/screenshots/dashboard.png)
 
 **역 상세** — 현재 위험도 등급, 평균 지연 시간·지연 증가량·지연률·운행 중단률, 시간대별 평균 지연, 특보 발생 시 vs 평상시 지연 비교(호우·폭염).
 
-![역 상세](docs/screenshots/station-detail.png)
+![역 상세](.docs/screenshots/station-detail.png)
 
 **구간 상세** — 인접 역 사이 지연 증가량, 과거 특보별 분석, 구간 관련 발효 특보.
 
