@@ -79,7 +79,7 @@
                         │  읽기 전용
                         ▼
                    backend/ (FastAPI API)
-                        │  CONTRACT.md = 단일 계약
+                        │  
                         ▼
                    frontend/ (대시보드)
 ```
