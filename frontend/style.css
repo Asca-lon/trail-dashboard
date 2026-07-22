@@ -3397,25 +3397,18 @@ textarea {
   border-radius: 10px;
 }
 
-.route-alert-card__box--high {
+.route-alert-card__box--emergency {
   --route-alert-accent: var(--risk-high);
   --route-alert-background: var(--risk-high-bg);
   --route-alert-border: #FECACA;
   --route-alert-icon-filter: invert(37%) sepia(70%) saturate(1519%) hue-rotate(334deg) brightness(91%) contrast(92%);
 }
 
-.route-alert-card__box--warning {
+.route-alert-card__box--advisory {
   --route-alert-accent: var(--risk-warning);
   --route-alert-background: var(--risk-warning-bg);
   --route-alert-border: #FDE68A;
   --route-alert-icon-filter: invert(61%) sepia(63%) saturate(1533%) hue-rotate(356deg) brightness(91%) contrast(88%);
-}
-
-.route-alert-card__box--interest {
-  --route-alert-accent: var(--risk-interest);
-  --route-alert-background: var(--risk-interest-bg);
-  --route-alert-border: #BBF7D0;
-  --route-alert-icon-filter: invert(53%) sepia(61%) saturate(546%) hue-rotate(87deg) brightness(92%) contrast(86%);
 }
 
 .route-alert-card__box--none {

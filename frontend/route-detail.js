@@ -33,8 +33,13 @@ const RISK_LABELS = {
 const RISK_CARD_MODIFIER_CLASSES = Object.keys(RISK_LABELS).map(
   (riskLevel) => `route-risk-card--${riskLevel}`,
 );
-const ALERT_BOX_MODIFIER_CLASSES = Object.keys(RISK_LABELS).map(
-  (riskLevel) => `route-alert-card__box--${riskLevel}`,
+const ACTIVE_ALERT_CARD_STYLES = Object.freeze({
+  emergency: "emergency",
+  advisory: "advisory",
+  none: "none",
+});
+const ALERT_BOX_MODIFIER_CLASSES = Object.values(ACTIVE_ALERT_CARD_STYLES).map(
+  (style) => `route-alert-card__box--${style}`,
 );
 
 const GYEONGBU_HIGH_SPEED_SEGMENTS = [
@@ -239,18 +244,28 @@ function createActiveAlertContent(alert) {
   return [headline, details];
 }
 
+function getActiveAlertCardStyle(activeAlerts) {
+  if (activeAlerts.some((alert) => alert.alert_level === "경보")) {
+    return ACTIVE_ALERT_CARD_STYLES.emergency;
+  }
+
+  if (activeAlerts.some((alert) => alert.alert_level === "주의보")) {
+    return ACTIVE_ALERT_CARD_STYLES.advisory;
+  }
+
+  return ACTIVE_ALERT_CARD_STYLES.none;
+}
+
 function renderActiveAlerts(alertsData, selectedSegment) {
   const activeAlerts = Array.isArray(alertsData?.active) ? alertsData.active : [];
   const matchingAlerts = activeAlerts.filter((alert) => (
     isAlertMatchingSegment(alert, selectedSegment?.from, selectedSegment?.to)
   ));
-  const riskLevel = matchingAlerts.length > 0
-    ? (selectedSegment?.risk_level || "none")
-    : "none";
+  const alertCardStyle = getActiveAlertCardStyle(matchingAlerts);
 
   activeAlertCardElements.forEach((card) => {
     card.classList.remove(...ALERT_BOX_MODIFIER_CLASSES);
-    card.classList.add(`route-alert-card__box--${riskLevel}`);
+    card.classList.add(`route-alert-card__box--${alertCardStyle}`);
 
     if (matchingAlerts.length === 0) {
       const emptyMessage = document.createElement("p");
