@@ -99,6 +99,37 @@ def classify_segment_risk(
     return "interest"
 
 
+# ── 특보 라벨 ────────────────────────────────────────────────
+# 화면에는 '특보'가 아니라 '폭염 경보'처럼 종류와 등급이 나와야 한다.
+# 집계 테이블(station/segment_vulnerability)의 PK 가 (…, alert_type, alert_level)이라
+# 데이터는 조합별로 있는데, 조회 시 GROUP BY 로 합치면 그 정보가 사라진다.
+# 그래서 라벨을 별도로 만들어 사유 문구에 넣는다.
+
+def alert_label(alert_type: Optional[str], alert_level: Optional[str]) -> Optional[str]:
+    """('호우','경보') → '호우 경보'. 하나라도 없으면 None(라벨 생략)."""
+    # '전체'는 조합을 특정하지 않는다는 뜻이므로 라벨을 만들지 않는다.
+    if not alert_type or not alert_level:
+        return None
+    if alert_type == "전체" or alert_level == "전체":
+        return None
+    return f"{alert_type} {alert_level}"
+
+
+def _head(alert: Optional[str], dominant: bool) -> str:
+    """사유 문구의 머리말.
+
+    alert 없음      → '특보 시'          (기존 문구 유지)
+    특정 조합 조회   → '폭염 경보 시'      (지표가 그 조합의 값이므로 그대로 단정)
+    전체 합산 조회   → '폭염 경보 영향 최대 ·'
+        ⚠️ 이때 지표는 여러 특보를 합친 가중평균이다. 특정 특보의 값이 아니므로
+           '…시'라고 쓰면 그 특보만의 수치로 오독된다. 영향이 가장 큰 특보를
+           '지목'만 하고 수치는 구간·역 전체 기준임을 문구로 구분한다.
+    """
+    if not alert:
+        return "특보 시"
+    return f"{alert} 영향 최대 ·" if dominant else f"{alert} 시"
+
+
 # ── 사유(risk_reason) 문구 ────────────────────────────────────
 # 등급과 문구가 어긋나지 않도록 여기서 같이 만든다. 프론트는 이 문구를 그대로 표시한다.
 
@@ -107,29 +138,38 @@ def station_risk_reason(
     delta_delay: Optional[float],
     delay_rate: Optional[float],
     sample_n: int,
+    alert: Optional[str] = None,
+    dominant: bool = False,
 ) -> str:
+    # 표본 부족은 특보와 무관한 판정이므로 라벨을 붙이지 않는다.
     if level == "insufficient":
         return f"표본 {sample_n}건으로 판단 근거 부족"
+    h = _head(alert, dominant)
     if level == "high":
         if delta_delay is not None and delta_delay >= 5:
-            return f"특보 시 평시보다 평균 지연이 {delta_delay:.1f}분 증가"
-        return f"특보 시 지연율 {(delay_rate or 0):.0%}, 평시보다 {delta_delay:.1f}분 증가"
+            return f"{h} 평시보다 평균 지연이 {delta_delay:.1f}분 증가"
+        return f"{h} 지연율 {(delay_rate or 0):.0%}, 평시보다 {delta_delay:.1f}분 증가"
     if level == "warning":
         if delta_delay is not None and delta_delay >= 2:
-            return f"특보 시 평시보다 평균 지연이 {delta_delay:.1f}분 증가"
-        return f"특보 시 지연율 {(delay_rate or 0):.0%}"
-    return "특보 시에도 평시 대비 지연 증가가 뚜렷하지 않음"
+            return f"{h} 평시보다 평균 지연이 {delta_delay:.1f}분 증가"
+        return f"{h} 지연율 {(delay_rate or 0):.0%}"
+    return f"{h} 평시 대비 지연 증가가 뚜렷하지 않음"
 
 
 def segment_risk_reason(
     level: RiskLevel,
     avg_delay_incr: Optional[float],
     sample_n: int,
+    alert: Optional[str] = None,
+    dominant: bool = False,
 ) -> str:
     if level == "insufficient":
         return f"표본 {sample_n}건으로 판단 근거 부족"
+    h = _head(alert, dominant)
     if level == "high":
-        return "특보 시간대 구간 평균 신규 지연이 5분 이상"
+        # 기존엔 '5분 이상'이라고만 했다. 화면의 avg_delay_incr 열과 같은 값을
+        # 문구에도 보여 주면 사유와 수치가 어긋나 보이지 않는다.
+        return f"{h} 구간 평균 신규 지연 {(avg_delay_incr or 0):.1f}분"
     if level == "warning":
-        return f"특보 시간대 구간 평균 신규 지연 {(avg_delay_incr or 0):.1f}분"
-    return "특보 시간대 구간 신규 지연이 크지 않음"
+        return f"{h} 구간 평균 신규 지연 {(avg_delay_incr or 0):.1f}분"
+    return f"{h} 구간 신규 지연이 크지 않음"

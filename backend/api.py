@@ -38,7 +38,7 @@ from models import (
 )
 from risk_rules import (
     classify_station_risk, classify_segment_risk, get_confidence,
-    station_risk_reason, segment_risk_reason,
+    station_risk_reason, segment_risk_reason, alert_label, MIN_SAMPLE_N,
 )
 
 # ── 설정 ──────────────────────────────────────────────────────
@@ -115,23 +115,85 @@ def _bucket_rows_to_points(rows: list[dict], *keys: str) -> list[dict]:
 # ── 등급 부착 ────────────────────────────────────────────────
 # 원시 지표 dict 에 risk_level/confidence/risk_reason 을 채운다(mock·DB 공용).
 # 프론트가 자체 임계값을 계산하지 않도록 백엔드가 단일 기준으로 등급을 확정한다.
-def _attach_station_risk(item: dict) -> dict:
+def _attach_station_risk(item: dict, alert: str | None = None,
+                         dominant: bool = False) -> dict:
     n = item.get("sample_n") or 0
     lvl = classify_station_risk(item.get("delta_delay"), item.get("delay_rate"), n)
     item["risk_level"] = lvl
     item["confidence"] = get_confidence(n)
     item["risk_reason"] = station_risk_reason(
-        lvl, item.get("delta_delay"), item.get("delay_rate"), n)
+        lvl, item.get("delta_delay"), item.get("delay_rate"), n,
+        alert=alert, dominant=dominant)
     return item
 
 
-def _attach_segment_risk(item: dict) -> dict:
+def _attach_segment_risk(item: dict, alert: str | None = None,
+                         dominant: bool = False) -> dict:
     n = item.get("sample_n") or 0
     lvl = classify_segment_risk(item.get("avg_delay_incr"), n)
     item["risk_level"] = lvl
     item["confidence"] = get_confidence(n)
-    item["risk_reason"] = segment_risk_reason(lvl, item.get("avg_delay_incr"), n)
+    item["risk_reason"] = segment_risk_reason(
+        lvl, item.get("avg_delay_incr"), n, alert=alert, dominant=dominant)
     return item
+
+
+# ── '영향 최대' 특보 조회 ─────────────────────────────────────
+# 순위표·히트맵과 등급이 어긋나지 않도록 지표는 '전체 합산 가중평균'을 유지한다.
+# 다만 화면에 '특보'라고만 뜨면 무슨 특보인지 알 수 없으므로, 어떤 조합이
+# 가장 큰 영향을 줬는지만 따로 뽑아 사유 문구에 붙인다(수치는 합산값 그대로).
+# 조합 수가 역 10 × (호우·폭염) × (주의보·경보) 수준이라 쿼리 1회로 충분하다.
+def _dominant_segment_alert(line: str) -> dict[tuple[str, str], str]:
+    """(from,to) → '호우 경보'. 표본 미달 조합은 후보에서 제외."""
+    from db import fetch_all
+    rows = fetch_all(
+        'SELECT sf.station_name AS "from", st.station_name AS "to", '
+        "  v.alert_type, v.alert_level, v.avg_delay_incr, v.sample_n "
+        "FROM segment_vulnerability v "
+        "  JOIN stations sf ON sf.station_code=v.from_station "
+        "  JOIN stations st ON st.station_code=v.to_station "
+        "WHERE v.line=%(line)s AND v.alert_type IN ('호우','폭염')",
+        {"line": line},
+    )
+    best: dict[tuple[str, str], tuple] = {}
+    for r in rows:
+        if (r["sample_n"] or 0) < MIN_SAMPLE_N:
+            continue
+        lab = alert_label(r["alert_type"], r["alert_level"])
+        if not lab:
+            continue
+        k = (r["from"], r["to"])
+        # 신규 지연이 큰 조합 우선, 같으면 표본 많은 쪽.
+        score = (r["avg_delay_incr"] or 0, r["sample_n"] or 0)
+        if k not in best or score > best[k][0]:
+            best[k] = (score, lab)
+    return {k: v[1] for k, v in best.items()}
+
+
+def _dominant_station_alert(line: str) -> dict[str, str]:
+    """역 이름 → '폭염 경보'. 평시 대비 증가량이 가장 큰 조합."""
+    from db import fetch_all
+    rows = fetch_all(
+        "SELECT s.station_name AS station, v.alert_type, v.alert_level, "
+        "  v.avg_delay, v.base_avg_delay, v.sample_n "
+        "FROM station_vulnerability v JOIN stations s ON s.station_code=v.station_code "
+        "WHERE s.line=%(line)s AND v.alert_type IN ('호우','폭염')",
+        {"line": line},
+    )
+    best: dict[str, tuple] = {}
+    for r in rows:
+        if (r["sample_n"] or 0) < MIN_SAMPLE_N:
+            continue
+        lab = alert_label(r["alert_type"], r["alert_level"])
+        if not lab:
+            continue
+        a, b = r["avg_delay"], r["base_avg_delay"]
+        delta = (a - b) if (a is not None and b is not None) else 0
+        score = (delta, r["sample_n"] or 0)
+        k = r["station"]
+        if k not in best or score > best[k][0]:
+            best[k] = (score, lab)
+    return {k: v[1] for k, v in best.items()}
 
 
 # 히트맵 vuln(0~1) ↔ 등급. 등급이 권위값, vuln 은 하위호환 색상 힌트.
@@ -185,12 +247,16 @@ def get_segments(line: str = "경부선", alert_type: str | None = None,
     _check(alert_type, alert_level, train_type)
     if USE_MOCK:
         d = _mock("vulnerability_segments.json")
+        # ⚠️ 라벨은 아래에서 '전체'로 덮어쓰기 '전에' 읽어야 한다.
+        #    mock 파일 자체가 특정 조합(호우 경보)의 데이터다.
+        _lab = alert_label(alert_type or d.get("alert_type"),
+                           alert_level or d.get("alert_level"))
         d["line"] = line
         d["alert_type"] = alert_type or "전체"
         d["alert_level"] = alert_level or "전체"
         for s in d["segments"]:
             s.setdefault("segment_id", segment_slug(s["from"], s["to"]))
-            _attach_segment_risk(s)
+            _attach_segment_risk(s, alert=_lab)
         return d
     from db import fetch_all
 
@@ -225,13 +291,18 @@ def get_segments(line: str = "경부선", alert_type: str | None = None,
         "ORDER BY 3 DESC NULLS LAST",
         params,
     )
+    # 조합을 지정해 조회했으면 그 라벨이 정확한 값이다(dominant 아님).
+    # '전체'로 합쳐 봤으면 영향 최대 조합을 지목만 한다.
+    _exact = alert_label(alert_type, alert_level)
+    _dom = {} if _exact else _dominant_segment_alert(line)
     segments = [_attach_segment_risk({
         "segment_id": segment_slug(r["from"], r["to"]),
         "from": r["from"], "to": r["to"],
         "avg_delay_incr": _r1(r["avg_delay_incr"]),
         "stop_rate": round(r["stop_rate"], 2) if r["stop_rate"] is not None else None,
         "sample_n": r["sample_n"],
-    }) for r in rows]
+    }, alert=_exact or _dom.get((r["from"], r["to"])),
+       dominant=not _exact) for r in rows]
     return {
         "line": line,
         "alert_type": alert_type or "전체",
@@ -253,6 +324,9 @@ def get_stations(line: str = "경부선", alert_type: str | None = None, alert_l
     _check(alert_type, alert_level)
     if USE_MOCK:
         d = _mock("vulnerability_stations.json")
+        # ⚠️ 라벨은 '전체'로 덮어쓰기 전에 읽는다(mock 은 폭염 경보 데이터).
+        _lab = alert_label(alert_type or d.get("alert_type"),
+                           alert_level or d.get("alert_level"))
         d["line"] = line
         d["alert_type"] = alert_type or "전체"
         d["alert_level"] = alert_level or "전체"
@@ -261,7 +335,7 @@ def get_stations(line: str = "경부선", alert_type: str | None = None, alert_l
             if s.get("delay_count") is None and s.get("sample_n") is not None \
                     and s.get("delay_rate") is not None:
                 s["delay_count"] = round(s["sample_n"] * s["delay_rate"])
-            _attach_station_risk(s)
+            _attach_station_risk(s, alert=_lab)
         return d
     from db import fetch_all
 
@@ -294,6 +368,8 @@ def get_stations(line: str = "경부선", alert_type: str | None = None, alert_l
         "ORDER BY 2 DESC NULLS LAST",
         params,
     )
+    _exact = alert_label(alert_type, alert_level)
+    _dom = {} if _exact else _dominant_station_alert(line)
     stations = []
     for r in rows:
         avg = _r1(r["avg_delay"])
@@ -310,7 +386,7 @@ def get_stations(line: str = "경부선", alert_type: str | None = None, alert_l
             "sample_n": n,
             # delay_count 는 DB 컬럼이 아니라 유도값(프론트 추정식과 동일)
             "delay_count": round(n * rate) if (n is not None and rate is not None) else None,
-        }))
+        }, alert=_exact or _dom.get(r["station"]), dominant=not _exact))
     return {
         "line": line,
         "alert_type": alert_type or "전체",
@@ -651,6 +727,7 @@ def get_checklist(line: str = "경부선"):
     )
     # 1) 표본 10건 미만 제외  2) 등급(높음→주의→관심) 우선  3) 같은 등급이면 신규지연 내림차순  4) 상위 10
     _RISK_ORDER = {"high": 0, "warning": 1, "interest": 2, "insufficient": 3}
+    _dom_ck = _dominant_segment_alert(line)   # 사유에 붙일 '영향 최대' 특보
     cands = []
     for r in rows:
         n = r["sample_n"] or 0
@@ -665,7 +742,9 @@ def get_checklist(line: str = "경부선"):
         "segment_id": segment_slug(r["from_station"], r["to_station"]),
         "target": f"{r['from_station']}→{r['to_station']} 구간",
         # 조합이 아니라 구간 전체 기준 사유(등급과 같은 근거).
-        "reason": segment_risk_reason(lvl, r["avg_delay_incr"], r["sample_n"]),
+        "reason": segment_risk_reason(
+            lvl, r["avg_delay_incr"], r["sample_n"],
+            alert=_dom_ck.get((r["from_station"], r["to_station"])), dominant=True),
         "avg_delay_incr": _r1(r["avg_delay_incr"]), "sample_n": r["sample_n"],
         "risk_level": lvl,
     } for i, (lvl, r) in enumerate(cands[:10])]
