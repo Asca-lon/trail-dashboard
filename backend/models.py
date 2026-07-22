@@ -236,6 +236,10 @@ class ChecklistItem(BaseModel):
     segment_id: Optional[str] = None   # target_type == "segment" 일 때
     target: str
     reason: str
+    # 기상특보 라벨('호우 주의보'). 프론트가 reason 문자열을 정규식으로 파싱하지 않도록
+    # 백엔드가 명시적으로 내려준다. 특보를 지정해 조회하면 그 조합, '전체'면 영향이
+    # 가장 큰 조합. 표본 미달 등으로 특정할 수 없으면 null.
+    alert: Optional[str] = None
     avg_delay_incr: float
     sample_n: int
     # 점검표 등급도 백엔드가 확정한다(프론트 임계값 제거). 표본 10건 미만은 애초에 목록에서 빠진다.

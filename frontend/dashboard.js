@@ -1155,14 +1155,26 @@ function renderRankings(vulnerabilitySegmentsData, vulnerabilityStationsData) {
   }
 }
 
+// 기상특보 라벨. API 가 item.alert 로 명시적으로 내려준다(권위값).
+// reason 문자열 파싱은 옛 응답용 폴백일 뿐이다 — 문구가 바뀌면 바로 깨지므로
+// 새 필드가 있으면 반드시 그쪽을 쓴다.
+function getAlertLabel(item) {
+  if (item && item.alert) {
+    return item.alert;
+  }
+
+  return getAlertLabelFromReason(item ? item.reason : "");
+}
+
 function getAlertLabelFromReason(reason) {
   if (!reason) {
     return "-";
   }
 
-  const match = reason.match(/^(.*?)\s시/);
+  // "호우 경보 시 …" 형태의 옛 문구에서만 동작한다.
+  const match = reason.match(/^(호우|폭염)\s*(주의보|경보)/);
 
-  return match ? match[1].replace(/\s/g, "") : "-";
+  return match ? `${match[1]} ${match[2]}` : "-";
 }
 
 function renderInspectionDetail(item, stations = []) {
@@ -1179,7 +1191,7 @@ function renderInspectionDetail(item, stations = []) {
   const fields = [
     ["대상", item.target || "-"],
     ["위험도", (RISK_LEVELS[riskLevel] || RISK_LEVELS.none).label],
-    ["기상특보", getAlertLabelFromReason(item.reason)],
+    ["기상특보", getAlertLabel(item)],
     ["주요 위험", item.reason || "-"],
     ["평균 지연 증가", Number.isFinite(item.avg_delay_incr) ? `+${item.avg_delay_incr.toFixed(1)}분` : "-"],
     ["분석 표본", Number.isFinite(item.sample_n) ? `${item.sample_n}건` : "-"],
@@ -1275,7 +1287,7 @@ function createInspectionRow(item, stations) {
   row.append(
     riskCell,
     createInspectionTargetCell(item, stations),
-    createRankingCell(getAlertLabelFromReason(item.reason)),
+    createRankingCell(getAlertLabel(item)),
     createRankingCell(item.reason || "-"),
     detailCell,
   );

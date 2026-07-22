@@ -19,6 +19,7 @@ api.py — B(백엔드) FastAPI. CONTRACT §5 를 그대로 노출한다.
 - 강수량(rain_mm) · 예보(forecast) · 강풍 · 대설 은 모두 응답에 없다.
 """
 from __future__ import annotations
+import re
 import json
 import os
 from datetime import datetime, timezone, timedelta
@@ -706,6 +707,11 @@ def get_checklist(line: str = "경부선"):
         for it in d.get("items", []):
             it.setdefault("risk_level",
                           classify_segment_risk(it.get("avg_delay_incr"), it.get("sample_n") or 0))
+            # mock 의 reason 은 "호우 경보 시 …" 형태라 앞부분이 특보 라벨이다.
+            # DB 응답과 같은 필드를 갖도록 여기서 채운다.
+            if it.get("alert") is None:
+                m = re.match(r"^(호우|폭염)\s*(주의보|경보)", it.get("reason") or "")
+                it["alert"] = f"{m.group(1)} {m.group(2)}" if m else None
         return d
     from db import fetch_all
     # 우선 점검 Top-N. 등급이 순위표·히트맵과 어긋나지 않도록 **같은 집계 단위**를 쓴다:
@@ -742,9 +748,12 @@ def get_checklist(line: str = "경부선"):
         "segment_id": segment_slug(r["from_station"], r["to_station"]),
         "target": f"{r['from_station']}→{r['to_station']} 구간",
         # 조합이 아니라 구간 전체 기준 사유(등급과 같은 근거).
+        # 우선 점검 대상 테이블에는 '기상특보' 칸이 따로 있다(아래 alert).
+        # 사유에까지 특보명을 반복하면 같은 정보가 두 번 나오므로 머리말을 생략한다.
         "reason": segment_risk_reason(
-            lvl, r["avg_delay_incr"], r["sample_n"],
-            alert=_dom_ck.get((r["from_station"], r["to_station"])), dominant=True),
+            lvl, r["avg_delay_incr"], r["sample_n"], show_alert=False),
+        # 기상특보 칸 전용. 프론트가 reason 을 파싱하지 않게 별도 필드로 준다.
+        "alert": _dom_ck.get((r["from_station"], r["to_station"])),
         "avg_delay_incr": _r1(r["avg_delay_incr"]), "sample_n": r["sample_n"],
         "risk_level": lvl,
     } for i, (lvl, r) in enumerate(cands[:10])]

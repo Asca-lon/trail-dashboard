@@ -115,19 +115,29 @@ def alert_label(alert_type: Optional[str], alert_level: Optional[str]) -> Option
     return f"{alert_type} {alert_level}"
 
 
-def _head(alert: Optional[str], dominant: bool) -> str:
+def _join(head: str, body: str) -> str:
+    """머리말이 비면 앞 공백 없이 본문만 남긴다."""
+    return f"{head} {body}".strip()
+
+
+def _head(alert: Optional[str], dominant: bool, show: bool = True) -> str:
     """사유 문구의 머리말.
 
     alert 없음      → '특보 시'          (기존 문구 유지)
     특정 조합 조회   → '폭염 경보 시'      (지표가 그 조합의 값이므로 그대로 단정)
-    전체 합산 조회   → '폭염 경보 영향 최대 ·'
+    전체 합산 조회   → '폭염 경보 영향 ·'
         ⚠️ 이때 지표는 여러 특보를 합친 가중평균이다. 특정 특보의 값이 아니므로
            '…시'라고 쓰면 그 특보만의 수치로 오독된다. 영향이 가장 큰 특보를
            '지목'만 하고 수치는 구간·역 전체 기준임을 문구로 구분한다.
+           (영향이 가장 큰 조합이라는 뜻)
     """
+    # show=False: 화면에 '기상특보' 칸이 따로 있어 문구에서 특보를 반복할 필요가 없을 때
+    # (예: /checklist 의 우선 점검 대상 테이블). 중복 표기를 피한다.
+    if not show:
+        return ""
     if not alert:
         return "특보 시"
-    return f"{alert} 영향 최대 ·" if dominant else f"{alert} 시"
+    return f"{alert} 영향 ·" if dominant else f"{alert} 시"
 
 
 # ── 사유(risk_reason) 문구 ────────────────────────────────────
@@ -140,20 +150,24 @@ def station_risk_reason(
     sample_n: int,
     alert: Optional[str] = None,
     dominant: bool = False,
+    show_alert: bool = True,
 ) -> str:
     # 표본 부족은 특보와 무관한 판정이므로 라벨을 붙이지 않는다.
     if level == "insufficient":
         return f"표본 {sample_n}건으로 판단 근거 부족"
-    h = _head(alert, dominant)
     if level == "high":
         if delta_delay is not None and delta_delay >= 5:
-            return f"{h} 평시보다 평균 지연이 {delta_delay:.1f}분 증가"
-        return f"{h} 지연율 {(delay_rate or 0):.0%}, 평시보다 {delta_delay:.1f}분 증가"
-    if level == "warning":
+            body = f"평시보다 평균 지연이 {delta_delay:.1f}분 증가"
+        else:
+            body = f"지연율 {(delay_rate or 0):.0%}, 평시보다 {delta_delay:.1f}분 증가"
+    elif level == "warning":
         if delta_delay is not None and delta_delay >= 2:
-            return f"{h} 평시보다 평균 지연이 {delta_delay:.1f}분 증가"
-        return f"{h} 지연율 {(delay_rate or 0):.0%}"
-    return f"{h} 평시 대비 지연 증가가 뚜렷하지 않음"
+            body = f"평시보다 평균 지연이 {delta_delay:.1f}분 증가"
+        else:
+            body = f"지연율 {(delay_rate or 0):.0%}"
+    else:
+        body = "평시 대비 지연 증가가 뚜렷하지 않음"
+    return _join(_head(alert, dominant, show_alert), body)
 
 
 def segment_risk_reason(
@@ -162,14 +176,13 @@ def segment_risk_reason(
     sample_n: int,
     alert: Optional[str] = None,
     dominant: bool = False,
+    show_alert: bool = True,
 ) -> str:
     if level == "insufficient":
         return f"표본 {sample_n}건으로 판단 근거 부족"
-    h = _head(alert, dominant)
-    if level == "high":
-        # 기존엔 '5분 이상'이라고만 했다. 화면의 avg_delay_incr 열과 같은 값을
-        # 문구에도 보여 주면 사유와 수치가 어긋나 보이지 않는다.
-        return f"{h} 구간 평균 신규 지연 {(avg_delay_incr or 0):.1f}분"
-    if level == "warning":
-        return f"{h} 구간 평균 신규 지연 {(avg_delay_incr or 0):.1f}분"
-    return f"{h} 구간 신규 지연이 크지 않음"
+    if level in ("high", "warning"):
+        # 화면의 avg_delay_incr 열과 같은 값을 문구에도 보여 사유와 수치가 어긋나지 않게 한다.
+        body = f"구간 평균 신규 지연 {(avg_delay_incr or 0):.1f}분"
+    else:
+        body = "구간 신규 지연이 크지 않음"
+    return _join(_head(alert, dominant, show_alert), body)
