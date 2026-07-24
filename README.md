@@ -207,6 +207,7 @@ trail-dashboard/
 | [`Docker_run.md`](./Docker_run.md) | 도커 설치·실행 상세 (OS별) |
 | [`TECH_STACK.md`](./TECH_STACK.md) | 사용 기술·버전 목록 |
 | [`server_RUN.md`](./server_RUN.md) | 서버(SSH·uvicorn) 직접 실행 |
+| [`API_GUIDE.md`](./API_GUIDE.md) | LLM,임베딩 모델 차이와 api키 설정방법 |
 | `.docs/` | 화면 설계·RAG·리팩터링 등 상세 설계 문서 |
 
 ---
